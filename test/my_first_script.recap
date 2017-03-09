@@ -9,7 +9,7 @@ ps_min_criteria.var = "PS"
 ps_min_criteria.mag = "200Pa"
 ps_min_criteria.dist = "4.0deg"
 ps_min_criteria.searchdist = "0.0"
-
+  
 warm_core_criteria = parameter_list()
 warm_core_criteria.var = "T(400hPa)"
 warm_core_criteria.mag = "-0.4K"
@@ -32,12 +32,12 @@ topo_threshold = parameter_list()
 topo_threshold.var = "ZS"
 topo_threshold.op = "<="
 topo_threshold.value = "70.0m"
-topo_threshold.number = "8"
+topo_threshold.number = 8
 
 stitch_param = parameter_list()
 stitch_param.range = "8.0deg"
 stitch_param.minduration = "8"
-stitch_param.maxgap = "2"
+stitch_param.maxgap = 2
 stitch_param.threshold = list(topo_threshold)
 
 cyclone_paths = stitch_nodes(stitch_param)
