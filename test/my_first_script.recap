@@ -1,0 +1,46 @@
+# The list of data files and grid can be specified on the command line
+# i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "gridfile=/mydata/mygrid.g" "datalookup=/mydata/mylookup.txt"
+data = data_file_list("*.nc")
+grid = grid_file("my_grid.g")
+datalookup = data_name_lookup_table("my_data_lookup_table.txt")
+
+ps_min_criteria = parameter_list()
+ps_min_criteria.var = "PS"
+ps_min_criteria.mag = "200Pa"
+ps_min_criteria.dist = "4.0deg"
+ps_min_criteria.searchdist = "0.0"
+
+warm_core_criteria = parameter_list()
+warm_core_criteria.var = "T(400hPa)"
+warm_core_criteria.mag = "-0.4K"
+warm_core_criteria.dist = "8.0deg"
+warm_core_criteria.searchdist = "1.1deg"
+
+wind_mag = variable("_VECMAG(U(850hPa),V(850hPa))")
+wind_mag.outputop = "max"
+wind_mag.dist = "4.0deg"
+
+dcu_param = parameter_list()
+dcu_param.searchbymin = "PS"
+dcu_param.mergedist = "2.0deg"
+dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
+dcu_param.output = ["lat", "lon", "PS", "ZS", wind_mag]
+
+candidates = point_search(dcu_param)
+
+topo_threshold = parameter_list()
+topo_threshold.var = "ZS"
+topo_threshold.op = "<="
+topo_threshold.value = "70.0m"
+topo_threshold.number = "8"
+
+stitch_param = parameter_list()
+stitch_param.range = "8.0deg"
+stitch_param.minduration = "8"
+stitch_param.maxgap = "2"
+stitch_param.threshold = list(topo_threshold)
+
+cyclone_paths = stitch_nodes(stitch_param)
+
+write_csv(cyclone_paths)
+
