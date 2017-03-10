@@ -14,6 +14,7 @@ FILES= Announce.cpp \
 	   Exception.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
+	   Object.cpp \
        Variable.cpp \
        kdtree.cpp
 

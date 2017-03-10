@@ -36,7 +36,7 @@ topo_threshold.number = 8
 
 stitch_param = parameter_list()
 stitch_param.range = "8.0deg"
-stitch_param.minduration = "8"
+stitch_param.minduration = 8
 stitch_param.maxgap = 2
 stitch_param.threshold = list(topo_threshold)
 

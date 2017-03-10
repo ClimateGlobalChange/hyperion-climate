@@ -21,10 +21,18 @@
 
 #include <string>
 #include <set>
+#include <vector>
+#include <map>
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class Object;
+
+typedef std::set<Object *> ObjectChildrenSet;
+
+typedef std::map<std::string, Object *> ObjectMap;
+
+typedef int ObjectIndex;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -33,11 +41,37 @@ class Object;
 ///	</summary>
 class ObjectRegistry {
 
+public:
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~ObjectRegistry();
+
+public:
+	///	<summary>
+	///		Get the Object with the specified name.
+	///	</summary>
+	Object * GetObject(
+		const std::string & strName
+	) const;
+
+	///	<summary>
+	///		Insert the Object with the specified name.
+	///	</summary>
+	///	<returns>
+	///		true if insertion is successful.  false if parent Object could
+	///		not be found in the ObjectRegistry.
+	///	</returns>
+	bool Insert(
+		const std::string & strName,
+		Object * pObject
+	);
+
 private:
 	///	<summary>
-	///		Set of Objects.
+	///		Map from Object name to Object instance.
 	///	</summary>
-	std::set<Object> m_setObject;
+	ObjectMap m_mapObjects;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,60 +81,207 @@ private:
 ///	</summary>
 class Object {
 
+friend class ObjectRegistry;
+
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
 	Object(const std::string & strName) :
-		m_strName(strName),
-		m_fOwnsData(false),
-		m_pData(NULL)
+		m_strName(strName)
 	{ }
 
 	///	<summary>
-	///		Destructor.
+	///		Virtual destructor.
 	///	</summary>
-	~Object() {
-		if (m_fOwnsData) {
-			free(m_pData);
-		}
-	}
-
-public:
-	///	<summary>
-	///		Inequality comparator.
-	///	</summary>
-	bool operator< (const Object & obj) {
-		return (m_strName < obj.m_strName);
+	virtual ~Object() {
 	}
 
 	///	<summary>
-	///		Equality comparator.
+	///		Self-duplicator.
 	///	</summary>
-	bool operator== (const Object & obj) {
-		return (m_strName == obj.m_strName);
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(new Object(strDuplicateName), objreg);
 	}
 
 protected:
 	///	<summary>
-	///		Name of the object.
+	///		Duplicate this object and its children.
+	///	</summary>
+	Object * _Duplicate(
+		Object * pobjDuplicate,
+		ObjectRegistry & objreg
+	) const;
+
+protected:
+	///	<summary>
+	///		Name of the Object.
 	///	</summary>
 	std::string m_strName;
 
 	///	<summary>
-	///		List of attributes.
+	///		List of child Objects.
 	///	</summary>
-	std::set<Object> m_setAttributes;
+	ObjectChildrenSet m_setChildren;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for representing String objects.
+///	</summary>
+class StringObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	StringObject(
+		const std::string & strName,
+		const std::string & strValue
+	) :
+		Object(strName),
+		m_strValue(strValue)
+	{ }
 
 	///	<summary>
-	///		Flag indicating that this object owns its data.
+	///		Self-duplicator.
 	///	</summary>
-	bool m_fOwnsData;
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new StringObject(strDuplicateName, m_strValue),
+			objreg);
+	}
+
+protected:
+	///	<summary>
+	///		String value of the Object.
+	///	</summary>
+	std::string m_strValue;
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for representing integer objects.
+///	</summary>
+class IntegerObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	IntegerObject(
+		const std::string & strName,
+		const int & iValue
+	) :
+		Object(strName),
+		m_iValue(iValue)
+	{ }
 
 	///	<summary>
-	///		Data associatd with this object.
+	///		Self-duplicator.
 	///	</summary>
-	void * m_pData;
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new IntegerObject(strDuplicateName, m_iValue),
+			objreg);
+	}
+
+protected:
+	///	<summary>
+	///		Integer value of the Object.
+	///	</summary>
+	int m_iValue;
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for representing floating point objects.
+///	</summary>
+class FloatingPointObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	FloatingPointObject(
+		const std::string & strName,
+		const double & dValue
+	) :
+		Object(strName),
+		m_dValue(dValue)
+	{ }
+
+	///	<summary>
+	///		Self-duplicator.
+	///	</summary>
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new FloatingPointObject(strDuplicateName, m_dValue),
+			objreg);
+	}
+
+protected:
+	///	<summary>
+	///		Double value of the Object.
+	///	</summary>
+	double m_dValue;
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for representing Variable operations.
+///	</summary>
+class VariableObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableObject(
+		const std::string & strName,
+		const std::string & strValue
+	) :
+		Object(strName),
+		m_strValue(strValue)
+	{ }
+
+	///	<summary>
+	///		Self-duplicator.
+	///	</summary>
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new VariableObject(strDuplicateName, m_strValue),
+			objreg);
+	}
+
+protected:
+	///	<summary>
+	///		String describing the Variable operation.
+	///	</summary>
+	std::string m_strValue;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////

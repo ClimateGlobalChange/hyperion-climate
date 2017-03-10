@@ -76,6 +76,14 @@ try {
 		iLine++;
 
 		// Parser state
+		enum ObjectType {
+			ObjectType_Token,
+			ObjectType_String,
+			ObjectType_Integer,
+			ObjectType_FloatingPoint,
+			ObjectType_Op
+		};
+
 		enum ParserState {
 			ParserState_WS,
 			ParserState_Token,
@@ -86,8 +94,9 @@ try {
 
 		// Parsed command line
 		std::vector<std::string> vecCommandLine;
-		std::vector<ParserState> vecCommandLineType;
+		std::vector<ObjectType> vecCommandLineType;
 
+		ObjectType objtype;
 		ParserState parse_state = ParserState_WS;
 
 		std::stack<char> stParentheses;
@@ -114,6 +123,7 @@ try {
 				} else if (((strLine[i] >= '0') && (strLine[i] <= '9')) ||
 					(strLine[i] == '.')
 				) {
+					objtype = ObjectType_Integer;
 					parse_state = ParserState_Number;
 					continue;
 
@@ -150,7 +160,15 @@ try {
 			} else if (parse_state == ParserState_Token) {
 				if (((strLine[i] >= 'A') && (strLine[i] <= 'Z')) ||
 				    ((strLine[i] >= 'a') && (strLine[i] <= 'z')) ||
-					(strLine[i] == '_')
+					(strLine[i] == '_') ||
+					(strLine[i] == '.')
+				) {
+					i++;
+					continue;
+
+				} else if (
+					(i != iPos) &&
+					((strLine[i] >= '0') && (strLine[i] <= '9'))
 				) {
 					i++;
 					continue;
@@ -160,7 +178,7 @@ try {
 						vecCommandLine.push_back(
 							strLine.substr(iPos, i-iPos));
 						vecCommandLineType.push_back(
-							ParserState_Token);
+							ObjectType_Token);
 						iPos = i;
 					}
 
@@ -170,15 +188,18 @@ try {
 						break;
 					}
 
-					if (
+					if (strLine[i] == '\"') {
+						Announce("ERROR: Unexpected character on line %i (%i)", iLine, i);
+						fError = true;
+						break;
+
+					} else if (
 						(strLine[i] == '=') ||
 						(strLine[i] == '(') ||
 						(strLine[i] == ')') ||
 						(strLine[i] == '[') ||
 						(strLine[i] == ']') ||
-						(strLine[i] == ',') ||
-						(strLine[i] == '\"') ||
-						(strLine[i] == '.')
+						(strLine[i] == ',')
 					) {
 						parse_state = ParserState_Op;
 						continue;
@@ -207,7 +228,7 @@ try {
 					vecCommandLine.push_back(
 						strLine.substr(iPos, i-iPos));
 					vecCommandLineType.push_back(
-						ParserState_String);
+						ObjectType_String);
 					parse_state = ParserState_Op;
 					continue;
 				}
@@ -218,6 +239,9 @@ try {
 				if (((strLine[i] >= '0') && (strLine[i] <= '9')) ||
 					(strLine[i] == '.')
 				) {
+					if ((strLine[i] == '.') && (objtype == ObjectType_Integer)) {
+						objtype = ObjectType_FloatingPoint;
+					}
 					i++;
 					continue;
 
@@ -226,7 +250,7 @@ try {
 						vecCommandLine.push_back(
 							strLine.substr(iPos, i-iPos));
 						vecCommandLineType.push_back(
-							ParserState_Number);
+							objtype);
 						iPos = i;
 					}
 
@@ -238,9 +262,8 @@ try {
 
 					if ((strLine[i] == '=') ||
 						(strLine[i] == '(') ||
-						(strLine[i] == ')') ||
 						(strLine[i] == '[') ||
-						(strLine[i] == ']')
+						(strLine[i] == '\"')
 					) {
 						Announce("ERROR: Unexpected character on line %i (%i)", iLine, i);
 						fError = true;
@@ -248,9 +271,9 @@ try {
 
 					} else if (
 						(strLine[i] == ',') ||
-						(strLine[i] == '\"') ||
-						(strLine[i] == '.')
-					) {
+						(strLine[i] == ')') ||
+						(strLine[i] == ']')
+					)  {
 						parse_state = ParserState_Op;
 						continue;
 
@@ -280,14 +303,14 @@ try {
 				} else if (strLine[i] == '(') {
 					stParentheses.push('(');
 					vecCommandLine.push_back("(");
-					vecCommandLineType.push_back(ParserState_Op);
-					parse_state = ParserState_Token;
+					vecCommandLineType.push_back(ObjectType_Op);
+					parse_state = ParserState_WS;
 
 				} else if (strLine[i] == '[') {
 					stParentheses.push('[');
 					vecCommandLine.push_back("[");
-					vecCommandLineType.push_back(ParserState_Op);
-					parse_state = ParserState_Token;
+					vecCommandLineType.push_back(ObjectType_Op);
+					parse_state = ParserState_WS;
 
 				} else if (strLine[i] == '\"') {
 					if ((stParentheses.size() != 0) &&
@@ -313,7 +336,8 @@ try {
 					}
 					stParentheses.pop();
 					vecCommandLine.push_back(")");
-					vecCommandLineType.push_back(ParserState_Op);
+					vecCommandLineType.push_back(ObjectType_Op);
+					parse_state = ParserState_WS;
 
 				} else if (strLine[i] == ']') {
 					if (stParentheses.size() == 0) {
@@ -328,22 +352,18 @@ try {
 					}
 					stParentheses.pop();
 					vecCommandLine.push_back("]");
-					vecCommandLineType.push_back(ParserState_Op);
+					vecCommandLineType.push_back(ObjectType_Op);
+					parse_state = ParserState_WS;
 
 				} else if (strLine[i] == '=') {
 					vecCommandLine.push_back("=");
-					vecCommandLineType.push_back(ParserState_Op);
+					vecCommandLineType.push_back(ObjectType_Op);
 					parse_state = ParserState_WS;
 
 				} else if (strLine[i] == ',') {
 					vecCommandLine.push_back(",");
-					vecCommandLineType.push_back(ParserState_Op);
+					vecCommandLineType.push_back(ObjectType_Op);
 					parse_state = ParserState_WS;
-
-				} else if (strLine[i] == '.') {
-					vecCommandLine.push_back(".");
-					vecCommandLineType.push_back(ParserState_Op);
-					parse_state = ParserState_Token;
 
 				} else {
 					Announce("ERROR: Unexpected character on line %i (%i)", iLine, i);
@@ -359,6 +379,10 @@ try {
 			_EXCEPTIONT("CommandLine/CommandLineType mismatch");
 		}
 
+		if (fError) {
+			return (-1);
+		}
+
 		if (parse_state == ParserState_String) {
 			Announce("ERROR: Unbalanced quotation marks on line %i", iLine);
 			return (-1);
@@ -367,11 +391,12 @@ try {
 			Announce("ERROR: Unbalanced parenthesis or bracket on line %i", iLine);
 			return (-1);
 		}
-
-		if (fError) {
-			return (-1);
+/*
+		for (int i = 0; i < vecCommandLine.size(); i++) {
+			printf("%s:", vecCommandLine[i].c_str());
 		}
-
+		printf("\n");
+*/
 		// Blank command line (do nothing)
 		if (vecCommandLine.size() == 0) {
 			continue;
@@ -381,38 +406,141 @@ try {
 			Announce("ERROR: Syntax error on line %i", iLine);
 			return (-1);
 
-		// Assignment
+		// Assignment or Evaluate op
 		} else {
 			int iAssignmentOp = (-1);
 			int iEvaluateOp = (-1);
 			for (int i = 0; i < vecCommandLine.size(); i++) {
-				if ((vecCommandLineType[i] == ParserState_Op) &&
+				if ((vecCommandLineType[i] == ObjectType_Op) &&
 				    (vecCommandLine[i] == "=")
 				) {
 					if (iEvaluateOp != (-1)) {
 						Announce("ERROR: Syntax error on line %i", iLine);
 						return (-1);
 					}
+					if (i != 1) {
+						Announce("ERROR: Syntax error on line %i", iLine);
+						return (-1);
+					}
 					iAssignmentOp = i;
 				}
-				if ((vecCommandLineType[i] == ParserState_Op) &&
+				if ((vecCommandLineType[i] == ObjectType_Op) &&
 				    (vecCommandLine[i] == "(")
 				) {
 					iEvaluateOp = i;
 				}
 			}
 
+			// Assignment but insufficient tokens in line
+			if ((iAssignmentOp != (-1)) && (vecCommandLine.size() < 3)) {
+				Announce("ERROR: Syntax error in assignment on line %i", iLine);
+				return (-1);
+			}
+
+			// No assignment or function evaluation: syntax error
 			if ((iAssignmentOp == (-1)) && (iEvaluateOp == (-1))) {
 				Announce("ERROR: Syntax error on line %i", iLine);
 				return (-1);
 			}
-		}
 
-		for (int i = 0; i < vecCommandLine.size(); i++) {
-			printf("%s:", vecCommandLine[i].c_str());
-		}
-		printf("\n");
+			// Assignment of primitive type to LHS
+			if ((iAssignmentOp != (-1)) && (iEvaluateOp == (-1))) {
+				bool fSuccess = true;
 
+				// String type on RHS
+				if (vecCommandLineType[2] == ObjectType_String) {
+					fSuccess =
+						objreg.Insert(
+							vecCommandLine[0],
+							new StringObject(
+								vecCommandLine[0],
+								vecCommandLine[2]));
+
+				// Integer type on RHS
+				} else if (vecCommandLineType[2] == ObjectType_Integer) {
+					//printf("INT: %s %i\n", vecCommandLine[0].c_str(), atoi(vecCommandLine[2].c_str()));
+					fSuccess =
+						objreg.Insert(
+							vecCommandLine[0],
+							new IntegerObject(
+								vecCommandLine[0],
+								atoi(vecCommandLine[2].c_str())));
+
+				// Floating point type on RHS
+				} else if (vecCommandLineType[2] == ObjectType_FloatingPoint) {
+					//printf("FLT: %s %1.5e\n", vecCommandLine[0].c_str(), atof(vecCommandLine[2].c_str()));
+					fSuccess =
+						objreg.Insert(
+							vecCommandLine[0],
+							new FloatingPointObject(
+								vecCommandLine[0],
+								atof(vecCommandLine[2].c_str())));
+
+				// Object type on RHS
+				} else if (vecCommandLineType[2] == ObjectType_Token) {
+					Object * obj = objreg.GetObject(vecCommandLine[2]);
+					if (obj != NULL) {
+						obj->Duplicate(vecCommandLine[0], objreg);
+					} else {
+						fSuccess = false;
+					}
+
+				// List type on RHS
+				} else if (
+					(vecCommandLineType[2] == ObjectType_Op) &&
+					(vecCommandLine[2] == "[")
+				) {
+					printf("LIST: %s\n", vecCommandLine[0].c_str());
+
+				} else {
+					Announce("ERROR: Invalid RHS in assignment on line %i", iLine);
+					return (-1);
+				}
+
+				if (!fSuccess) {
+					Announce("ERROR: Invalid assignment on line %i", iLine);
+					return (-1);
+				}
+			}
+
+			// Assignment of function to LHS
+			if ((iAssignmentOp != (-1)) && (iEvaluateOp != (-1))) {
+
+				// parameter_list() type
+				if (vecCommandLine[2] == "parameter_list") {
+					//printf("PLI: %s\n", vecCommandLine[0].c_str()); 
+					objreg.Insert(
+						vecCommandLine[0],
+						new Object(vecCommandLine[0]));
+
+				// variable(STRING) type
+				} else if (vecCommandLine[2] == "variable") {
+					if (vecCommandLine.size() != 6) {
+						Announce("ERROR: Variable op declaration missing"
+							" operation on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLine[3] != "(") {
+						Announce("ERROR: Syntax error on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLineType[4] != ObjectType_String) {
+						Announce("ERROR: Invalid variable op declaration on line %i", iLine);
+						return (-1);
+					}
+					//printf("VAR: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
+					objreg.Insert(
+						vecCommandLine[0],
+						new VariableObject(
+							vecCommandLine[0], vecCommandLine[4]));
+
+				// Unknown function (keep as a WARNING for now)
+				} else {
+					Announce("WARNING: Unknown function \"%s\" on line %i",
+						vecCommandLine[2].c_str(), iLine);
+				}
+			}
+		}
 	}
 
 } catch(Exception & e) {
