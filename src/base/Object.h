@@ -56,13 +56,20 @@ public:
 	) const;
 
 	///	<summary>
-	///		Insert the Object with the specified name.
+	///		Remove the Object with the specified name.
+	///	</summary>
+	void Remove(
+		const std::string & strName
+	);
+
+	///	<summary>
+	///		Assign the Object with the specified name.
 	///	</summary>
 	///	<returns>
 	///		true if insertion is successful.  false if parent Object could
 	///		not be found in the ObjectRegistry.
 	///	</returns>
-	bool Insert(
+	bool Assign(
 		const std::string & strName,
 		Object * pObject
 	);
@@ -281,6 +288,31 @@ protected:
 	///		String describing the Variable operation.
 	///	</summary>
 	std::string m_strValue;
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for registering Objects.
+///	</summary>
+class ListObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ListObject(
+		const std::string & strName
+	) :
+		Object(strName)
+	{ }
+
+protected:
+	///	<summary>
+	///		Vector of Objects in this List.
+	///	</summary>
+	std::vector<Object *> m_vecObjects;
 
 };
 

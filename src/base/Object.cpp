@@ -43,16 +43,41 @@ Object * ObjectRegistry::GetObject(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool ObjectRegistry::Insert(
+void ObjectRegistry::Remove(
+	const std::string & strName
+) {
+	// Check if this Object already exists
+	ObjectMap::iterator iter = m_mapObjects.find(strName);
+	if (iter == m_mapObjects.end()) {
+		_EXCEPTION1("Object \"%s\" not found in registry", strName.c_str());
+	}
+
+	printf("REMOVE %s\n", strName.c_str());
+
+	// Remove all children of this Object
+	ObjectChildrenSet::const_iterator iterChildren
+		= iter->second->m_setChildren.begin();
+	for (; iterChildren != iter->second->m_setChildren.end(); iterChildren++) {
+		Remove((*iterChildren)->m_strName);
+	}
+
+	// Remove this Object
+	delete (iter->second);
+	m_mapObjects.erase(iter);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool ObjectRegistry::Assign(
 	const std::string & strName,
 	Object * pObject
 ) {
-	//printf("INSERT %s\n", strName.c_str());
+	//printf("ASSIGN %s\n", strName.c_str());
 
 	// Check if this Object already exists
 	ObjectMap::const_iterator iter = m_mapObjects.find(strName);
 	if (iter != m_mapObjects.end()) {
-		_EXCEPTION1("Duplicate Object \"%s\"", strName.c_str());
+		Remove(strName);
 	}
 
 	// Add the Object to its parent
@@ -64,7 +89,7 @@ bool ObjectRegistry::Insert(
 		}
 	}
 
-	// Insert the Object into the parent's array
+	// Assign the Object into the parent's array
 	if (strParent != "") {
 		ObjectMap::const_iterator iterParent = m_mapObjects.find(strParent);
 		if (iterParent == m_mapObjects.end()) {
@@ -75,7 +100,7 @@ bool ObjectRegistry::Insert(
 		iterParent->second->m_setChildren.insert(pObject);
 	}
 
-	// Insert the Object into the ObjectRegistry
+	// Assign the Object into the ObjectRegistry
 	m_mapObjects.insert(
 		ObjectMap::value_type(strName, pObject));
 
@@ -90,7 +115,7 @@ Object * Object::_Duplicate(
 	Object * pobjDuplicate,
 	ObjectRegistry & objreg
 ) const {
-	bool fSuccess = objreg.Insert(pobjDuplicate->m_strName, pobjDuplicate);
+	bool fSuccess = objreg.Assign(pobjDuplicate->m_strName, pobjDuplicate);
 	if (!fSuccess) {
 		_EXCEPTIONT("Failed to insert Object into registry");
 	}

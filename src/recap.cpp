@@ -450,7 +450,7 @@ try {
 				// String type on RHS
 				if (vecCommandLineType[2] == ObjectType_String) {
 					fSuccess =
-						objreg.Insert(
+						objreg.Assign(
 							vecCommandLine[0],
 							new StringObject(
 								vecCommandLine[0],
@@ -460,7 +460,7 @@ try {
 				} else if (vecCommandLineType[2] == ObjectType_Integer) {
 					//printf("INT: %s %i\n", vecCommandLine[0].c_str(), atoi(vecCommandLine[2].c_str()));
 					fSuccess =
-						objreg.Insert(
+						objreg.Assign(
 							vecCommandLine[0],
 							new IntegerObject(
 								vecCommandLine[0],
@@ -470,7 +470,7 @@ try {
 				} else if (vecCommandLineType[2] == ObjectType_FloatingPoint) {
 					//printf("FLT: %s %1.5e\n", vecCommandLine[0].c_str(), atof(vecCommandLine[2].c_str()));
 					fSuccess =
-						objreg.Insert(
+						objreg.Assign(
 							vecCommandLine[0],
 							new FloatingPointObject(
 								vecCommandLine[0],
@@ -509,7 +509,7 @@ try {
 				// parameter_list() type
 				if (vecCommandLine[2] == "parameter_list") {
 					//printf("PLI: %s\n", vecCommandLine[0].c_str()); 
-					objreg.Insert(
+					objreg.Assign(
 						vecCommandLine[0],
 						new Object(vecCommandLine[0]));
 
@@ -529,7 +529,7 @@ try {
 						return (-1);
 					}
 					//printf("VAR: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					objreg.Insert(
+					objreg.Assign(
 						vecCommandLine[0],
 						new VariableObject(
 							vecCommandLine[0], vecCommandLine[4]));
