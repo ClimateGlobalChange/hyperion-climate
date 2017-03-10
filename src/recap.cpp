@@ -76,14 +76,6 @@ try {
 		iLine++;
 
 		// Parser state
-		enum ObjectType {
-			ObjectType_Token,
-			ObjectType_String,
-			ObjectType_Integer,
-			ObjectType_FloatingPoint,
-			ObjectType_Op
-		};
-
 		enum ParserState {
 			ParserState_WS,
 			ParserState_Token,
@@ -447,58 +439,76 @@ try {
 			if ((iAssignmentOp != (-1)) && (iEvaluateOp == (-1))) {
 				bool fSuccess = true;
 
-				// String type on RHS
-				if (vecCommandLineType[2] == ObjectType_String) {
-					fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new StringObject(
-								vecCommandLine[0],
-								vecCommandLine[2]));
-
-				// Integer type on RHS
-				} else if (vecCommandLineType[2] == ObjectType_Integer) {
-					//printf("INT: %s %i\n", vecCommandLine[0].c_str(), atoi(vecCommandLine[2].c_str()));
-					fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new IntegerObject(
-								vecCommandLine[0],
-								atoi(vecCommandLine[2].c_str())));
-
-				// Floating point type on RHS
-				} else if (vecCommandLineType[2] == ObjectType_FloatingPoint) {
-					//printf("FLT: %s %1.5e\n", vecCommandLine[0].c_str(), atof(vecCommandLine[2].c_str()));
-					fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new FloatingPointObject(
-								vecCommandLine[0],
-								atof(vecCommandLine[2].c_str())));
-
-				// Object type on RHS
-				} else if (vecCommandLineType[2] == ObjectType_Token) {
-					Object * obj = objreg.GetObject(vecCommandLine[2]);
-					if (obj != NULL) {
-						obj->Duplicate(vecCommandLine[0], objreg);
-					} else {
-						fSuccess = false;
-					}
-
 				// List type on RHS
-				} else if (
-					(vecCommandLineType[2] == ObjectType_Op) &&
+				if ((vecCommandLineType[2] == ObjectType_Op) &&
 					(vecCommandLine[2] == "[")
 				) {
 					printf("LIST: %s\n", vecCommandLine[0].c_str());
 
+					ListObject * pobjList = new ListObject(vecCommandLine[0]);
+
+					objreg.Assign(
+						vecCommandLine[0],
+						pobjList);
+
+					int iListEntry = 0;
+					for (int i = 3; i < vecCommandLine.size(); i++) {
+
+						if (vecCommandLine[i] == "]") {
+							break;
+						}
+						if (vecCommandLine[i] == ",") {
+							if (iListEntry == 0) {
+								Announce("ERROR: Malformed list after entry 0 on line %i",
+									iLine);
+								return (-1);
+
+							} else {
+								i++;
+							}
+
+						} else if (iListEntry != 0) {
+							Announce("ERROR: Malformed list after entry %i on line %i",
+								iListEntry, iLine);
+							return (-1);
+						}
+
+						std::string strChildName =
+							vecCommandLine[0] + "._" + std::to_string(iListEntry);
+/*
+						printf("%i %i %i %s %s\n",
+							i, iListEntry,
+							vecCommandLineType[i],
+							strChildName.c_str(),
+							vecCommandLine[i].c_str());
+*/
+						fSuccess =
+							objreg.Create(
+								vecCommandLineType[i],
+								strChildName,
+								vecCommandLine[i]);
+
+						if (!fSuccess) {
+							Announce("ERROR: Invalid list entry %i on line %i",
+								iListEntry, iLine);
+							return (-1);
+						}
+
+						pobjList->PushBack(strChildName);
+						iListEntry++;
+					}
+
+				// Try to create the object as a primitive
 				} else {
-					Announce("ERROR: Invalid RHS in assignment on line %i", iLine);
-					return (-1);
+					fSuccess =
+						objreg.Create(
+							vecCommandLineType[2],
+							vecCommandLine[0],
+							vecCommandLine[2]);
 				}
 
 				if (!fSuccess) {
-					Announce("ERROR: Invalid assignment on line %i", iLine);
+					Announce("ERROR: Invalid RHS in assignment on line %i", iLine);
 					return (-1);
 				}
 			}

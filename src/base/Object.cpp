@@ -16,6 +16,8 @@
 
 #include "Object.h"
 
+#include <cstdlib>
+
 ///////////////////////////////////////////////////////////////////////////////
 // ObjectRegistry
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,6 +41,56 @@ Object * ObjectRegistry::GetObject(
 	} else {
 		return (iter->second);
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool ObjectRegistry::Create(
+	const ObjectType & objtype,
+	const std::string & strName,
+	const std::string & strValue
+) {
+	// String type on RHS
+	if (objtype == ObjectType_String) {
+		return Assign(
+			strName,
+			new StringObject(
+				strName,
+				strValue));
+
+	// Integer type on RHS
+	} else if (objtype == ObjectType_Integer) {
+		return Assign(
+			strName,
+			new IntegerObject(
+				strName,
+				atoi(strValue.c_str())));
+
+	// Floating point type on RHS
+	} else if (objtype == ObjectType_FloatingPoint) {
+		return Assign(
+			strName,
+			new FloatingPointObject(
+				strName,
+				atof(strValue.c_str())));
+
+	// Object type on RHS
+	} else if (objtype == ObjectType_Token) {
+		Object * pobj = GetObject(strValue);
+		if (pobj != NULL) {
+			Object * pobjDuplicate = pobj->Duplicate(strName, *this);
+			if (pobjDuplicate != NULL) {
+				return true;
+			} else {
+				_EXCEPTIONT("Unknown error");
+			}
+		} else {
+			return false;
+		}
+	}
+
+	// Invalid type
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

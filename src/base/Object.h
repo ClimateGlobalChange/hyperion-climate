@@ -36,6 +36,20 @@ typedef int ObjectIndex;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+typedef int ObjectType;
+
+static const ObjectType ObjectType_Op = 0;
+
+static const ObjectType ObjectType_Token = 1;
+
+static const ObjectType ObjectType_String = 2;
+
+static const ObjectType ObjectType_Integer = 3;
+
+static const ObjectType ObjectType_FloatingPoint = 4;
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A class for registering Objects.
 ///	</summary>
@@ -54,6 +68,15 @@ public:
 	Object * GetObject(
 		const std::string & strName
 	) const;
+
+	///	<summary>
+	///		Create an Object of the given type.
+	///	</summary>
+	bool Create(
+		const ObjectType & objtype,
+		const std::string & strName,
+		const std::string & strValue
+	);
 
 	///	<summary>
 	///		Remove the Object with the specified name.
@@ -308,11 +331,20 @@ public:
 		Object(strName)
 	{ }
 
+	///	<summary>
+	///		Add an Object to the ListObject.
+	///	</summary>
+	void PushBack(
+		const std::string & strObject
+	) {
+		m_vecObjectNames.push_back(strObject);
+	}
+
 protected:
 	///	<summary>
-	///		Vector of Objects in this List.
+	///		Vector of Object names in this ListObject.
 	///	</summary>
-	std::vector<Object *> m_vecObjects;
+	std::vector<std::string> m_vecObjectNames;
 
 };
 
