@@ -1,6 +1,6 @@
 # The list of data files and grid can be specified on the command line
 # i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "gridfile=/mydata/mygrid.g" "datalookup=/mydata/mylookup.txt"
-data = data_file_list("*.nc")
+datafiles = file_list("*.nc")
 grid = grid_file("nhemi_30_x4.g")
 datalookup = data_name_lookup_table("my_data_lookup_table.txt")
 

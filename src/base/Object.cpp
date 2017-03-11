@@ -141,7 +141,7 @@ bool ObjectRegistry::Assign(
 		}
 	}
 
-	// Assign the Object into the parent's array
+	// Put a pointer to the Object into the parent's array
 	if (strParent != "") {
 		ObjectMap::const_iterator iterParent = m_mapObjects.find(strParent);
 		if (iterParent == m_mapObjects.end()) {
@@ -179,7 +179,7 @@ Object * Object::_Duplicate(
 	ObjectChildrenSet::const_iterator iter = m_setChildren.begin();
 	for (; iter != m_setChildren.end(); iter++) {
 
-		printf("ORIGINAL CHILD %s\n", (*iter)->m_strName.c_str());
+		//printf("ORIGINAL CHILD %s\n", (*iter)->m_strName.c_str());
 		std::string strNewChildName =
 			pobjDuplicate->m_strName
 			+ (*iter)->m_strName.substr(

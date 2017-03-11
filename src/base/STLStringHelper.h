@@ -54,6 +54,38 @@ inline static void ToUpper(std::string &str) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Wildcard matching function from StackExchange:
+///		http://stackoverflow.com/questions/3300419/file-name-matching-with-wildcard
+///	</summary>
+static bool WildcardMatch(
+	const char * needle,
+	const char * haystack
+) {
+    for (; *needle!='\0'; ++needle) {
+        switch (*needle) {
+        case '?': ++haystack;   
+                break;
+        case '*': {
+            size_t max = strlen(haystack);
+            if (needle[1] == '\0' || max == 0)
+                return true;
+            for (size_t i = 0; i < max; i++)
+                if (WildcardMatch(needle+1, haystack + i))
+                    return true;
+            return false;
+        }
+        default:
+            if (*haystack != *needle)
+                return false;
+            ++haystack;
+        }       
+    }
+    return (*haystack == '\0');
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 };
 
 #endif

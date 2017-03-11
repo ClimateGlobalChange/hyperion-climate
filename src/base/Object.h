@@ -137,6 +137,13 @@ public:
 		return _Duplicate(new Object(strDuplicateName), objreg);
 	}
 
+	///	<summary>
+	///		Number of children in Object.
+	///	</summary>
+	size_t ChildrenCount() const {
+		return m_setChildren.size();
+	}
+
 protected:
 	///	<summary>
 	///		Duplicate this object and its children.

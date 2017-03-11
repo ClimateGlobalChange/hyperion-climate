@@ -15,6 +15,7 @@ FILES= Announce.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
 	   Object.cpp \
+	   FileListObject.cpp \
        Variable.cpp \
        kdtree.cpp \
 	   LegendrePolynomial.cpp \

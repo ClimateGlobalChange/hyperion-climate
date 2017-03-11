@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    GridObject.h
+///	\file    FileListObject.h
 ///	\author  Paul Ullrich
 ///	\version March 10, 2017
 ///
 ///	<remarks>
-///		Copyright 2000- Paul Ullrich
+///		Copyright 2016- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -14,15 +14,11 @@
 ///		or implied warranty.
 ///	</remarks>
 
-#ifndef _GRIDOBJECT_H_
-#define _GRIDOBJECT_H_
+#ifndef _FILELISTOBJECT_H_
+#define _FILELISTOBJECT_H_
 
 #include "Announce.h"
 #include "Object.h"
-#include "DataArray1D.h"
-#include "GridElements.h"
-
-#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -30,27 +26,16 @@
 ///		A data structure describing the grid, including coordinates of
 ///		each data point and graph connectivity of elements.
 ///	</summary>
-class GridObject : public Object {
+class FileListObject : public ListObject {
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	GridObject(
+	FileListObject(
 		const std::string & strName
 	) :
-		Object(strName)
-	{ }
-
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	GridObject(
-		const std::string & strName,
-		const std::string & strMeshFile
-	) :
-		Object(strName),
-		m_mesh(strMeshFile)
+		ListObject(strName)
 	{ }
 
 	///	<summary>
@@ -60,29 +45,23 @@ public:
 		const std::string & strDuplicateName,
 		ObjectRegistry & objreg
 	) const {
-		Announce("ERROR: Grid objects cannot be duplicated");
-		return (NULL);
+		return _Duplicate(
+			new FileListObject(strDuplicateName),
+			objreg);
 	}
 
 public:
 	///	<summary>
-	///		Get a reference to the Mesh.
+	///		Populate from a search string.
 	///	</summary>
-	const Mesh & GetMesh() const {
-		return m_mesh;
-	}
-
-protected:
-	///	<summary>
-	///		Mesh associated with this Grid.
-	///	</summary>
-	Mesh m_mesh;
-
-public:
-	///	<summary>
-	///		Grid dimensions.
-	///	</summary>
-	std::vector<size_t> m_nGridDim;
+	///	<returns>
+	///		false if the directory specified by strSearchString does
+	///		not exist.  true otherwise.
+	///	</returns>
+	bool PopulateFromSearchString(
+		const std::string & strSearchString,
+		ObjectRegistry & objreg
+	);
 };
 
 ///////////////////////////////////////////////////////////////////////////////

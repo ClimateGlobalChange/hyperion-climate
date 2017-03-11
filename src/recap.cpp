@@ -19,6 +19,8 @@
 #include "Announce.h"
 #include "Object.h"
 #include "Variable.h"
+#include "GridObject.h"
+#include "FileListObject.h"
 
 #include <iostream>
 #include <fstream>
@@ -547,7 +549,7 @@ try {
 				// grid(STRING) type
 				} else if (vecCommandLine[2] == "grid_file") {
 					if (vecCommandLine.size() != 6) {
-						Announce("ERROR: grid_file filename missing"
+						Announce("ERROR: grid_file filename argument missing"
 							" on line %i", iLine);
 						return (-1);
 					}
@@ -556,7 +558,7 @@ try {
 						return (-1);
 					}
 					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid variable op declaration on line %i", iLine);
+						Announce("ERROR: Invalid grid_file declaration on line %i", iLine);
 						return (-1);
 					}
 
@@ -565,6 +567,37 @@ try {
 						vecCommandLine[0],
 						new GridObject(
 							vecCommandLine[0], vecCommandLine[4]));
+
+				// file_list(STRING) type
+				} else if (vecCommandLine[2] == "file_list") {
+					if (vecCommandLine.size() != 6) {
+						Announce("ERROR: file_list search string argument missing"
+							" on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLine[3] != "(") {
+						Announce("ERROR: Syntax error on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLineType[4] != ObjectType_String) {
+						Announce("ERROR: Invalid file_list declaration on line %i", iLine);
+						return (-1);
+					}
+
+					printf("FILELIST: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
+					FileListObject * pObj =
+						new FileListObject(
+							vecCommandLine[0]);
+
+					objreg.Assign(vecCommandLine[0], pObj);
+
+					pObj->PopulateFromSearchString(
+							vecCommandLine[4],
+							objreg);
+
+					Announce("file_list %s contains %i entries",
+						vecCommandLine[0].c_str(),
+						pObj->ChildrenCount());
 
 				// Unknown function (keep as a WARNING for now)
 				} else {
