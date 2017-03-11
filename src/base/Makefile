@@ -16,7 +16,11 @@ FILES= Announce.cpp \
        TimeObj.cpp \
 	   Object.cpp \
        Variable.cpp \
-       kdtree.cpp
+       kdtree.cpp \
+	   LegendrePolynomial.cpp \
+	   GaussQuadrature.cpp \
+	   MeshUtilitiesFuzzy.cpp \
+	   GridElements.cpp
 
 LIB_TARGET= libhyperionbase.a
 

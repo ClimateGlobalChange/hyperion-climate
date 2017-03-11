@@ -311,7 +311,6 @@ protected:
 	///		String describing the Variable operation.
 	///	</summary>
 	std::string m_strValue;
-
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -331,6 +330,19 @@ public:
 		Object(strName)
 	{ }
 
+	///	<summary>
+	///		Self-duplicator.
+	///	</summary>
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new ListObject(strDuplicateName),
+			objreg);
+	}
+
+public:
 	///	<summary>
 	///		Add an Object to the ListObject.
 	///	</summary>

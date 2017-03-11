@@ -20,7 +20,7 @@
 #include "netcdfcpp.h"
 
 #include "DataArray1D.h"
-#include "SimpleGrid.h"
+#include "GridObject.h"
 
 #include <vector>
 
@@ -130,7 +130,7 @@ public:
 	void LoadGridData(
 		VariableRegistry & varreg,
 		NcFileVector & vecFiles,
-		const SimpleGrid & grid,
+		const GridObject & grid,
 		int iTime = (-1)
 	);
 

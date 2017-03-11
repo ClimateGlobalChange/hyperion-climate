@@ -300,27 +300,28 @@ NcVar * Variable::GetFromNetCDF(
 void Variable::LoadGridData(
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
-	const SimpleGrid & grid,
+	const GridObject & grid,
 	int iTime
 ) {
+	// The grid's mesh
+	const Mesh & mesh = grid.GetMesh();
+
 	// Check if data already loaded
 	if (iTime == m_iTime) {
-		if (m_data.GetRows() != grid.GetSize()) {
+		if (m_data.GetRows() != mesh.faces.size()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
 	if (m_fNoTimeInNcFile) {
-		if (m_data.GetRows() != grid.GetSize()) {
+		if (m_data.GetRows() != mesh.faces.size()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
 
-	//std::cout << "Loading " << ToString(varreg) << " " << iTime << std::endl;
-
 	// Allocate data
-	m_data.Allocate(grid.GetSize());
+	m_data.Allocate(mesh.faces.size());
 	m_iTime = iTime;
 
 	// Get the data directly from a variable
@@ -483,7 +484,7 @@ void Variable::LoadGridData(
 		}
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = 2.0 * 7.2921e-5 * sin(grid.m_dLat[i]);
+			m_data[i] = 2.0 * 7.2921e-5 * sin(mesh.dLat[i]);
 		}
 
 	// Evaluate the mean operator
@@ -491,6 +492,11 @@ void Variable::LoadGridData(
 		if (m_varArg.size() != 2) {
 			_EXCEPTION1("_MEAN expects two arguments: %i given",
 				m_varArg.size());
+		}
+
+		// Check for adjacency list
+		if (mesh.adjlist.size() == 0) {
+			_EXCEPTIONT("Adjacency list not available for Grid");
 		}
 
 		// Obtain field and distance
@@ -510,7 +516,7 @@ void Variable::LoadGridData(
 		// Calculate mean of field
 		m_data.Zero();
 
-		if (grid.m_vecConnectivity.size() != m_data.GetRows()) {
+		if (mesh.adjlist.size() != m_data.GetRows()) {
 			_EXCEPTIONT("Invalid grid connectivity array");
 		}
 
@@ -519,8 +525,8 @@ void Variable::LoadGridData(
 			std::set<int> setNodesToVisit;
 			setNodesToVisit.insert(i);
 
-			double dLat0 = grid.m_dLat[i];
-			double dLon0 = grid.m_dLon[i];
+			double dLat0 = mesh.dLat[i];
+			double dLon0 = mesh.dLon[i];
 
 			while (setNodesToVisit.size() != 0) {
 
@@ -534,8 +540,9 @@ void Variable::LoadGridData(
 				m_data[i] += varField.m_data[j];
 
 				// Find additional neighbors to explore
-				for (int k = 0; k < grid.m_vecConnectivity[j].size(); k++) {
-					int l = grid.m_vecConnectivity[j][k];
+				std::set<int>::const_iterator iter = mesh.adjlist[j].begin();
+				for (; iter != mesh.adjlist[j].end(); iter++) {
+					int l = (*iter);
 
 					// Check if already visited
 					if (setNodesVisited.find(l) != setNodesVisited.end()) {
@@ -543,8 +550,8 @@ void Variable::LoadGridData(
 					}
 
 					// Test that this node satisfies the distance criteria
-					double dLat1 = grid.m_dLat[l];
-					double dLon1 = grid.m_dLon[l];
+					double dLat1 = mesh.dLat[l];
+					double dLon1 = mesh.dLon[l];
 
 					double dR =
 						sin(dLat0) * sin(dLat1)

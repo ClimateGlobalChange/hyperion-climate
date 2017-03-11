@@ -544,6 +544,28 @@ try {
 						new VariableObject(
 							vecCommandLine[0], vecCommandLine[4]));
 
+				// grid(STRING) type
+				} else if (vecCommandLine[2] == "grid_file") {
+					if (vecCommandLine.size() != 6) {
+						Announce("ERROR: grid_file filename missing"
+							" on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLine[3] != "(") {
+						Announce("ERROR: Syntax error on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLineType[4] != ObjectType_String) {
+						Announce("ERROR: Invalid variable op declaration on line %i", iLine);
+						return (-1);
+					}
+
+					printf("GRID: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
+					objreg.Assign(
+						vecCommandLine[0],
+						new GridObject(
+							vecCommandLine[0], vecCommandLine[4]));
+
 				// Unknown function (keep as a WARNING for now)
 				} else {
 					Announce("WARNING: Unknown function \"%s\" on line %i",
