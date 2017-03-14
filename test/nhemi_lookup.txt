@@ -1,0 +1,10 @@
+# This is an example variable lookup table, used to map the native naming
+# conventions to CF-compliant conventions.  The file contains either 2 or 3
+# columns, corresponding the CF-complaint name, the native variable name,
+# and (optionally) the units used by the native variable
+
+# CF-Compliant    Native       Units
+# Name            Name
+
+U(850hPa)         U850         m/s
+V(850hPa)         V850         m/s

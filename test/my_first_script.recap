@@ -2,7 +2,7 @@
 # i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "gridfile=/mydata/mygrid.g" "datalookup=/mydata/mylookup.txt"
 datafiles = file_list("*.nc")
 grid = grid_file("nhemi_30_x4.g")
-datalookup = data_name_lookup_table("my_data_lookup_table.txt")
+varlookup = variable_lookup_table("nhemi_lookup.txt")
 
 ps_min_criteria = parameter_list()
 ps_min_criteria.var = "PS"

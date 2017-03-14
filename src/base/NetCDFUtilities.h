@@ -24,6 +24,15 @@ class NcVar;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Determine if the given string is a valid NetCDF variable name.
+///	</summary>
+bool IsValidNetCDFVariableName(
+	const std::string & strVariableName
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
 void CopyNcFileAttributes(
 	NcFile * fileIn,
 	NcFile * fileOut

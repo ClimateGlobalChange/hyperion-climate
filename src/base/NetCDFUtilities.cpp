@@ -23,6 +23,44 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool IsValidNetCDFVariableName(
+	const std::string & strVar
+) {
+	// Valid interior characters:
+	//   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+_.@"
+	// Valid first characters:
+	//   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+
+	if (strVar.length() == 0) {
+		return false;
+	}
+	if (((strVar[0] >= 'a') && (strVar[0] <= 'z')) ||
+	    ((strVar[0] >= 'A') && (strVar[0] <= 'Z')) ||
+	    ((strVar[0] >= '0') && (strVar[0] <= '9')) ||
+	    (strVar[0] == '_')
+	) {
+	} else {
+		return false;
+	}
+	for (int i = 1; i < strVar.length(); i++) {
+		if (((strVar[i] >= 'a') && (strVar[i] <= 'z')) ||
+		    ((strVar[i] >= 'A') && (strVar[i] <= 'Z')) ||
+		    ((strVar[i] >= '0') && (strVar[i] <= '9')) ||
+		    (strVar[i] == '_') ||
+		    (strVar[i] == '+') ||
+		    (strVar[i] == '-') ||
+		    (strVar[i] == '.') ||
+		    (strVar[i] == '@')
+		) {
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void CopyNcFileAttributes(
 	NcFile * fileIn,
 	NcFile * fileOut

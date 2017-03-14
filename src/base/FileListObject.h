@@ -23,8 +23,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A data structure describing the grid, including coordinates of
-///		each data point and graph connectivity of elements.
+///		A data structure describing a list of files.
 ///	</summary>
 class FileListObject : public ListObject {
 

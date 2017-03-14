@@ -16,6 +16,7 @@ FILES= Announce.cpp \
        TimeObj.cpp \
 	   Object.cpp \
 	   FileListObject.cpp \
+	   VariableLookupObject.cpp \
        Variable.cpp \
        kdtree.cpp \
 	   LegendrePolynomial.cpp \

@@ -21,6 +21,7 @@
 #include "Variable.h"
 #include "GridObject.h"
 #include "FileListObject.h"
+#include "VariableLookupObject.h"
 
 #include <iostream>
 #include <fstream>
@@ -598,6 +599,43 @@ try {
 					Announce("file_list %s contains %i entries",
 						vecCommandLine[0].c_str(),
 						pObj->ChildrenCount());
+
+
+				// variable_lookup_table(STRING) type
+				} else if (vecCommandLine[2] == "variable_lookup_table") {
+					if (vecCommandLine.size() != 6) {
+						Announce("ERROR: variable_lookup_table filename argument missing"
+							" on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLine[3] != "(") {
+						Announce("ERROR: Syntax error on line %i", iLine);
+						return (-1);
+					}
+					if (vecCommandLineType[4] != ObjectType_String) {
+						Announce("ERROR: Invalid variable_lookup_table filename on line %i", iLine);
+						return (-1);
+					}
+
+					printf("LOOKUP: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
+					VariableLookupObject * pObj =
+						new VariableLookupObject(
+							vecCommandLine[0]);
+
+					objreg.Assign(vecCommandLine[0], pObj);
+
+					std::string strError =
+						pObj->PopulateFromFile(
+							vecCommandLine[4]);
+
+					if (strError != "") {
+						Announce("ERROR: %s", strError.c_str());
+						return (-1);
+					}
+
+					Announce("variable_lookup_table %s contains %i entries",
+						vecCommandLine[0].c_str(),
+						pObj->LookupEntryCount());
 
 				// Unknown function (keep as a WARNING for now)
 				} else {
