@@ -14,6 +14,8 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "PointSearch.h"
+
 #include "Variable.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -36,6 +38,8 @@
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
+
+namespace HPointwise {
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1709,6 +1713,22 @@ void PointSearch(
 	AnnounceOnlyOutputOnRankZero();
 }
 */
+///////////////////////////////////////////////////////////////////////////////
+
+std::string PointSearchFunction::Call(
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	std::cout << "POINT SEARCH" << std::endl;
+
+	if (ppReturn != NULL) {
+		(*ppReturn) = new StringObject("NULL", "NULL");
+	}
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 /*
 ///////////////////////////////////////////////////////////////////////////////
@@ -2131,4 +2151,6 @@ try {
 #endif
 }
 */
+
+}
 

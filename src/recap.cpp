@@ -23,6 +23,8 @@
 #include "FileListObject.h"
 #include "VariableLookupObject.h"
 
+#include "Pointwise/Pointwise.h"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -64,6 +66,12 @@ try {
 
 	// Load command-line variables
 
+
+	// Create GlobalFunction registry
+	GlobalFunctionRegistry funcreg;
+
+	// Register functions from pointwise/
+	HPointwise::RegisterGlobalFunctions(funcreg);
 
 	// Create Object and Variable registry
 	ObjectRegistry objreg;
@@ -667,10 +675,36 @@ try {
 						vecCommandLine[0].c_str(),
 						pObj->LookupEntryCount());
 
-				// Unknown function (keep as a WARNING for now)
 				} else {
-					Announce("WARNING: Unknown function \"%s\" on line %i",
-						vecCommandLine[2].c_str(), iLine);
+
+					// Check the GlobalFunctionRegistry for this function
+					std::string strFunctionName = vecCommandLine[2];
+
+					GlobalFunction * pFunc =
+						funcreg.GetGlobalFunction(strFunctionName);
+
+					if (pFunc == NULL) {
+						Announce("WARNING: Unknown function \"%s\" on line %i",
+							vecCommandLine[2].c_str(), iLine);
+
+					} else {
+						Object * pObjReturn = NULL;
+
+						std::cout << "EVAL " << strFunctionName << std::endl;
+						std::string strError =
+							pFunc->Call(
+								vecFuncArguments,
+								vecFuncArgumentsType,
+								&pObjReturn);
+
+						if (pObjReturn == NULL) {
+							Announce("ERROR: Function \"%s\" does not return a value on line %i",
+								strFunctionName.c_str(), iLine);
+							return (-1);
+						}
+
+						objreg.Assign(vecCommandLine[0], pObjReturn);
+					}
 				}
 			}
 
@@ -716,8 +750,24 @@ try {
 				// Call generic function
 				} else {
 					strFunctionName = vecCommandLine[0];
-					Announce("WARNING: Unknown function \"%s\" on line %i",
-						vecCommandLine[0].c_str(), iLine);
+
+					std::cout << strFunctionName << std::endl;
+
+					GlobalFunction * pFunc =
+						funcreg.GetGlobalFunction(strFunctionName);
+
+					if (pFunc == NULL) {
+						Announce("WARNING: Unknown function \"%s\" on line %i",
+							vecCommandLine[0].c_str(), iLine);
+
+					} else {
+						std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
+						std::string strError =
+							pFunc->Call(
+								vecFuncArguments,
+								vecFuncArgumentsType,
+								NULL);
+					}
 				}
 			}
 		}

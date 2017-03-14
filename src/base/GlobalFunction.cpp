@@ -35,7 +35,9 @@ GlobalFunction * GlobalFunctionRegistry::GetGlobalFunction(
 	const std::string & strName
 ) const {
 
-	GlobalFunctionMap::const_iterator iter = m_mapGlobalFunctions.find(strName);
+	GlobalFunctionMap::const_iterator iter =
+		m_mapGlobalFunctions.find(strName);
+
 	if (iter == m_mapGlobalFunctions.end()) {
 		return NULL;
 	} else {
