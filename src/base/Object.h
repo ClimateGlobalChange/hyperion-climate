@@ -138,6 +138,19 @@ public:
 	}
 
 	///	<summary>
+	///		Call a member function of this Object.
+	///	</summary>
+	virtual std::string Call(
+		const std::string & strFunctionName,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	) {
+		return std::string("ERROR: Unknown member function [")
+			+ strFunctionName + std::string("]");
+	}
+
+	///	<summary>
 	///		Number of children in Object.
 	///	</summary>
 	size_t ChildrenCount() const {

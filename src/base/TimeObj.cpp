@@ -2,10 +2,10 @@
 ///
 ///	\file    TimeObj.cpp
 ///	\author  Paul Ullrich
-///	\version October 31, 2013
+///	\version March 14, 2017
 ///
 ///	<remarks>
-///		Copyright 2000-2010 Paul Ullrich
+///		Copyright 2000- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -820,6 +820,98 @@ void Time::FromFormattedString(
 
 	// Normalize
 	NormalizeTime();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::FromCFCompliantUnitsOffsetInt(
+	const std::string & strFormattedTime,
+	int nOffset
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(11);
+		FromFormattedString(strSubStr);
+
+		AddDays(nOffset);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(12);
+		FromFormattedString(strSubStr);
+
+		AddHours(nOffset);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		AddMinutes(nOffset);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::FromCFCompliantUnitsOffsetDouble(
+	const std::string & strFormattedTime,
+	double dOffset
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(11);
+		FromFormattedString(strSubStr);
+
+		int nDays = static_cast<int>(dOffset);
+		AddDays(nDays);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 86400.0);
+		AddSeconds(nSeconds);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(12);
+		FromFormattedString(strSubStr);
+
+		int nHours = static_cast<int>(dOffset);
+		AddHours(nHours);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 3600.0);
+		AddSeconds(nSeconds);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		int nMinutes = static_cast<int>(dOffset);
+		AddMinutes(nMinutes);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 60.0);
+		AddSeconds(nSeconds);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

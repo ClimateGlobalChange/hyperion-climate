@@ -19,13 +19,68 @@
 
 #include "Announce.h"
 #include "Object.h"
+#include "TimeObj.h"
+
+///////////////////////////////////////////////////////////////////////////////
+
+class VariableInfo {
+
+public:
+	///	<summary>
+	///		A local (file,time) pair.
+	///	</summary>
+	typedef std::pair<size_t, int> LocalFileTimePair;
+
+	///	<summary>
+	///		A map from time indices to local (file,time) pairs.
+	///	</summary>
+	typedef std::map<size_t, LocalFileTimePair> VariableTimeFileMap;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableInfo(
+		const std::string & strVariable
+	) :
+		m_strVariable(strVariable),
+		m_iTimeDimIx(-1)
+	{ } 
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Dimension of time variable.
+	///	</summary>
+	std::vector<int> m_vecDimSizes;
+
+	///	<summary>
+	///		Index of time dimension or (-1) if time dimension doesn't exist.
+	///	</summary>
+	int m_iTimeDimIx;
+
+	///	<summary>
+	///		Map from Times to filename index and time index.
+	///	</summary>
+	VariableTimeFileMap m_mapTimeFile;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
 ///		A data structure describing a list of files.
 ///	</summary>
-class FileListObject : public ListObject {
+class FileListObject : public Object {
+
+public:
+	///	<summary>
+	///		Invalid Time index.
+	///	</summary>
+	static const size_t InvalidTimeIx;
 
 public:
 	///	<summary>
@@ -34,7 +89,7 @@ public:
 	FileListObject(
 		const std::string & strName
 	) :
-		ListObject(strName)
+		Object(strName)
 	{ }
 
 	///	<summary>
@@ -49,18 +104,72 @@ public:
 			objreg);
 	}
 
+	///	<summary>
+	///		Call a member function of this Object.
+	///	</summary>
+	virtual std::string Call(
+		const std::string & strFunctionName,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	) {
+		if (strFunctionName == "output_csv") {
+			if ((vecCommandLineType.size() != 1) ||
+			    (vecCommandLineType[0] != ObjectType_String)
+			) {
+				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
+			}
+			return OutputTimeVariableIndexCSV(vecCommandLine[0]);
+		}
+		return
+			Object::Call(
+				strFunctionName,
+				vecCommandLine,
+				vecCommandLineType,
+				ppReturn);
+	}
+
 public:
 	///	<summary>
 	///		Populate from a search string.
 	///	</summary>
 	///	<returns>
-	///		false if the directory specified by strSearchString does
-	///		not exist.  true otherwise.
+	///		An error message if an error occurred.  A blank string otherwise.
 	///	</returns>
-	bool PopulateFromSearchString(
+	std::string PopulateFromSearchString(
 		const std::string & strSearchString,
 		ObjectRegistry & objreg
 	);
+
+protected:
+	///	<summary>
+	///		Index variable data.
+	///	</summary>
+	std::string IndexVariableData();
+
+protected:
+	///	<summary>
+	///		Output the time-variable index as a CSV.
+	///	</summary>
+	std::string OutputTimeVariableIndexCSV(
+		const std::string & strCSVOutput
+	);
+
+public:
+	///	<summary>
+	///		The list of filenames.
+	///	</summary>
+	std::vector<std::string> m_vecFilenames;
+
+	///	<summary>
+	///		The list of Times that appear in the FileList.
+	///	</summary>
+	std::vector<Time> m_vecTimes;
+
+	///	<summary>
+	///		The list of variable names that appear in the FileList.
+	///	</summary>
+	std::vector<VariableInfo> m_vecVariableInfo;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

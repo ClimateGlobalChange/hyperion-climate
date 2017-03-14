@@ -2,10 +2,10 @@
 ///
 ///	\file    TimeObj.h
 ///	\author  Paul Ullrich
-///	\version October 31, 2013
+///	\version March 14, 2017
 ///
 ///	<remarks>
-///		Copyright 2000-2010 Paul Ullrich
+///		Copyright 2000- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -35,6 +35,7 @@ public:
 	///		Type of calendar.
 	///	</summary>
 	enum CalendarType {
+		CalendarUnknown,
 		CalendarNone,
 		CalendarNoLeap,
 		CalendarStandard
@@ -63,7 +64,11 @@ public:
 		m_iMicroSecond(0),
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
-	{ }
+	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
+	}
 
 	///	<summary>
 	///		Constructor.
@@ -85,6 +90,9 @@ public:
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
 	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
 		NormalizeTime();
 	}
 
@@ -104,7 +112,28 @@ public:
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
 	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
 		FromLongString(strTime);
+	}
+
+public:
+	///	<summary>
+	///		Returns the CalendarType associated with the given string.
+	///	</summary>
+	static CalendarType CalendarTypeFromString(
+		const std::string & strCalendar
+	) {
+		if (strCalendar == "none") {
+			return CalendarNone;
+		} else if (strCalendar == "noleap") {
+			return CalendarNoLeap;
+		} else if (strCalendar == "standard") {
+			return CalendarStandard;
+		} else {
+			return CalendarUnknown;
+		}
 	}
 
 public:
@@ -422,6 +451,26 @@ public:
 	///		- HH:MM:SS.UUUU
 	///	</summary>
 	void FromFormattedString(const std::string & strFormattedTime);
+
+	///	<summary>
+	///		Set the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	void FromCFCompliantUnitsOffsetInt(
+		const std::string & strFormattedTime,
+		int nOffset
+	);
+
+	///	<summary>
+	///		Set the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	void FromCFCompliantUnitsOffsetDouble(
+		const std::string & strFormattedTime,
+		double dOffset
+	);
 
 	///	<summary>
 	///		Get the name of the calendar.

@@ -392,6 +392,10 @@ try {
 		}
 		printf("\n");
 */
+		// Arguments to a function call on this command line
+		std::vector<std::string> vecFuncArguments;
+		std::vector<ObjectType> vecFuncArgumentsType;
+
 		// Blank command line (do nothing)
 		if (vecCommandLine.size() == 0) {
 			continue;
@@ -406,23 +410,48 @@ try {
 			int iAssignmentOp = (-1);
 			int iEvaluateOp = (-1);
 			for (int i = 0; i < vecCommandLine.size(); i++) {
-				if ((vecCommandLineType[i] == ObjectType_Op) &&
-				    (vecCommandLine[i] == "=")
-				) {
-					if (iEvaluateOp != (-1)) {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
+
+				// Assignment or evaluation on this command line
+				if (vecCommandLineType[i] == ObjectType_Op) {
+
+					// Assignment operator
+					if (vecCommandLine[i] == "=") {
+						if (iAssignmentOp != (-1)) {
+							Announce("ERROR: Multiple assignment operators on line %i", iLine);
+							return (-1);
+						}
+						if (iEvaluateOp != (-1)) {
+							Announce("ERROR: Syntax error on line %i", iLine);
+							return (-1);
+						}
+						if (i != 1) {
+							Announce("ERROR: Syntax error on line %i", iLine);
+							return (-1);
+						}
+						iAssignmentOp = i;
+
+					// Evaluation operator
+					} else if (vecCommandLine[i] == "(") {
+						if (iEvaluateOp != (-1)) {
+							Announce("ERROR: Nested function calls not yet "
+								"supported on line %i", iLine);
+							return (-1);
+						}
+						iEvaluateOp = i;
+
+					// List constructor
+					} else if (vecCommandLine[i] == "[") {
+						if (iEvaluateOp != (-1)) {
+							Announce("ERROR: Nested list construction not yet "
+								"supported on line %i", iLine);
+							return (-1);
+						}
 					}
-					if (i != 1) {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
-					}
-					iAssignmentOp = i;
-				}
-				if ((vecCommandLineType[i] == ObjectType_Op) &&
-				    (vecCommandLine[i] == "(")
-				) {
-					iEvaluateOp = i;
+
+				// Add arguments to function call
+				} else if (iEvaluateOp != (-1)) {
+					vecFuncArguments.push_back(vecCommandLine[i]);
+					vecFuncArgumentsType.push_back(vecCommandLineType[i]);
 				}
 			}
 
@@ -592,14 +621,15 @@ try {
 
 					objreg.Assign(vecCommandLine[0], pObj);
 
-					pObj->PopulateFromSearchString(
+					std::string strError =
+						pObj->PopulateFromSearchString(
 							vecCommandLine[4],
 							objreg);
 
-					Announce("file_list %s contains %i entries",
-						vecCommandLine[0].c_str(),
-						pObj->ChildrenCount());
-
+					if (strError != "") {
+						Announce("ERROR: %s", strError.c_str());
+						return (-1);
+					}
 
 				// variable_lookup_table(STRING) type
 				} else if (vecCommandLine[2] == "variable_lookup_table") {
@@ -641,6 +671,53 @@ try {
 				} else {
 					Announce("WARNING: Unknown function \"%s\" on line %i",
 						vecCommandLine[2].c_str(), iLine);
+				}
+			}
+
+			// Evaluation of function
+			if ((iAssignmentOp == (-1)) && (iEvaluateOp != (-1))) {
+
+				std::string strObject;
+				std::string strFunctionName;
+
+				// Check for member function
+				for (int i = vecCommandLine[0].length()-1; i >= 0; i--) {
+					if (vecCommandLine[0][i] == '.') {
+						strObject = vecCommandLine[0].substr(0, i);
+						strFunctionName = vecCommandLine[0].substr(i+1);
+						break;
+					}
+				}
+
+				// Call member function
+				if (strObject != "") {
+					Object * pObj = objreg.GetObject(strObject);
+					if (pObj == NULL) {
+						Announce("ERROR: Invalid object \"%s\"",
+							strObject.c_str());
+						return (-1);
+					}
+
+					Object * pObjReturn = NULL;
+
+					std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
+					std::string strError =
+						pObj->Call(
+							strFunctionName,
+							vecFuncArguments,
+							vecFuncArgumentsType,
+							&pObjReturn);
+
+					if (strError != "") {
+						Announce("%s (Line %i)\n", strError.c_str(), iLine);
+						return (-1);
+					}
+
+				// Call generic function
+				} else {
+					strFunctionName = vecCommandLine[0];
+					Announce("WARNING: Unknown function \"%s\" on line %i",
+						vecCommandLine[0].c_str(), iLine);
 				}
 			}
 		}
