@@ -15,7 +15,6 @@
 ///	</remarks>
 
 #include "Variable.h"
-#include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
 #include "DataArray1D.h"
@@ -458,42 +457,7 @@ public:
 	///	</summary>
 	double m_dDistance;
 };
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse the list of input files.
-///	</summary>
-void ParseInputFiles(
-	const std::string & strInputFile,
-	std::vector<NcFile *> & vecFiles
-) {
-	int iLast = 0;
-	for (int i = 0; i <= strInputFile.length(); i++) {
-		if ((i == strInputFile.length()) ||
-		    (strInputFile[i] == ';')
-		) {
-			std::string strFile =
-				strInputFile.substr(iLast, i - iLast);
-
-			NcFile * pNewFile = new NcFile(strFile.c_str());
-
-			if (!pNewFile->is_valid()) {
-				_EXCEPTION1("Cannot open input file \"%s\"",
-					strFile.c_str());
-			}
-
-			vecFiles.push_back(pNewFile);
-			iLast = i+1;
-		}
-	}
-
-	if (vecFiles.size() == 0) {
-		_EXCEPTION1("No input files found in \"%s\"",
-			strInputFile.c_str());
-	}
-}
-
+/*
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -651,151 +615,6 @@ void FindLocalMinMax(
 			queueNodes.push(grid.m_vecConnectivity[ix][n]);
 		}
 	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse a pair of Date values.
-///	</summary>
-void ParseDate(
-	int nDate,
-	int nDateSec,
-	int & nDateYear,
-	int & nDateMonth,
-	int & nDateDay,
-	int & nDateHour
-) {
-	nDateYear  = nDate / 10000;
-	nDateMonth = (nDate % 10000) / 100;
-	nDateDay   = (nDate % 100);
-	nDateHour  = nDateSec / 3600;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse a time value.
-///	</summary>
-void ParseTimeDouble(
-	const std::string & strTimeUnits,
-	const std::string & strTimeCalendar,
-	double dTime,
-	int & nDateYear,
-	int & nDateMonth,
-	int & nDateDay,
-	int & nDateHour
-) {
-	// Get calendar type
-	Time::CalendarType cal;
-	if ((strTimeCalendar.length() >= 6) &&
-		(strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
-	) {
-		cal = Time::CalendarNoLeap;
-
-	} else if (
-		(strTimeCalendar.length() >= 8) &&
-		(strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
-	) {
-		cal = Time::CalendarStandard;
-
-	} else {
-		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
-	}
-/*
-	Time time(Time::CalendarStandard);
-	time.FromFormattedString("1800-01-01 00:00:00");
-	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
-	time.AddHours(1577832);
-
-	Announce("Time (YMDS): %i %i %i %i",
-			time.GetYear(),
-			time.GetMonth(),
-			time.GetDay(),
-			time.GetSecond());
-
-	_EXCEPTION();
-*/
-	// Time format is "days since ..."
-	if ((strTimeUnits.length() >= 11) &&
-	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(11);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		int nDays = static_cast<int>(dTime);
-		time.AddDays(nDays);
-
-		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
-		time.AddSeconds(nSeconds);
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	// Time format is "hours since ..."
-	} else if (
-	    (strTimeUnits.length() >= 12) &&
-	    (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(12);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		time.AddHours(static_cast<int>(dTime));
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	// Time format is "minutes since ..."
-	} else if (
-	    (strTimeUnits.length() >= 14) &&
-	    (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(14);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		time.AddMinutes(static_cast<int>(dTime));
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	} else {
-		_EXCEPTIONT("Unknown \"time::units\" format");
-	}
-	//_EXCEPTION();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1889,7 +1708,9 @@ void PointSearch(
 	AnnounceSetOutputBuffer(stdout);
 	AnnounceOnlyOutputOnRankZero();
 }
+*/
 
+/*
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
@@ -2309,4 +2130,5 @@ try {
 	MPI_Finalize();
 #endif
 }
+*/
 

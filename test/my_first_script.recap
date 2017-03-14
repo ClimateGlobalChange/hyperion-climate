@@ -28,7 +28,7 @@ dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
 dcu_param.output = ["lat", "lon", "PS", "ZS", wind_mag]
 
-candidates = point_search(dcu_param)
+candidates = point_search(grid, datafiles, varlookup, dcu_param)
 
 topo_threshold = parameter_list()
 topo_threshold.var = "ZS"

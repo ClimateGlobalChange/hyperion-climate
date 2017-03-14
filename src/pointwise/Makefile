@@ -10,22 +10,10 @@ HYPERIONCLIMATEDIR= ../..
 # Load Makefile framework. 
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
-FILES= Announce.cpp \
-	   Exception.cpp \
-       NetCDFUtilities.cpp \
-       TimeObj.cpp \
-	   Object.cpp \
-	   FileListObject.cpp \
-	   VariableLookupObject.cpp \
-	   GlobalFunction.cpp \
-       Variable.cpp \
-       kdtree.cpp \
-	   LegendrePolynomial.cpp \
-	   GaussQuadrature.cpp \
-	   MeshUtilitiesFuzzy.cpp \
-	   GridElements.cpp
+FILES= Pointwise.cpp \
+	   PointSearch.cpp 
 
-LIB_TARGET= libhyperionbase.a
+LIB_TARGET= libhyperionpointwise.a
 
 .PHONY: all clean
 
