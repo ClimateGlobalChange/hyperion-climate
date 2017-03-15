@@ -23,9 +23,7 @@
 #include "DataArray2D.h"
 #include "TimeObj.h"
 
-#include "GridObject.h"
-#include "FileListObject.h"
-#include "VariableLookupObject.h"
+#include "RecapConfigObject.h"
 
 #include "kdtree.h"
 
@@ -206,88 +204,10 @@ class ClosedContourOp {
 
 public:
 	///	<summary>
-	///		Parse a closed contour operation string.
+	///		Convert to string.
 	///	</summary>
-	void Parse(
-		VariableRegistry & varreg,
-		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Amount,
-			ReadMode_Distance,
-			ReadMode_MinMaxDist,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Amount;
-
-		// Get variable information
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
-
-		// Loop through string
-		for (int i = iLast; i <= strOp.length(); i++) {
-
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
-
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
-
-				// Read in amount
-				if (eReadMode == ReadMode_Amount) {
-					m_dDeltaAmount = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
-
-				// Read in distance
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_MinMaxDist;
-
-				// Read in min/max distance
-				} else if (eReadMode == ReadMode_MinMaxDist) {
-					m_dMinMaxDist = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
-						"\nRequired: \"<name>,<amount>,<distance>,"
-						"<minmaxdist>\"",
-						strOp.c_str());
-				}
-			}
-		}
-
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
-					"\nRequired: \"<name>,<amount>,<distance>,"
-					"<minmaxdist>\"",
-					strOp.c_str());
-		}
-
-		// Output announcement
-		char szBuffer[128];
-
-		std::string strDescription;
-		strDescription += var.ToString(varreg);
-
-		if (m_dDeltaAmount == 0.0) {
-			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
-		}
-		if (m_dDistance <= 0.0) {
-			_EXCEPTIONT("For closed contour op, distance must be positive");
-		}
-		if (m_dMinMaxDist < 0.0) {
-			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
-		}
-
+	std::string ToString() const {
+/*
 		if (m_dDeltaAmount < 0.0) {
 			Announce("%s decreases by %f over %f degrees"
 				   " (max search %f deg)",
@@ -304,6 +224,8 @@ public:
 				m_dDistance,
 				m_dMinMaxDist);
 		}
+*/
+		return std::string("");
 	}
 
 public:
@@ -1721,16 +1643,33 @@ void PointSearch(
 
 std::string PointSearchFunction::Call(
 	const ObjectRegistry & objreg,
-	const VariableRegistry & varreg,
 	const std::vector<std::string> & vecCommandLine,
 	const std::vector<ObjectType> & vecCommandLineType,
 	Object ** ppReturn
 ) {
 	AnnounceStartBlock("BEGIN point_search");
 
-	if (vecCommandLine.size() != 4) {
-		return std::string("point_search(grid, file_list, lookup_table, param) expects 4 arguments");
+	if (vecCommandLine.size() != 2) {
+		return std::string("point_search(config, param) expects 2 arguments");
 	}
+
+	// Check validity of configuration
+	RecapConfigObject * pobjConfig =
+		dynamic_cast<RecapConfigObject *>(objreg.GetObject(vecCommandLine[0]));
+	if (pobjConfig == NULL) {
+		return std::string("First argument to point_search must be of type "
+			"recap_configuration");
+	}
+
+	// Check for valid configuration
+	if (!pobjConfig->IsValid()) {
+		return std::string("First argument is an invalid recap_configuration "
+			"object: Missing \"data\" or \"grid\" properties");
+	}
+/*
+	// Grid object
+	GridObject * pobjGrid =
+		dynamic_cast<GridObject *>(pobjConfig->GetChild("data"));
 
 	// Grid object
 	GridObject * pobjGrid =
@@ -1742,21 +1681,21 @@ std::string PointSearchFunction::Call(
 	// FileList object
 	FileListObject * pobjFileList =
 		dynamic_cast<FileListObject *>(objreg.GetObject(vecCommandLine[1]));
-	if (pobjGrid == NULL) {
+	if (pobjFileList == NULL) {
 		return std::string("Second argument to point_search must be of type file_list");
 	}
 
 	// Lookup object
 	VariableLookupObject * pobjVarLookup =
 		dynamic_cast<VariableLookupObject *>(objreg.GetObject(vecCommandLine[2]));
-	if (pobjGrid == NULL) {
+	if (pobjVarLookup == NULL) {
 		return std::string("Third argument to point_search must be of type variable_lookup");
 	}
-
+*/
 	// Parameters
 	Object * pobjParam =
-		dynamic_cast<Object *>(objreg.GetObject(vecCommandLine[3]));
-	if (pobjGrid == NULL) {
+		dynamic_cast<Object *>(objreg.GetObject(vecCommandLine[1]));
+	if (pobjParam == NULL) {
 		return std::string("Fourth argument to point_search must be of type parameter_list");
 	}
 
@@ -1780,6 +1719,109 @@ std::string PointSearchFunction::Call(
 
 	if (pobjSearchByMin != NULL) {
 		dcuparam.fSearchByMinima = true;
+	}
+
+	// Construct all closed contour objects
+	ListObject * pobjClosedContourList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(pobjParam->ChildName("closedcontourcmd")));
+
+	if (pobjClosedContourList != NULL) {
+		for (size_t i = 0; i < pobjClosedContourList->ChildrenCount(); i++) {
+
+			ClosedContourOp opCC;
+
+			Object * pobjChild = pobjClosedContourList->GetChild(i);
+
+			// Variable
+			StringObject * pobjClosedContourVar =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(pobjChild->ChildName("var")));
+			if (pobjClosedContourVar == NULL) {
+				return pobjChild->Name()
+					+ std::string(" has invalid \"var\" property");
+			}
+
+			Variable * pVar;
+			std::string strError =
+				pobjConfig->GetVariable(
+					pobjClosedContourVar->Value(),
+					&pVar);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			// Magnitude
+			StringObject * pobjClosedContourMag =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(pobjChild->ChildName("mag")));
+			if (pobjClosedContourMag == NULL) {
+				return pobjChild->Name()
+					+ std::string(" has invalid \"mag\" property");
+			}
+
+			bool fSuccessMag =
+				pobjClosedContourMag->ToUnit(
+					pVar->Units(), &opCC.m_dDeltaAmount);
+			if (!fSuccessMag) {
+				return std::string("Cannot convert ")
+					+ pobjChild->ChildName("mag")
+					+ std::string(" to ")
+					+ pVar->Units();
+			}
+
+			// Distance
+			StringObject * pobjClosedContourDist =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(pobjChild->ChildName("dist")));
+			if (pobjClosedContourDist == NULL) {
+				return pobjChild->Name()
+					+ std::string(" has invalid \"dist\" property");
+			}
+
+			bool fSuccessDist =
+				pobjClosedContourDist->ToUnit(
+					"deg", &opCC.m_dDistance);
+			if (!fSuccessDist) {
+				return std::string("Cannot convert ")
+					+ pobjChild->ChildName("dist")
+					+ std::string(" to great-circle distance");
+			}
+
+			// Search distance
+			StringObject * pobjClosedContourMinMaxDist =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(pobjChild->ChildName("minmaxdist")));
+			if (pobjClosedContourMinMaxDist == NULL) {
+				return pobjChild->Name()
+					+ std::string(" has invalid \"minmaxdist\" property");
+			}
+
+			bool fSuccessMinMaxDist =
+				pobjClosedContourMinMaxDist->ToUnit(
+					"deg", &opCC.m_dMinMaxDist);
+			if (!fSuccessMinMaxDist) {
+				return std::string("Cannot convert ")
+					+ pobjChild->ChildName("minmaxdist")
+					+ std::string(" to great-circle distance");
+			}
+	
+/*
+			Object * pobjCC =
+				pobjClosedContourList->
+ 
+warm_core_criteria = parameter_list()
+warm_core_criteria.var = "T(400hPa)"
+warm_core_criteria.mag = "-0.4K"
+warm_core_criteria.dist = "8.0deg"
+warm_core_criteria.minmaxdist = "1.1deg"
+
+			StringObject * pobjCCDelta =
+				dynamic_cast<StringObject *>(
+					pobjClosedContour
+*/
+		}
 	}
 
 	// Distribute time steps over ranks

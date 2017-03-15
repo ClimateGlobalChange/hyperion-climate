@@ -30,7 +30,7 @@ class VariableRegistry;
 
 class Object;
 
-typedef std::set<Object *> ObjectChildrenSet;
+typedef std::vector<Object *> ObjectChildrenVector;
 
 typedef std::map<std::string, Object *> ObjectMap;
 
@@ -130,11 +130,18 @@ public:
 	}
 
 	///	<summary>
-	///		Create a string containing this object's name.
+	///		Get the name of this Object.
+	///	</summary>
+	const std::string & Name() const {
+		return m_strName;
+	}
+
+	///	<summary>
+	///		Create a string containing this Object's name.
 	///	</summary>
 	std::string ChildName(
 		const std::string & strChild
-	) {
+	) const {
 		return (m_strName + "." + strChild);
 	}
 
@@ -153,7 +160,6 @@ public:
 	///	</summary>
 	virtual std::string Call(
 		const ObjectRegistry & objreg,
-		const VariableRegistry & varreg,
 		const std::string & strFunctionName,
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
@@ -167,7 +173,39 @@ public:
 	///		Number of children in Object.
 	///	</summary>
 	size_t ChildrenCount() const {
-		return m_setChildren.size();
+		return m_vecChildren.size();
+	}
+
+	///	<summary>
+	///		Get child Object by index.
+	///	</summary>
+	Object * GetChild(size_t sChild) const {
+		if (sChild >= m_vecChildren.size()) {
+			_EXCEPTIONT("Children vector access out of range");
+		}
+		return m_vecChildren[sChild];
+	}
+
+	///	<summary>
+	///		Get child Object by name.
+	///	</summary>
+	Object * GetChild(const std::string & strChildName) const {
+		std::string strFullChildName = ChildName(strChildName);
+		for (size_t i = 0; i < m_vecChildren.size(); i++) {
+			if (m_vecChildren[i]->Name() == strFullChildName) {
+				return m_vecChildren[i];
+			}
+		}
+		return NULL;
+	}
+
+protected:
+	///	<summary>
+	///		Add a child Object.
+	///	</summary>
+	virtual bool AddChild(Object * pChild) {
+		m_vecChildren.push_back(pChild);
+		return true;
 	}
 
 protected:
@@ -188,7 +226,7 @@ protected:
 	///	<summary>
 	///		List of child Objects.
 	///	</summary>
-	ObjectChildrenSet m_setChildren;
+	ObjectChildrenVector m_vecChildren;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -221,6 +259,23 @@ public:
 			new StringObject(strDuplicateName, m_strValue),
 			objreg);
 	}
+
+	///	<summary>
+	///		Get the string.
+	///	</summary>
+	const std::string & Value() const {
+		return m_strValue;
+	}
+
+public:
+	///	<summary>
+	///		Return the value of the string with the specified units.
+	///	</summary>
+	bool ToUnit(
+		const std::string & strUnit,
+		double * dValueOut,
+		bool fIsDelta = false
+	);
 
 protected:
 	///	<summary>

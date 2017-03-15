@@ -16,10 +16,43 @@
 
 #include "Variable.h"
 
+#include "FileListObject.h"
+
 #include <set>
 
 ///////////////////////////////////////////////////////////////////////////////
 // VariableRegistry
+///////////////////////////////////////////////////////////////////////////////
+
+Variable * VariableRegistry::FindOrRegister(
+	const std::string & strVariableName,
+	const FileListObject * pobjFileList
+) {
+	std::map<std::string, Variable>::iterator iterVar =
+		m_mapVariables.find(strVariableName);
+
+	// Variable exists in registry
+	if (iterVar != m_mapVariables.end()) {
+		return &(iterVar->second);
+	}
+
+	// Check if variable is in the FileList, and add to registry if present
+	const VariableInfo * pvarinfo =
+		pobjFileList->GetVariableInfo(strVariableName);
+	if (pvarinfo != NULL) {
+		iterVar =
+			m_mapVariables.insert(
+				std::pair<std::string, Variable>(
+					strVariableName,
+					Variable(strVariableName, pvarinfo))).first;
+
+		return &(iterVar->second);
+	}
+
+	// Combinations not yet supported
+	return NULL;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int VariableRegistry::FindOrRegister(
@@ -55,6 +88,26 @@ void VariableRegistry::UnloadAllGridData() {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Variable
+///////////////////////////////////////////////////////////////////////////////
+
+Variable::Variable(
+	const std::string & strName,
+	const VariableInfo * pvarinfo
+) :
+	m_strName(strName),
+	m_pvarinfo(pvarinfo),
+	m_fOp(false),
+	m_strUnits(),
+	m_nSpecifiedDim(0),
+	m_fNoTimeInNcFile(false),
+	m_iTime(-2)
+{
+	if (pvarinfo != NULL) {
+		m_strUnits = pvarinfo->m_strUnits;
+	}
+	memset(m_iDim, 0, MaxArguments * sizeof(int));
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 bool Variable::operator==(
@@ -217,7 +270,7 @@ std::string Variable::ToString(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
+/*
 NcVar * Variable::GetFromNetCDF(
 	NcFileVector & vecFiles,
 	int iTime
@@ -294,9 +347,9 @@ NcVar * Variable::GetFromNetCDF(
 
 	return var;
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
-
+/*
 void Variable::LoadGridData(
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
@@ -589,7 +642,7 @@ void Variable::LoadGridData(
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 	}
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 
 void Variable::UnloadGridData() {

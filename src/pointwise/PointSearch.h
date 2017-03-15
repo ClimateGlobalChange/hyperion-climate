@@ -39,7 +39,6 @@ public:
 	///	</summary>
 	virtual std::string Call(
 		const ObjectRegistry & objreg,
-		const VariableRegistry & varreg,
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
 		Object ** ppReturn

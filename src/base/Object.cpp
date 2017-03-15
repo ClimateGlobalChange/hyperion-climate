@@ -17,6 +17,7 @@
 #include "Object.h"
 
 #include <cstdlib>
+#include <cmath>
 
 ///////////////////////////////////////////////////////////////////////////////
 // ObjectRegistry
@@ -107,10 +108,8 @@ void ObjectRegistry::Remove(
 	printf("REMOVE %s\n", strName.c_str());
 
 	// Remove all children of this Object
-	ObjectChildrenSet::const_iterator iterChildren
-		= iter->second->m_setChildren.begin();
-	for (; iterChildren != iter->second->m_setChildren.end(); iterChildren++) {
-		Remove((*iterChildren)->m_strName);
+	for (size_t i = 0; i < iter->second->m_vecChildren.size(); i++) {
+		Remove(iter->second->m_vecChildren[i]->m_strName);
 	}
 
 	// Remove this Object
@@ -149,7 +148,10 @@ bool ObjectRegistry::Assign(
 		}
 
 		//printf("PARENT %s\n", strParent.c_str());
-		iterParent->second->m_setChildren.insert(pObject);
+		bool fSuccess = iterParent->second->AddChild(pObject);
+		if (!fSuccess) {
+			return false;
+		}
 	}
 
 	// Assign the Object into the ObjectRegistry
@@ -176,23 +178,306 @@ Object * Object::_Duplicate(
 
 	const int nNewNameLength = pobjDuplicate->m_strName.length();
 
-	ObjectChildrenSet::const_iterator iter = m_setChildren.begin();
-	for (; iter != m_setChildren.end(); iter++) {
+	for (size_t i = 0; i < m_vecChildren.size(); i++) {
 
 		//printf("ORIGINAL CHILD %s\n", (*iter)->m_strName.c_str());
 		std::string strNewChildName =
 			pobjDuplicate->m_strName
-			+ (*iter)->m_strName.substr(
+			+ m_vecChildren[i]->m_strName.substr(
 				nOriginalNameLength, std::string::npos);
 
 		if (strNewChildName[nNewNameLength] != '.') {
 			_EXCEPTIONT("Logic error: Invalid child");
 		}
 
-		(*iter)->Duplicate(strNewChildName, objreg);
+		m_vecChildren[i]->Duplicate(strNewChildName, objreg);
 	}
 
 	return (pobjDuplicate);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// StringObject
+///////////////////////////////////////////////////////////////////////////////
+
+bool StringObject::ToUnit(
+	const std::string & strTargetUnit,
+	double * dValueOut,
+	bool fIsDelta
+) {
+	// Check argument
+	if (dValueOut == NULL) {
+		_EXCEPTIONT("Invalid pointer to double on return");
+	}
+
+	// Extract the value and unit from this String
+	enum ParseMode {
+		ParseMode_WS,
+		ParseMode_Number,
+		ParseMode_Unit
+	};
+
+	ParseMode mode = ParseMode_WS;
+	ParseMode modeNext = ParseMode_Number;
+
+	bool fHasPeriod = false;
+
+	std::string strNumber;
+	std::string strUnit;
+
+	int iPos = 0;
+	for (;;) {
+		if (iPos >= m_strValue.length()) {
+			break;
+		}
+
+		// Whitespace
+		if (mode == ParseMode_WS) {
+			if ((m_strValue[iPos] == ' ') ||
+			    (m_strValue[iPos] == '\t')
+			) {
+				iPos++;
+			} else {
+				mode = modeNext;
+			}
+
+		// Number
+		} else if (mode == ParseMode_Number) {
+			if ((m_strValue[iPos] >= '0') && (m_strValue[iPos] <= '9')) {
+				strNumber += m_strValue[iPos];
+				iPos++;
+
+			} else if (m_strValue[iPos] == '.') {
+				if (fHasPeriod) {
+					return false;
+				} else {
+					strNumber += m_strValue[iPos];
+					fHasPeriod = true;
+					iPos++;
+				}
+
+			} else if (m_strValue[iPos] == '-') {
+				if (strNumber.length() != 0) {
+					return false;
+				} else {
+					strNumber += m_strValue[iPos];
+					iPos++;
+				}
+
+			} else if (
+				((m_strValue[iPos] >= 'a') && (m_strValue[iPos] <= 'z')) ||
+				((m_strValue[iPos] >= 'A') && (m_strValue[iPos] <= 'Z'))
+			) {
+				mode = ParseMode_Unit;
+
+			} else if (
+				(m_strValue[iPos] == ' ') ||
+			    (m_strValue[iPos] == '\t')
+			) {
+				mode = ParseMode_WS;
+				modeNext = ParseMode_Unit;
+
+			} else {
+				return false;
+			}
+
+		// Unit
+		} else if (mode == ParseMode_Unit) {
+			if (((m_strValue[iPos] >= 'a') && (m_strValue[iPos] <= 'z')) ||
+				((m_strValue[iPos] >= 'A') && (m_strValue[iPos] <= 'Z'))
+			) {
+				strUnit += m_strValue[iPos];
+				iPos++;
+
+			} else if (
+				(m_strValue[iPos] == ' ') ||
+			    (m_strValue[iPos] == '\t')
+			) {
+				break;
+
+			} else {
+				return false;
+			}
+
+		// Invalid mode
+		} else {
+			_EXCEPTIONT("Invalid mode");
+		}
+	}
+
+	if (strNumber.length() == 0) {
+		return false;
+	}
+
+	// Value
+	const double dValue = atof(strNumber.c_str());
+
+	// Perform unit conversion from great circle distance (degrees)
+	if (strUnit == "deg") {
+		if (strTargetUnit == "deg") {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "rad") {
+			(*dValueOut) = dValue * M_PI / 180.0;
+
+		} else if (strTargetUnit == "m") {
+			(*dValueOut) = 6.37122e6 * dValue * M_PI / 180.0;
+
+		} else if (strTargetUnit == "km") {
+			(*dValueOut) = 6.37122e3 * dValue * M_PI / 180.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (radians)
+	} else if (strUnit == "rad") {
+		if (strTargetUnit == "deg") {
+			(*dValueOut) = 180.0 / M_PI * dValue;
+
+		} else if (strTargetUnit == "rad") {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "m") {
+			(*dValueOut) = 6.37122e6 * dValue;
+
+		} else if (strTargetUnit == "km") {
+			(*dValueOut) = 6.37122e3 * dValue;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (meters)
+	} else if (strUnit == "m") {
+		if (strTargetUnit == "deg") {
+			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e6;
+
+		} else if (strTargetUnit == "rad") {
+			(*dValueOut) = dValue / 6.37122e6;
+
+		} else if (strTargetUnit == "m") {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "km") {
+			(*dValueOut) = dValue / 1000.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (kilometers)
+	} else if (strUnit == "km") {
+		if (strTargetUnit == "deg") {
+			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e3;
+
+		} else if (strTargetUnit == "rad") {
+			(*dValueOut) = dValue / 6.37122e3;
+
+		} else if (strTargetUnit == "m") {
+			(*dValueOut) = dValue * 1000.0;
+
+		} else if (strTargetUnit == "km") {
+			(*dValueOut) = dValue;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from temperature (K)
+	} else if (strUnit == "K") {
+		if (strTargetUnit == "K") {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "degC") {
+			if (fIsDelta) {
+				(*dValueOut) = dValue;
+			} else {
+				(*dValueOut) = dValue - 273.15;
+			}
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from temperature (degC)
+	} else if (strUnit == "degC") {
+		if (strTargetUnit == "K") {
+			if (fIsDelta) {
+				(*dValueOut) = dValue;
+			} else {
+				(*dValueOut) = dValue + 273.15;
+			}
+
+		} else if (strTargetUnit == "degC") {
+			(*dValueOut) = dValue;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (Pa)
+	} else if (strUnit == "Pa") {
+		if (strTargetUnit == "Pa") {
+			(*dValueOut) = dValue;
+
+		} else if (
+		    (strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			(*dValueOut) = dValue / 100.0;
+
+		} else if (strTargetUnit == "atm") {
+			(*dValueOut) = dValue / 101325.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (hPa,mb,mbar)
+	} else if ((strUnit == "hPa") || (strUnit == "mb") || (strUnit == "mbar")) {
+		if (strTargetUnit == "Pa") {
+			(*dValueOut) = dValue * 100.0;
+
+		} else if (
+		    (strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "atm") {
+			(*dValueOut) = dValue / 1013.25;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (atm)
+	} else if (strUnit == "atm") {
+		if (strTargetUnit == "Pa") {
+			(*dValueOut) = dValue * 101325.0;
+
+		} else if (
+		    (strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			(*dValueOut) = dValue * 1013.25;
+
+		} else if (strTargetUnit == "atm") {
+			(*dValueOut) = dValue;
+
+		} else {
+			return false;
+		}
+
+	} else {
+		return false;
+	}
+
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

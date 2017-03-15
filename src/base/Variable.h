@@ -26,9 +26,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef std::vector<NcFile *> NcFileVector;
+class FileListObject;
 
-///////////////////////////////////////////////////////////////////////////////
+class VariableInfo;
 
 class Variable;
 
@@ -43,6 +43,14 @@ typedef std::vector<VariableIndex> VariableIndexVector;
 class VariableRegistry {
 
 public:
+	///	<summary>
+	///		Find or register a variable.
+	///	</summary>
+	Variable * FindOrRegister(
+		const std::string & strVariableName,
+		const FileListObject * pobjFileList
+	);
+
 	///	<summary>
 	///		Register a variable.  Or return an index if the Variable already
 	///		exists in the registry.
@@ -60,6 +68,11 @@ public:
 	void UnloadAllGridData();
 
 private:
+	///	<summary>
+	///		Set of Variables.
+	///	</summary>
+	std::map<std::string, Variable> m_mapVariables;
+
 	///	<summary>
 	///		Array of variables.
 	///	</summary>
@@ -84,8 +97,10 @@ public:
 	///		Default constructor.
 	///	</summary>
 	Variable() :
-		m_fOp(false),
 		m_strName(),
+		m_pvarinfo(NULL),
+		m_fOp(false),
+		m_strUnits(),
 		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
 		m_iTime(-2)
@@ -93,11 +108,26 @@ public:
 		memset(m_iDim, 0, MaxArguments * sizeof(int));
 	}
 
+	///	<summary>
+	///		Primitive Variable constructor.
+	///	</summary>
+	Variable(
+		const std::string & strName,
+		const VariableInfo * pvarinfo
+	);
+
 public:
 	///	<summary>
 	///		Equality operator.
 	///	</summary>
 	bool operator==(const Variable & var);
+
+	///	<summary>
+	///		Comparator operator.
+	///	</summary>
+	bool operator<(const Variable & var) {
+		return (m_strName < var.m_strName);
+	}
 
 public:
 	///	<summary>
@@ -115,7 +145,7 @@ public:
 	std::string ToString(
 		VariableRegistry & varreg
 	) const;
-
+/*
 	///	<summary>
 	///		Get this variable in the given NcFile.
 	///	</summary>
@@ -133,7 +163,7 @@ public:
 		const GridObject & grid,
 		int iTime = (-1)
 	);
-
+*/
 	///	<summary>
 	///		Unload the current data block.
 	///	</summary>
@@ -148,14 +178,40 @@ public:
 
 public:
 	///	<summary>
+	///		Name accessor.
+	///	</summary>
+	const std::string & Name() const {
+		return m_strName;
+	}
+
+	///	<summary>
+	///		Units accessor.
+	///	</summary>
+	const std::string & Units() const {
+		return m_strUnits;
+	}
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strName;
+
+	///	<summary>
+	///		Pointer to the associated VariableInfo structure in
+	///		FileListObject, or NULL if this is a combination of variables.
+	///	</summary>
+	const VariableInfo * m_pvarinfo;
+
+	///	<summary>
 	///		Flag indicating this is an operator.
 	///	</summary>
 	bool m_fOp;
 
 	///	<summary>
-	///		Variable name.
+	///		Variable units.
 	///	</summary>
-	std::string m_strName;
+	std::string m_strUnits;
 
 	///	<summary>
 	///		Number of dimensions specified.

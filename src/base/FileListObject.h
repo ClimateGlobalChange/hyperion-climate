@@ -41,9 +41,9 @@ public:
 	///		Constructor.
 	///	</summary>
 	VariableInfo(
-		const std::string & strVariable
+		const std::string & strVariableName
 	) :
-		m_strVariable(strVariable),
+		m_strVariableName(strVariableName),
 		m_iTimeDimIx(-1)
 	{ } 
 
@@ -51,7 +51,12 @@ public:
 	///	<summary>
 	///		Variable name.
 	///	</summary>
-	std::string m_strVariable;
+	std::string m_strVariableName;
+
+	///	<summary>
+	///		Units for the Variable.
+	///	</summary>
+	std::string m_strUnits;
 
 	///	<summary>
 	///		Dimension of time variable.
@@ -109,7 +114,6 @@ public:
 	///	</summary>
 	virtual std::string Call(
 		const ObjectRegistry & objreg,
-		const VariableRegistry & varreg,
 		const std::string & strFunctionName,
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
@@ -126,7 +130,6 @@ public:
 		return
 			Object::Call(
 				objreg,
-				varreg,
 				strFunctionName,
 				vecCommandLine,
 				vecCommandLineType,
@@ -134,6 +137,21 @@ public:
 	}
 
 public:
+	///	<summary>
+	///		Get the VariableInfo associated with a given variable name.
+	///	</summary>
+	const VariableInfo * GetVariableInfo(
+		const std::string & strVariableName
+	) const {
+		for (size_t i = 0; i < m_vecVariableInfo.size(); i++) {
+			if (m_vecVariableInfo[i].m_strVariableName == strVariableName) {
+				return &(m_vecVariableInfo[i]);
+			}
+		}
+		return NULL;
+	}
+
+	///	</summary>
 	///	<summary>
 	///		Populate from a search string.
 	///	</summary>
@@ -159,7 +177,7 @@ protected:
 		const std::string & strCSVOutput
 	);
 
-public:
+protected:
 	///	<summary>
 	///		The list of filenames.
 	///	</summary>
@@ -174,6 +192,7 @@ public:
 	///		The list of variable names that appear in the FileList.
 	///	</summary>
 	std::vector<VariableInfo> m_vecVariableInfo;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////

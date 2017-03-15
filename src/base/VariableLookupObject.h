@@ -76,6 +76,18 @@ public:
 		return m_mapLookupTable.size();	
 	}
 
+	///	<summary>
+	///		Convert a standard variable string to a native variable string.
+	///	</summary>
+	std::string Convert(const std::string & strNative) {
+		LookupTableMap::iterator iter = m_mapLookupTable.find(strNative);
+		if (iter == m_mapLookupTable.end()) {
+			return strNative;
+		} else {
+			return iter->second.strTargetName;
+		}
+	}
+
 public:
 	///	<summary>
 	///		Populate the lookup table from a file.

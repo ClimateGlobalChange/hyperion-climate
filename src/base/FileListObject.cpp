@@ -249,6 +249,21 @@ std::string FileListObject::IndexVariableData() {
 
 			VariableInfo & info = m_vecVariableInfo[sVarIndex];
 
+			// Get units, if available
+			NcAtt * attUnits = var->get_att("units");
+			if (attUnits != NULL) {
+				std::string strUnits = attUnits->as_string(0);
+				if (strUnits != "") {
+					if ((info.m_strUnits != "") && (strUnits != info.m_strUnits)) {
+						return std::string("Variable \"") + strVariableName
+							+ std::string("\" has inconsistent units across files");
+					}
+					if (info.m_strUnits == "") {
+						info.m_strUnits = strUnits;
+					}
+				}
+			}
+
 			// Load dimension sizes
 			const int nDims = var->num_dims();
 			if (info.m_vecDimSizes.size() != 0) {
@@ -341,7 +356,7 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 
 	// Output variables across header
 	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
-		ofOutput << "," << m_vecVariableInfo[v].m_strVariable;
+		ofOutput << "," << m_vecVariableInfo[v].m_strVariableName;
 	}
 	ofOutput << std::endl;
 

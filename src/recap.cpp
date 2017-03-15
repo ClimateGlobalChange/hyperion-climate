@@ -18,10 +18,10 @@
 
 #include "Announce.h"
 #include "Object.h"
-#include "Variable.h"
 #include "GridObject.h"
 #include "FileListObject.h"
 #include "VariableLookupObject.h"
+#include "RecapConfigObject.h"
 
 #include "Pointwise/Pointwise.h"
 
@@ -75,8 +75,6 @@ try {
 
 	// Create Object and Variable registry
 	ObjectRegistry objreg;
-
-	VariableRegistry varreg;
 
 	// Begin parsing
 	int iLine = 0;
@@ -487,9 +485,13 @@ try {
 
 					ListObject * pobjList = new ListObject(vecCommandLine[0]);
 
-					objreg.Assign(
-						vecCommandLine[0],
-						pobjList);
+					bool fSuccess =
+						objreg.Assign(
+							vecCommandLine[0],
+							pobjList);
+					if (!fSuccess) {
+						return (-1);
+					}
 
 					int iListEntry = 0;
 					for (int i = 3; i < vecCommandLine.size(); i++) {
@@ -558,10 +560,19 @@ try {
 
 				// parameter_list() type
 				if (vecCommandLine[2] == "parameter_list") {
-					//printf("PLI: %s\n", vecCommandLine[0].c_str()); 
-					objreg.Assign(
-						vecCommandLine[0],
-						new Object(vecCommandLine[0]));
+					if (vecFuncArguments.size() != 0) {
+						Announce("ERROR: Invalid arguments to parameter_list on line %i", iLine);
+						return (-1);
+					}
+
+					bool fSuccess =
+						objreg.Assign(
+							vecCommandLine[0],
+							new Object(vecCommandLine[0]));
+
+					if (!fSuccess) {
+						return (-1);
+					}
 
 				// variable(STRING) type
 				} else if (vecCommandLine[2] == "variable") {
@@ -579,14 +590,36 @@ try {
 						return (-1);
 					}
 					//printf("VAR: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					objreg.Assign(
-						vecCommandLine[0],
-						new VariableObject(
-							vecCommandLine[0], vecCommandLine[4]));
+					bool fSuccess =
+						objreg.Assign(
+							vecCommandLine[0],
+							new VariableObject(
+								vecCommandLine[0], vecCommandLine[4]));
+
+					if (!fSuccess) {
+						return (-1);
+					}
+
+				// recap_configuration() type
+				} else if (vecCommandLine[2] == "recap_configuration") {
+					if (vecFuncArguments.size() != 0) {
+						Announce("ERROR: Invalid arguments to recap_configuration on line %i", iLine);
+						return (-1);
+					}
+
+					printf("CONFIG: %s\n", vecCommandLine[0].c_str());
+					RecapConfigObject * pObj =
+						new RecapConfigObject(
+							vecCommandLine[0]);
+
+					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
+					if (!fSuccess) {
+						return (-1);
+					}
 
 				// grid(STRING) type
 				} else if (vecCommandLine[2] == "grid") {
-					if (vecCommandLine.size() != 6) {
+					if (vecFuncArguments.size() != 1) {
 						Announce("ERROR: grid filename argument missing"
 							" on line %i", iLine);
 						return (-1);
@@ -601,14 +634,19 @@ try {
 					}
 
 					printf("GRID: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					objreg.Assign(
-						vecCommandLine[0],
-						new GridObject(
-							vecCommandLine[0], vecCommandLine[4]));
+					bool fSuccess =
+						objreg.Assign(
+							vecCommandLine[0],
+							new GridObject(
+								vecCommandLine[0], vecCommandLine[4]));
+
+					if (!fSuccess) {
+						return (-1);
+					}
 
 				// file_list(STRING) type
 				} else if (vecCommandLine[2] == "file_list") {
-					if (vecCommandLine.size() != 6) {
+					if (vecFuncArguments.size() != 1) {
 						Announce("ERROR: file_list search string argument missing"
 							" on line %i", iLine);
 						return (-1);
@@ -627,7 +665,10 @@ try {
 						new FileListObject(
 							vecCommandLine[0]);
 
-					objreg.Assign(vecCommandLine[0], pObj);
+					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
+					if (!fSuccess) {
+						return (-1);
+					}
 
 					std::string strError =
 						pObj->PopulateFromSearchString(
@@ -641,7 +682,7 @@ try {
 
 				// variable_lookup_table(STRING) type
 				} else if (vecCommandLine[2] == "variable_lookup") {
-					if (vecCommandLine.size() != 6) {
+					if (vecFuncArguments.size() != 1) {
 						Announce("ERROR: variable_lookup filename argument missing"
 							" on line %i", iLine);
 						return (-1);
@@ -660,7 +701,10 @@ try {
 						new VariableLookupObject(
 							vecCommandLine[0]);
 
-					objreg.Assign(vecCommandLine[0], pObj);
+					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
+					if (!fSuccess) {
+						return (-1);
+					}
 
 					std::string strError =
 						pObj->PopulateFromFile(
@@ -694,7 +738,6 @@ try {
 						std::string strError =
 							pFunc->Call(
 								objreg,
-								varreg,
 								vecFuncArguments,
 								vecFuncArgumentsType,
 								&pObjReturn);
@@ -710,7 +753,10 @@ try {
 							return (-1);
 						}
 
-						objreg.Assign(vecCommandLine[0], pObjReturn);
+						bool fSuccess = objreg.Assign(vecCommandLine[0], pObjReturn);
+						if (!fSuccess) {
+							return (-1);
+						}
 					}
 				}
 			}
@@ -745,7 +791,6 @@ try {
 					std::string strError =
 						pObj->Call(
 							objreg,
-							varreg,
 							strFunctionName,
 							vecFuncArguments,
 							vecFuncArgumentsType,
@@ -774,7 +819,6 @@ try {
 						std::string strError =
 							pFunc->Call(
 								objreg,
-								varreg,
 								vecFuncArguments,
 								vecFuncArgumentsType,
 								NULL);

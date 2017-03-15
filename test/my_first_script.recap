@@ -1,23 +1,28 @@
 # The list of data files and grid can be specified on the command line
-# i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "gridfile=/mydata/mygrid.g" "datalookup=/mydata/mylookup.txt"
-datafiles = file_list("*.nc")
-datafiles.output_csv("nhemi_data_index.csv")
+# i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "grid=/mydata/mygrid.g" "varlookup=/mydata/mylookup.txt"
+config = recap_configuration()
+config.data = file_list("*.nc")
+config.grid = grid("nhemi_30_x4.g")
+config.lookup = variable_lookup("nhemi_lookup.txt")
 
-grid = grid("nhemi_30_x4.g")
-varlookup = variable_lookup("nhemi_lookup.txt")
+# Output the data index associated with this configuration
+config.data.output_csv("nhemi_data_index.csv")
 
+# Surface pressure minima criteria
 ps_min_criteria = parameter_list()
 ps_min_criteria.var = "PS"
 ps_min_criteria.mag = "200Pa"
 ps_min_criteria.dist = "4.0deg"
-ps_min_criteria.searchdist = "0.0"
-  
+ps_min_criteria.minmaxdist = "0.0deg"
+
+# Warm core criteria
 warm_core_criteria = parameter_list()
 warm_core_criteria.var = "T(400hPa)"
 warm_core_criteria.mag = "-0.4K"
 warm_core_criteria.dist = "8.0deg"
-warm_core_criteria.searchdist = "1.1deg"
+warm_core_criteria.minmaxdist = "1.1deg"
 
+# Wind magnitude (output)
 wind_mag = variable("_VECMAG(U(850hPa),V(850hPa))")
 wind_mag.outputop = "max"
 wind_mag.dist = "4.0deg"
@@ -28,7 +33,7 @@ dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
 dcu_param.output = ["lat", "lon", "PS", "ZS", wind_mag]
 
-candidates = point_search(grid, datafiles, varlookup, dcu_param)
+candidates = point_search(config, dcu_param)
 
 topo_threshold = parameter_list()
 topo_threshold.var = "ZS"
