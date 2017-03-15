@@ -585,9 +585,9 @@ try {
 							vecCommandLine[0], vecCommandLine[4]));
 
 				// grid(STRING) type
-				} else if (vecCommandLine[2] == "grid_file") {
+				} else if (vecCommandLine[2] == "grid") {
 					if (vecCommandLine.size() != 6) {
-						Announce("ERROR: grid_file filename argument missing"
+						Announce("ERROR: grid filename argument missing"
 							" on line %i", iLine);
 						return (-1);
 					}
@@ -596,7 +596,7 @@ try {
 						return (-1);
 					}
 					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid grid_file declaration on line %i", iLine);
+						Announce("ERROR: Invalid grid declaration on line %i", iLine);
 						return (-1);
 					}
 
@@ -640,9 +640,9 @@ try {
 					}
 
 				// variable_lookup_table(STRING) type
-				} else if (vecCommandLine[2] == "variable_lookup_table") {
+				} else if (vecCommandLine[2] == "variable_lookup") {
 					if (vecCommandLine.size() != 6) {
-						Announce("ERROR: variable_lookup_table filename argument missing"
+						Announce("ERROR: variable_lookup filename argument missing"
 							" on line %i", iLine);
 						return (-1);
 					}
@@ -651,7 +651,7 @@ try {
 						return (-1);
 					}
 					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid variable_lookup_table filename on line %i", iLine);
+						Announce("ERROR: Invalid variable_lookup filename on line %i", iLine);
 						return (-1);
 					}
 
@@ -693,9 +693,16 @@ try {
 						std::cout << "EVAL " << strFunctionName << std::endl;
 						std::string strError =
 							pFunc->Call(
+								objreg,
+								varreg,
 								vecFuncArguments,
 								vecFuncArgumentsType,
 								&pObjReturn);
+
+						if (strError != "") {
+							Announce("ERROR: %s", strError.c_str());
+							return (-1);
+						}
 
 						if (pObjReturn == NULL) {
 							Announce("ERROR: Function \"%s\" does not return a value on line %i",
@@ -737,6 +744,8 @@ try {
 					std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
 					std::string strError =
 						pObj->Call(
+							objreg,
+							varreg,
 							strFunctionName,
 							vecFuncArguments,
 							vecFuncArgumentsType,
@@ -764,6 +773,8 @@ try {
 						std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
 						std::string strError =
 							pFunc->Call(
+								objreg,
+								varreg,
 								vecFuncArguments,
 								vecFuncArgumentsType,
 								NULL);

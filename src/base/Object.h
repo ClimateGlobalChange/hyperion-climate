@@ -26,6 +26,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class VariableRegistry;
+
 class Object;
 
 typedef std::set<Object *> ObjectChildrenSet;
@@ -128,6 +130,15 @@ public:
 	}
 
 	///	<summary>
+	///		Create a string containing this object's name.
+	///	</summary>
+	std::string ChildName(
+		const std::string & strChild
+	) {
+		return (m_strName + "." + strChild);
+	}
+
+	///	<summary>
 	///		Self-duplicator.
 	///	</summary>
 	virtual Object * Duplicate(
@@ -141,6 +152,8 @@ public:
 	///		Call a member function of this Object.
 	///	</summary>
 	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const VariableRegistry & varreg,
 		const std::string & strFunctionName,
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,

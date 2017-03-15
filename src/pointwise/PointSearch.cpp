@@ -23,6 +23,10 @@
 #include "DataArray2D.h"
 #include "TimeObj.h"
 
+#include "GridObject.h"
+#include "FileListObject.h"
+#include "VariableLookupObject.h"
+
 #include "kdtree.h"
 
 #include "netcdfcpp.h"
@@ -949,7 +953,7 @@ void FindLocalAverage(
 
 	dAverage = dSum / static_cast<float>(nCount);
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 
 class PointSearchParam {
@@ -1031,7 +1035,7 @@ public:
 	int iVerbosityLevel;
 
 };
-
+/*
 ///////////////////////////////////////////////////////////////////////////////
 
 void PointSearch(
@@ -1716,15 +1720,76 @@ void PointSearch(
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string PointSearchFunction::Call(
+	const ObjectRegistry & objreg,
+	const VariableRegistry & varreg,
 	const std::vector<std::string> & vecCommandLine,
 	const std::vector<ObjectType> & vecCommandLineType,
 	Object ** ppReturn
 ) {
-	std::cout << "POINT SEARCH" << std::endl;
+	AnnounceStartBlock("BEGIN point_search");
 
+	if (vecCommandLine.size() != 4) {
+		return std::string("point_search(grid, file_list, lookup_table, param) expects 4 arguments");
+	}
+
+	// Grid object
+	GridObject * pobjGrid =
+		dynamic_cast<GridObject *>(objreg.GetObject(vecCommandLine[0]));
+	if (pobjGrid == NULL) {
+		return std::string("First argument to point_search must be of type grid");
+	}
+
+	// FileList object
+	FileListObject * pobjFileList =
+		dynamic_cast<FileListObject *>(objreg.GetObject(vecCommandLine[1]));
+	if (pobjGrid == NULL) {
+		return std::string("Second argument to point_search must be of type file_list");
+	}
+
+	// Lookup object
+	VariableLookupObject * pobjVarLookup =
+		dynamic_cast<VariableLookupObject *>(objreg.GetObject(vecCommandLine[2]));
+	if (pobjGrid == NULL) {
+		return std::string("Third argument to point_search must be of type variable_lookup");
+	}
+
+	// Parameters
+	Object * pobjParam =
+		dynamic_cast<Object *>(objreg.GetObject(vecCommandLine[3]));
+	if (pobjGrid == NULL) {
+		return std::string("Fourth argument to point_search must be of type parameter_list");
+	}
+
+	// Construct PointSearchParam object
+	PointSearchParam dcuparam;
+
+	StringObject * pobjSearchByMin =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("searchbymin")));
+
+	StringObject * pobjSearchByMax =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("searchbymax")));
+
+	if (((pobjSearchByMin == NULL) && (pobjSearchByMax == NULL)) ||
+	    ((pobjSearchByMin != NULL) && (pobjSearchByMax != NULL))
+	) {
+		return std::string("Exactly one of searchbymin or searchbymax "
+			"must be specified in param");
+	}
+
+	if (pobjSearchByMin != NULL) {
+		dcuparam.fSearchByMinima = true;
+	}
+
+	// Distribute time steps over ranks
+
+	// Check if a return value is needed
 	if (ppReturn != NULL) {
 		(*ppReturn) = new StringObject("NULL", "NULL");
 	}
+
+	AnnounceEndBlock("Done");
 	return std::string("");
 }
 

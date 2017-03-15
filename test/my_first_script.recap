@@ -3,8 +3,8 @@
 datafiles = file_list("*.nc")
 datafiles.output_csv("nhemi_data_index.csv")
 
-grid = grid_file("nhemi_30_x4.g")
-varlookup = variable_lookup_table("nhemi_lookup.txt")
+grid = grid("nhemi_30_x4.g")
+varlookup = variable_lookup("nhemi_lookup.txt")
 
 ps_min_criteria = parameter_list()
 ps_min_criteria.var = "PS"

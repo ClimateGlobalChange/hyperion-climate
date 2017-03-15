@@ -108,6 +108,8 @@ public:
 	///		Call a member function of this Object.
 	///	</summary>
 	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const VariableRegistry & varreg,
 		const std::string & strFunctionName,
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
@@ -123,6 +125,8 @@ public:
 		}
 		return
 			Object::Call(
+				objreg,
+				varreg,
 				strFunctionName,
 				vecCommandLine,
 				vecCommandLineType,
