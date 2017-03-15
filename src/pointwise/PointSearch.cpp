@@ -65,90 +65,10 @@ public:
 
 public:
 	///	<summary>
-	///		Parse a threshold operator string.
+	///		Convert to string.
 	///	</summary>
-	void Parse(
-		VariableRegistry & varreg,
-		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Op,
-			ReadMode_Value,
-			ReadMode_Distance,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Op;
-
-		// Parse variable
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
-
-		// Loop through string
-		for (int i = iLast; i <= strOp.length(); i++) {
-
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
-
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
-
-				// Read in operation
-				if (eReadMode == ReadMode_Op) {
-					if (strSubStr == ">") {
-						m_eOp = GreaterThan;
-					} else if (strSubStr == "<") {
-						m_eOp = LessThan;
-					} else if (strSubStr == ">=") {
-						m_eOp = GreaterThanEqualTo;
-					} else if (strSubStr == "<=") {
-						m_eOp = LessThanEqualTo;
-					} else if (strSubStr == "=") {
-						m_eOp = EqualTo;
-					} else if (strSubStr == "!=") {
-						m_eOp = NotEqualTo;
-					} else {
-						_EXCEPTION1("Threshold invalid operation \"%s\"",
-							strSubStr.c_str());
-					}
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Value;
-
-				// Read in value
-				} else if (eReadMode == ReadMode_Value) {
-					m_dValue = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
-
-				// Read in minimum count
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
-							"\nRequired: \"<name>,<operation>"
-							",<value>,<distance>\"",
-							strOp.c_str());
-				}
-			}
-		}
-
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
-					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
-					strOp.c_str());
-		}
-
-		if (m_dDistance < 0.0) {
-			_EXCEPTIONT("For threshold op, distance must be nonnegative");
-		}
-
+	std::string ToString() const {
+/*
 		// Output announcement
 		std::string strDescription = var.ToString(varreg);
 		if (m_eOp == GreaterThan) {
@@ -171,13 +91,39 @@ public:
 		strDescription += szBuffer;
 
 		Announce("%s", strDescription.c_str());
+*/
+		return std::string("");
+	}
+
+	///	<summary>
+	///		Set the operator from a string.
+	///	</summary>
+	bool SetOperatorFromString(
+		const std::string & strOp
+	) {
+		if (strOp == ">") {
+			m_eOp = GreaterThan;
+		} else if (strOp == "<") {
+			m_eOp = LessThan;
+		} else if (strOp == ">=") {
+			m_eOp = GreaterThanEqualTo;
+		} else if (strOp == "<=") {
+			m_eOp = LessThanEqualTo;
+		} else if (strOp == "=") {
+			m_eOp = EqualTo;
+		} else if (strOp == "!=") {
+			m_eOp = NotEqualTo;
+		} else {
+			return false;
+		}
+		return true;
 	}
 
 public:
 	///	<summary>
-	///		Variable to use for thresholding.
+	///		Pointer to variable to use for threshold op.
 	///	</summary>
-	VariableIndex m_varix;
+	Variable * m_pvar;
 
 	///	<summary>
 	///		Operation.
@@ -190,7 +136,7 @@ public:
 	double m_dValue;
 
 	///	<summary>
-	///		Distance to search for threshold value
+	///		Distance to search for threshold value (deg)
 	///	</summary>
 	double m_dDistance;
 };
@@ -203,6 +149,90 @@ public:
 class ClosedContourOp {
 
 public:
+	///	<summary>
+	///		Initialize from an Object.
+	///	</summary>
+	std::string InitializeFromObject(
+		const ObjectRegistry & objreg,
+		RecapConfigObject * pobjConfig,
+		const Object * pobj
+	) {
+		// Variable
+		StringObject * pobjClosedContourVar =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("var")));
+		if (pobjClosedContourVar == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"var\" property");
+		}
+
+		std::string strError =
+			pobjConfig->GetVariable(
+				pobjClosedContourVar->Value(),
+				&m_pvar);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		// Magnitude
+		StringObject * pobjClosedContourMag =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("mag")));
+		if (pobjClosedContourMag == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"mag\" property");
+		}
+
+		bool fSuccessMag =
+			pobjClosedContourMag->ToUnit(
+				m_pvar->Units(), &m_dDeltaAmount);
+		if (!fSuccessMag) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("mag")
+				+ std::string(" to ")
+				+ m_pvar->Units();
+		}
+
+		// Distance
+		StringObject * pobjClosedContourDist =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("dist")));
+		if (pobjClosedContourDist == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"dist\" property");
+		}
+
+		bool fSuccessDist =
+			pobjClosedContourDist->ToUnit(
+				"deg", &m_dDistance);
+		if (!fSuccessDist) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("dist")
+				+ std::string(" to great-circle distance");
+		}
+
+		// Search distance
+		StringObject * pobjClosedContourMinMaxDist =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("minmaxdist")));
+		if (pobjClosedContourMinMaxDist == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"minmaxdist\" property");
+		}
+
+		bool fSuccessMinMaxDist =
+			pobjClosedContourMinMaxDist->ToUnit(
+				"deg", &m_dMinMaxDist);
+		if (!fSuccessMinMaxDist) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("minmaxdist")
+				+ std::string(" to great-circle distance");
+		}
+
+		return std::string("");
+	}
+
 	///	<summary>
 	///		Convert to string.
 	///	</summary>
@@ -230,9 +260,9 @@ public:
 
 public:
 	///	<summary>
-	///		Variable to use for closed contour op.
+	///		Pointer to variable to use for closed contour op.
 	///	</summary>
-	VariableIndex m_varix;
+	Variable * m_pvar;
 
 	///	<summary>
 	///		Threshold amount.  If positive this represents a minimum
@@ -272,96 +302,10 @@ public:
 
 public:
 	///	<summary>
-	///		Parse a threshold operator string.
+	///		Convert to string.
 	///	</summary>
-	void Parse(
-		VariableRegistry & varreg,
-		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Op,
-			ReadMode_Distance,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Op;
-
-		// Get variable information
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
-
-		// Loop through string
-		for (int i = iLast; i <= strOp.length(); i++) {
-
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
-
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
-
-				// Read in operation
-				if (eReadMode == ReadMode_Op) {
-					if (strSubStr == "max") {
-						m_eOp = Max;
-					} else if (strSubStr == "min") {
-						m_eOp = Min;
-					} else if (strSubStr == "avg") {
-						m_eOp = Avg;
-					} else if (strSubStr == "maxdist") {
-						m_eOp = MaxDist;
-					} else if (strSubStr == "mindist") {
-						m_eOp = MinDist;
-					} else {
-						_EXCEPTION1("Output invalid operation \"%s\"",
-							strSubStr.c_str());
-					}
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
-
-				// Read in minimum count
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in output op \"%s\""
-							"\nRequired: \"<name>,<operation>,<distance>\"",
-							strOp.c_str());
-				}
-			}
-		}
-
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in output op \"%s\""
-					"\nRequired: \"<name>,<operation>,<distance>\"",
-					strOp.c_str());
-		}
-
-		if (m_dDistance < 0.0) {
-			_EXCEPTIONT("For output op, distance must be nonnegative");
-		}
-
-		// Output announcement
-		std::string strDescription;
-
-		if (m_eOp == Max) {
-			strDescription += "Maximum of ";
-		} else if (m_eOp == Min) {
-			strDescription += "Minimum of ";
-		} else if (m_eOp == Avg) {
-			strDescription += "Average of ";
-		} else if (m_eOp == MaxDist) {
-			strDescription += "Distance to maximum of ";
-		} else if (m_eOp == MinDist) {
-			strDescription += "Distance to minimum of ";
-		}
-
-		char szBuffer[128];
-
+	std::string ToString() const {
+/*
 		sprintf(szBuffer, "%s", var.ToString(varreg).c_str());
 		strDescription += szBuffer;
 
@@ -369,13 +313,37 @@ public:
 		strDescription += szBuffer;
 
 		Announce("%s", strDescription.c_str());
+*/
+		return std::string("");
+	}
+
+	///	<summary>
+	///		Assign the operator from a string.
+	///	</summary>
+	bool SetOperatorFromString(
+		const std::string & strOp
+	) {
+		if (strOp == "max") {
+			m_eOp = Max;
+		} else if (strOp == "min") {
+			m_eOp = Min;
+		} else if (strOp == "avg") {
+			m_eOp = Avg;
+		} else if (strOp == "maxdist") {
+			m_eOp = MaxDist;
+		} else if (strOp == "mindist") {
+			m_eOp = MinDist;
+		} else {
+			return false;
+		}
+		return true;
 	}
 
 public:
 	///	<summary>
-	///		Variable to use for output.
+	///		Pointer to variable to use for output.
 	///	</summary>
-	VariableIndex m_varix;
+	Variable * m_pvar;
 
 	///	<summary>
 	///		Operation.
@@ -387,27 +355,27 @@ public:
 	///	</summary>
 	double m_dDistance;
 };
-/*
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Find the locations of all minima in the given DataArray2D.
+///		Find the locations of all minima in the given DataArray1D.
 ///	</summary>
 template <typename real>
 void FindAllLocalMinima(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	const DataArray1D<real> & data,
 	std::set<int> & setMinima
 ) {
-	int sFaces = grid.m_vecConnectivity.size();
+	const int sFaces = mesh.adjlist.size();
 	for (int f = 0; f < sFaces; f++) {
 		
 		bool fMinimum = true;
 
 		real dValue = data[f];
-		int sNeighbors = grid.m_vecConnectivity[f].size();
+		int sNeighbors = mesh.adjlist[f].size();
 		for (int n = 0; n < sNeighbors; n++) {
-			if (data[grid.m_vecConnectivity[f][n]] < dValue) {
+			if (data[mesh.adjlist[f][n]] < dValue) {
 				fMinimum = false;
 				break;
 			}
@@ -426,19 +394,19 @@ void FindAllLocalMinima(
 ///	</summary>
 template <typename real>
 void FindAllLocalMaxima(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	const DataArray1D<real> & data,
 	std::set<int> & setMaxima
 ) {
-	int sFaces = grid.m_vecConnectivity.size();
+	const int sFaces = mesh.adjlist.size();
 	for (int f = 0; f < sFaces; f++) {
-		
+
 		bool fMaximum = true;
 
 		real dValue = data[f];
-		int sNeighbors = grid.m_vecConnectivity[f].size();
+		int sNeighbors = mesh.adjlist[f].size();
 		for (int n = 0; n < sNeighbors; n++) {
-			if (data[grid.m_vecConnectivity[f][n]] > dValue) {
+			if (data[mesh.adjlist[f][n]] > dValue) {
 				fMaximum = false;
 				break;
 			}
@@ -460,7 +428,7 @@ void FindAllLocalMaxima(
 ///	</param>
 template <typename real>
 void FindLocalMinMax(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	bool fMinimum,
 	const DataArray1D<real> & data,
 	int ix0,
@@ -472,6 +440,14 @@ void FindLocalMinMax(
 	// Verify that dMaxDist is less than 180.0
 	if (dMaxDist > 180.0) {
 		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Check index argument
+	if (ix0 >= mesh.dLat.GetRows()) {
+		_EXCEPTIONT("ix0 out of range of mesh.dLat");
+	}
+	if (ix0 >= mesh.dLon.GetRows()) {
+		_EXCEPTIONT("ix0 out of range of mesh.dLon");
 	}
 
 	// Initialize the maximum to the central location
@@ -487,8 +463,8 @@ void FindLocalMinMax(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = mesh.dLat[ix0];
+	double dLon0 = mesh.dLon[ix0];
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -501,8 +477,8 @@ void FindLocalMinMax(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatThis = mesh.dLat[ix];
+		double dLonThis = mesh.dLon[ix];
 
 		// Great circle distance to this element
 		double dR =
@@ -541,8 +517,8 @@ void FindLocalMinMax(
 		}
 
 		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		for (int n = 0; n < mesh.adjlist[ix].size(); n++) {
+			queueNodes.push(mesh.adjlist[ix][n]);
 		}
 	}
 }
@@ -554,7 +530,7 @@ void FindLocalMinMax(
 ///	</summary>
 template <typename real>
 bool HasClosedContour(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	const DataArray1D<real> & dataState,
 	const int ix0,
 	double dDeltaAmt,
@@ -581,7 +557,7 @@ bool HasClosedContour(
 		float dR;
 
 		FindLocalMinMax<real>(
-			grid,
+			mesh,
 			(dDeltaAmt > 0.0),
 			dataState,
 			ix0,
@@ -603,8 +579,8 @@ bool HasClosedContour(
 	// Reference value
 	real dRefValue = dataState[ixOrigin];
 
-	const double dLat0 = grid.m_dLat[ixOrigin];
-	const double dLon0 = grid.m_dLon[ixOrigin];
+	const double dLat0 = mesh.dLat[ixOrigin];
+	const double dLon0 = mesh.dLon[ixOrigin];
 
 	Announce(2, "Checking (%lu) : (%1.5f %1.5f)",
 		ixOrigin, dLat0, dLon0);
@@ -622,8 +598,8 @@ bool HasClosedContour(
 		setNodesVisited.insert(ix);
 
 		// Great circle distance to this element
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatThis = mesh.dLat[ix];
+		double dLonThis = mesh.dLon[ix];
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -666,8 +642,8 @@ bool HasClosedContour(
 		}
 
 		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueToVisit.push(grid.m_vecConnectivity[ix][n]);
+		for (int n = 0; n < mesh.adjlist[ix].size(); n++) {
+			queueToVisit.push(mesh.adjlist[ix][n]);
 		}
 	}
 
@@ -684,7 +660,7 @@ bool HasClosedContour(
 ///	</summary>
 template <typename real>
 bool SatisfiesThreshold(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	const DataArray1D<real> & dataState,
 	const int ix0,
 	const ThresholdOp::Operation op,
@@ -704,8 +680,8 @@ bool SatisfiesThreshold(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = mesh.dLat[ix0];
+	double dLon0 = mesh.dLon[ix0];
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -719,8 +695,8 @@ bool SatisfiesThreshold(
 		setNodesVisited.insert(ix);
 
 		// Great circle distance to this element
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatThis = mesh.dLat[ix];
+		double dLonThis = mesh.dLon[ix];
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -785,8 +761,8 @@ bool SatisfiesThreshold(
 		}
 
 		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		for (int n = 0; n < mesh.adjlist[ix].size(); n++) {
+			queueNodes.push(mesh.adjlist[ix][n]);
 		}
 	}
 
@@ -803,7 +779,7 @@ bool SatisfiesThreshold(
 ///	</param>
 template <typename real>
 void FindLocalAverage(
-	const SimpleGrid & grid,
+	const Mesh & mesh,
 	const DataArray1D<real> & data,
 	int ix0,
 	double dMaxDist,
@@ -822,8 +798,8 @@ void FindLocalAverage(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = mesh.dLat[ix0];
+	double dLon0 = mesh.dLon[ix0];
 
 	// Number of points
 	float dSum = 0.0;
@@ -840,8 +816,8 @@ void FindLocalAverage(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatThis = mesh.dLat[ix];
+		double dLonThis = mesh.dLon[ix];
 
 		// Great circle distance to this element
 		double dR =
@@ -868,14 +844,14 @@ void FindLocalAverage(
 		nCount++;
 
 		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		for (int n = 0; n < mesh.adjlist[ix].size(); n++) {
+			queueNodes.push(mesh.adjlist[ix][n]);
 		}
 	}
 
 	dAverage = dSum / static_cast<float>(nCount);
 }
-*/
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class PointSearchParam {
@@ -886,7 +862,7 @@ public:
 	///	</summary>
 	PointSearchParam() :
 		fpLog(NULL),
-		ixSearchBy(0),
+		pvarSearchBy(NULL),
 		fSearchByMinima(false),
 		dMaxLatitude(0.0),
 		dMinLatitude(0.0),
@@ -908,8 +884,8 @@ public:
 	// Log
 	FILE * fpLog;
 
-	// Variable index to search on
-	VariableIndex ixSearchBy;
+	// Variable to search on
+	Variable * pvarSearchBy;
 
 	// Serach on minima
 	bool fSearchByMinima;
@@ -957,15 +933,14 @@ public:
 	int iVerbosityLevel;
 
 };
-/*
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void PointSearch(
-	int iFile,
-	const std::string & strInputFiles,
-	const std::string & strOutputFile,
-	const std::string & strConnectivity,
-	VariableRegistry & varreg,
+	size_t iFileIx,
+	size_t iTimeIx,
+	const Mesh & mesh,
+	RecapConfigObject * pobjConfig,
 	const PointSearchParam & param
 ) {
 	// Set the Announce buffer
@@ -1006,327 +981,373 @@ void PointSearch(
 	std::vector<OutputOp> & vecOutputOp =
 		*(param.pvecOutputOp);
 
-	// Unload data from the VariableRegistry
-	varreg.UnloadAllGridData();
+	// Load the data for the search variable
+	if (param.pvarSearchBy == NULL) {
+		_EXCEPTION();
+	}
+	const DataArray1D<float> & dataSearch = param.pvarSearchBy->GetData();
 
-	// Define the SimpleGrid
-	SimpleGrid grid;
+	// Tag all minima
+	std::set<int> setCandidates;
 
-	// Dimensions
-	int nSize = 0;
-	int nLon = 0;
-	int nLat = 0;
-
-	// Load in the benchmark file
-	NcFileVector vecFiles;
-
-	ParseInputFiles(strInputFiles, vecFiles);
-
-	// Check for connectivity file
-	if (strConnectivity != "") {
-		grid.FromFile(strConnectivity);
-
-		nSize = grid.GetSize();
-
-	// No connectivity file; check for latitude/longitude dimension
+	if (param.fSearchByMinima) {
+		FindAllLocalMinima<float>(mesh, dataSearch, setCandidates);
 	} else {
-
-		NcDim * dimLat = vecFiles[0]->get_dim("lat");
-		if (dimLat == NULL) {
-			_EXCEPTIONT("No dimension \"lat\" found in input file");
-		}
-
-		NcDim * dimLon = vecFiles[0]->get_dim("lon");
-		if (dimLon == NULL) {
-			_EXCEPTIONT("No dimension \"lon\" found in input file");
-		}
-
-		NcVar * varLat = vecFiles[0]->get_var("lat");
-		if (varLat == NULL) {
-			_EXCEPTIONT("No variable \"lat\" found in input file");
-		}
-
-		NcVar * varLon = vecFiles[0]->get_var("lon");
-		if (varLon == NULL) {
-			_EXCEPTIONT("No variable \"lon\" found in input file");
-		}
-
-		nLat = dimLat->size();
-		nLon = dimLon->size();
-
-		DataArray1D<double> vecLat(nLat);
-		varLat->get(vecLat, nLat);
-
-		for (int j = 0; j < nLat; j++) {
-			vecLat[j] *= M_PI / 180.0;
-		}
-
-		DataArray1D<double> vecLon(nLon);
-		varLon->get(vecLon, nLon);
-
-		for (int i = 0; i < nLon; i++) {
-			vecLon[i] *= M_PI / 180.0;
-		}
-
-		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(vecLat, vecLon, param.fRegional);
+		FindAllLocalMaxima<float>(mesh, dataSearch, setCandidates);
 	}
 
-	// Get time dimension
-	NcDim * dimTime = vecFiles[0]->get_dim("time");
-	if (dimTime == NULL) {
-		_EXCEPTIONT("No dimension \"time\" found in first input file");
-	}
+	// Total number of candidates
+	int nTotalCandidates = setCandidates.size();
 
-	NcVar * varTime = vecFiles[0]->get_var("time");
-	if (varTime == NULL) {
-		_EXCEPTIONT("No variable \"time\" found in input file");
-	}
+	int nRejectedLocation = 0;
+	int nRejectedTopography = 0;
+	int nRejectedMerge = 0;
 
-	int nTime = dimTime->size();
+	DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
+	DataArray1D<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
+	DataArray1D<int> vecRejectedThreshold(vecThresholdOp.size());
 
-	DataArray1D<double> dTime(nTime);
+	// Eliminate based on interval
+	if ((param.dMinLatitude != param.dMaxLatitude) ||
+	    (param.dMinLongitude != param.dMaxLongitude) ||
+		(param.dMinAbsLatitude != 0.0)
+	) {
+		std::set<int> setNewCandidates;
 
-	if (varTime->type() == ncDouble) {
-		varTime->get(dTime, nTime);
+		std::set<int>::const_iterator iterCandidate
+			= setCandidates.begin();
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+			double dLat = mesh.dLat[*iterCandidate];
+			double dLon = mesh.dLon[*iterCandidate];
 
-	} else if (varTime->type() == ncFloat) {
-		DataArray1D<float> dTimeFloat;
-		dTimeFloat.Initialize(nTime);
-
-		varTime->get(dTimeFloat, nTime);
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(dTimeFloat[t]);
-		}
-
-	} else if (varTime->type() == ncInt) {
-		DataArray1D<int> dTimeInt;
-		dTimeInt.Initialize(nTime);
-
-		varTime->get(dTimeInt, nTime);
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(dTimeInt[t]);
-		}
-
-	} else {
-		_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
-			"Expected \"float\", \"double\" or \"int\"");
-	}
-
-	// Open output file
-	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
-	if (fpOutput == NULL) {
-		_EXCEPTION1("Could not open output file \"%s\"",
-			strOutputFile.c_str());
-	}
-
-	if (param.fOutputHeader) {
-		fprintf(fpOutput, "#year\tmonth\tday\tcount\thour\n");
-
-		if (grid.m_nGridDim.size() == 1) {
-			fprintf(fpOutput, "#\ti\tlon\tlat");
-		} else {
-			fprintf(fpOutput, "#\ti\tj\tlon\tlat");
-		}
-
-		for (int i = 0; i < vecOutputOp.size(); i++) {
-			Variable & varOp = varreg.Get(vecOutputOp[i].m_varix);
-			fprintf(fpOutput, "\t%s", varOp.ToString(varreg).c_str());
-		}
-		fprintf(fpOutput, "\n");
-	}
-
-	// Loop through all times
-	for (int t = 0; t < nTime; t += param.nTimeStride) {
-	//for (int t = 0; t < 1; t++) {
-
-		char szStartBlock[128];
-		sprintf(szStartBlock, "Time %i", t);
-		AnnounceStartBlock(szStartBlock);
-
-		// Load the data for the search variable
-		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
-		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
-
-		const DataArray1D<float> & dataSearch = varSearchBy.GetData();
-
-		// Tag all minima
-		std::set<int> setCandidates;
-
-		if (param.fSearchByMinima) {
-			FindAllLocalMinima<float>(grid, dataSearch, setCandidates);
-		} else {
-			FindAllLocalMaxima<float>(grid, dataSearch, setCandidates);
-		}
-
-		// Total number of candidates
-		int nTotalCandidates = setCandidates.size();
-
-		int nRejectedLocation = 0;
-		int nRejectedTopography = 0;
-		int nRejectedMerge = 0;
-
-		DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
-		DataArray1D<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
-		DataArray1D<int> vecRejectedThreshold(vecThresholdOp.size());
-
-		// Eliminate based on interval
-		if ((param.dMinLatitude != param.dMaxLatitude) ||
-		    (param.dMinLongitude != param.dMaxLongitude) ||
-			(param.dMinAbsLatitude != 0.0)
-		) {
-			std::set<int> setNewCandidates;
-
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				double dLat = grid.m_dLat[*iterCandidate];
-				double dLon = grid.m_dLon[*iterCandidate];
-
-				if (param.dMinLatitude != param.dMaxLatitude) {
-					if (dLat < param.dMinLatitude) {
+			if (param.dMinLatitude != param.dMaxLatitude) {
+				if (dLat < param.dMinLatitude) {
+					nRejectedLocation++;
+					continue;
+				}
+				if (dLat > param.dMaxLatitude) {
+					nRejectedLocation++;
+					continue;
+				}
+			}
+			if (param.dMinLongitude != param.dMaxLongitude) {
+				if (dLon < 0.0) {
+					int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
+					dLon += static_cast<double>(iLonShift + 1) * 2.0 * M_PI;
+				}
+				if (dLon >= 2.0 * M_PI) {
+					int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
+					dLon -= static_cast<double>(iLonShift - 1) * 2.0 * M_PI;
+				}
+				if (param.dMinLongitude < param.dMaxLongitude) {
+					if (dLon < param.dMinLongitude) {
 						nRejectedLocation++;
 						continue;
 					}
-					if (dLat > param.dMaxLatitude) {
+					if (dLon > param.dMaxLongitude) {
+						nRejectedLocation++;
+						continue;
+					}
+
+				} else {
+					if ((dLon > param.dMaxLongitude) &&
+					    (dLon < param.dMinLongitude)
+					) {
 						nRejectedLocation++;
 						continue;
 					}
 				}
-				if (param.dMinLongitude != param.dMaxLongitude) {
-					if (dLon < 0.0) {
-						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
-						dLon += static_cast<double>(iLonShift + 1) * 2.0 * M_PI;
-					}
-					if (dLon >= 2.0 * M_PI) {
-						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
-						dLon -= static_cast<double>(iLonShift - 1) * 2.0 * M_PI;
-					}
-					if (param.dMinLongitude < param.dMaxLongitude) {
-						if (dLon < param.dMinLongitude) {
-							nRejectedLocation++;
-							continue;
-						}
-						if (dLon > param.dMaxLongitude) {
-							nRejectedLocation++;
-							continue;
+			}
+			if (param.dMinAbsLatitude != 0.0) {
+				if (fabs(dLat) < param.dMinAbsLatitude) {
+					nRejectedLocation++;
+					continue;
+				}
+			}
+			setNewCandidates.insert(*iterCandidate);
+		}
+
+		setCandidates = setNewCandidates;
+	}
+/*
+	// Eliminate based on merge distance
+	if (param.dMergeDist != 0.0) {
+		std::set<int> setNewCandidates;
+
+		// Calculate chord distance
+		double dSphDist =
+			2.0 * sin(0.5 * param.dMergeDist / 180.0 * M_PI);
+
+		// Create a new KD Tree containing all nodes
+		kdtree * kdMerge = kd_create(3);
+
+		std::set<int>::const_iterator iterCandidate
+			= setCandidates.begin();
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+			double dLat = mesh.dLat[*iterCandidate];
+			double dLon = mesh.dLon[*iterCandidate];
+
+			double dX = cos(dLon) * cos(dLat);
+			double dY = sin(dLon) * cos(dLat);
+			double dZ = sin(dLat);
+
+			kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterCandidate)));
+		}
+
+		// Loop through all candidates find set of nearest neighbors
+		iterCandidate = setCandidates.begin();
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+			double dLat = mesh.dLat[*iterCandidate];
+			double dLon = mesh.dLon[*iterCandidate];
+
+			double dX = cos(dLon) * cos(dLat);
+			double dY = sin(dLon) * cos(dLat);
+			double dZ = sin(dLat);
+
+			// Find all neighbors within dSphDist
+			kdres * kdresMerge =
+				kd_nearest_range3(kdMerge, dX, dY, dZ, dSphDist);
+
+			// Number of neighbors
+			int nNeighbors = kd_res_size(kdresMerge);
+			if (nNeighbors == 0) {
+				setNewCandidates.insert(*iterCandidate);
+
+			} else {
+				double dValue =
+					static_cast<double>(dataSearch[*iterCandidate]);
+
+				bool fExtrema = true;
+				for (;;) {
+					int * ppr = (int *)(kd_res_item_data(kdresMerge));
+
+					if (param.fSearchByMinima) {
+						if (static_cast<double>(dataSearch[*ppr]) < dValue) {
+							fExtrema = false;
+							break;
 						}
 
 					} else {
-						if ((dLon > param.dMaxLongitude) &&
-						    (dLon < param.dMinLongitude)
-						) {
-							nRejectedLocation++;
-							continue;
-						}
-					}
-				}
-				if (param.dMinAbsLatitude != 0.0) {
-					if (fabs(dLat) < param.dMinAbsLatitude) {
-						nRejectedLocation++;
-						continue;
-					}
-				}
-				setNewCandidates.insert(*iterCandidate);
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		// Eliminate based on merge distance
-		if (param.dMergeDist != 0.0) {
-			std::set<int> setNewCandidates;
-
-			// Calculate chord distance
-			double dSphDist =
-				2.0 * sin(0.5 * param.dMergeDist / 180.0 * M_PI);
-
-			// Create a new KD Tree containing all nodes
-			kdtree * kdMerge = kd_create(3);
-
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				double dLat = grid.m_dLat[*iterCandidate];
-				double dLon = grid.m_dLon[*iterCandidate];
-
-				double dX = cos(dLon) * cos(dLat);
-				double dY = sin(dLon) * cos(dLat);
-				double dZ = sin(dLat);
-
-				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterCandidate)));
-			}
-
-			// Loop through all candidates find set of nearest neighbors
-			iterCandidate = setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				double dLat = grid.m_dLat[*iterCandidate];
-				double dLon = grid.m_dLon[*iterCandidate];
-
-				double dX = cos(dLon) * cos(dLat);
-				double dY = sin(dLon) * cos(dLat);
-				double dZ = sin(dLat);
-
-				// Find all neighbors within dSphDist
-				kdres * kdresMerge =
-					kd_nearest_range3(kdMerge, dX, dY, dZ, dSphDist);
-
-				// Number of neighbors
-				int nNeighbors = kd_res_size(kdresMerge);
-				if (nNeighbors == 0) {
-					setNewCandidates.insert(*iterCandidate);
-
-				} else {
-					double dValue =
-						static_cast<double>(dataSearch[*iterCandidate]);
-
-					bool fExtrema = true;
-					for (;;) {
-						int * ppr = (int *)(kd_res_item_data(kdresMerge));
-
-						if (param.fSearchByMinima) {
-							if (static_cast<double>(dataSearch[*ppr]) < dValue) {
-								fExtrema = false;
-								break;
-							}
-
-						} else {
-							if (static_cast<double>(dataSearch[*ppr]) > dValue) {
-								fExtrema = false;
-								break;
-							}
-						}
-
-						int iHasMore = kd_res_next(kdresMerge);
-						if (!iHasMore) {
+						if (static_cast<double>(dataSearch[*ppr]) > dValue) {
+							fExtrema = false;
 							break;
 						}
 					}
 
-					if (fExtrema) {
-						setNewCandidates.insert(*iterCandidate);
-					} else {
-						nRejectedMerge++;
+					int iHasMore = kd_res_next(kdresMerge);
+					if (!iHasMore) {
+						break;
 					}
 				}
 
-				kd_res_free(kdresMerge);
+				if (fExtrema) {
+					setNewCandidates.insert(*iterCandidate);
+				} else {
+					nRejectedMerge++;
+				}
 			}
 
-			// Destroy the KD Tree
-			kd_free(kdMerge);
-
-			// Update set of pressure minima
-			setCandidates = setNewCandidates;
+			kd_res_free(kdresMerge);
 		}
 
-		// Eliminate based on thresholds
-		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
+		// Destroy the KD Tree
+		kd_free(kdMerge);
 
-			std::set<int> setNewCandidates;
+		// Update set of pressure minima
+		setCandidates = setNewCandidates;
+	}
+
+	// Eliminate based on thresholds
+	for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
+
+		std::set<int> setNewCandidates;
+
+		// Load the search variable data
+		Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
+		var.LoadGridData(varreg, vecFiles, grid, t);
+		const DataArray1D<float> & dataState = var.GetData();
+
+		// Loop through all pressure minima
+		std::set<int>::const_iterator iterCandidate
+			= setCandidates.begin();
+
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+			// Determine if the threshold is satisfied
+			bool fSatisfiesThreshold =
+				SatisfiesThreshold<float>(
+					grid,
+					dataState,
+					*iterCandidate,
+					vecThresholdOp[tc].m_eOp,
+					vecThresholdOp[tc].m_dValue,
+					vecThresholdOp[tc].m_dDistance
+				);
+
+			// If not rejected, add to new pressure minima array
+			if (fSatisfiesThreshold) {
+				setNewCandidates.insert(*iterCandidate);
+			} else {
+				vecRejectedThreshold[tc]++;
+			}
+		}
+
+		setCandidates = setNewCandidates;
+	}
+
+	// Eliminate based on closed contours
+	for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
+		std::set<int> setNewCandidates;
+
+		// Load the search variable data
+		Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
+		var.LoadGridData(varreg, vecFiles, grid, t);
+		const DataArray1D<float> & dataState = var.GetData();
+
+		// Loop through all pressure minima
+		std::set<int>::const_iterator iterCandidate
+			= setCandidates.begin();
+
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+			// Determine if a closed contour is present
+			bool fHasClosedContour =
+				HasClosedContour<float>(
+					grid,
+					dataState,
+					*iterCandidate,
+					vecClosedContourOp[ccc].m_dDeltaAmount,
+					vecClosedContourOp[ccc].m_dDistance,
+					vecClosedContourOp[ccc].m_dMinMaxDist
+				);
+
+			// If not rejected, add to new pressure minima array
+			if (fHasClosedContour) {
+				setNewCandidates.insert(*iterCandidate);
+			} else {
+				vecRejectedClosedContour[ccc]++;
+			}
+		}
+
+		setCandidates = setNewCandidates;
+	}
+
+	// Eliminate based on no closed contours
+	for (int ccc = 0; ccc < vecNoClosedContourOp.size(); ccc++) {
+		std::set<int> setNewCandidates;
+
+		// Load the search variable data
+		Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
+		var.LoadGridData(varreg, vecFiles, grid, t);
+		const DataArray1D<float> & dataState = var.GetData();
+
+		// Loop through all pressure minima
+		std::set<int>::const_iterator iterCandidate
+			= setCandidates.begin();
+
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+			// Determine if a closed contour is present
+			bool fHasClosedContour =
+				HasClosedContour<float>(
+					grid,
+					dataState,
+					*iterCandidate,
+					vecNoClosedContourOp[ccc].m_dDeltaAmount,
+					vecNoClosedContourOp[ccc].m_dDistance,
+					vecNoClosedContourOp[ccc].m_dMinMaxDist
+				);
+
+			// If a closed contour is present, reject this candidate
+			if (fHasClosedContour) {
+				vecRejectedNoClosedContour[ccc]++;
+			} else {
+				setNewCandidates.insert(*iterCandidate);
+			}
+		}
+
+		setCandidates = setNewCandidates;
+	}
+
+	Announce("Total candidates: %i", setCandidates.size());
+	Announce("Rejected (  location): %i", nRejectedLocation);
+	Announce("Rejected (topography): %i", nRejectedTopography);
+	Announce("Rejected (    merged): %i", nRejectedMerge);
+
+	for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
+		Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
+
+		Announce("Rejected (thresh. %s): %i",
+				var.m_strName.c_str(),
+				vecRejectedThreshold[tc]);
+	}
+
+	for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
+		Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
+
+		Announce("Rejected (contour %s): %i",
+				var.m_strName.c_str(),
+				vecRejectedClosedContour[ccc]);
+	}
+
+	for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
+		Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
+
+		Announce("Rejected (nocontour %s): %i",
+				var.m_strName.c_str(),
+				vecRejectedNoClosedContour[ccc]);
+	}
+
+	// Write results to file
+	{
+		// Parse time information
+		//NcVar * varDate = ncInput.get_var("date");
+		//NcVar * varDateSec = ncInput.get_var("datesec");
+
+		int nDateYear;
+		int nDateMonth;
+		int nDateDay;
+		int nDateHour;
+
+		NcAtt * attTimeUnits = varTime->get_att("units");
+		if (attTimeUnits == NULL) {
+			_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
+		}
+
+		std::string strTimeUnits = attTimeUnits->as_string(0);
+
+		std::string strTimeCalendar = "standard";
+		NcAtt * attTimeCalendar = varTime->get_att("calendar");
+		if (attTimeCalendar != NULL) {
+			strTimeCalendar = attTimeCalendar->as_string(0);
+		}
+
+		ParseTimeDouble(
+			strTimeUnits,
+			strTimeCalendar,
+			dTime[t],
+			nDateYear,
+			nDateMonth,
+			nDateDay,
+			nDateHour);
+
+		// Write time information
+		fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
+			nDateYear,
+			nDateMonth,
+			nDateDay,
+			static_cast<int>(setCandidates.size()),
+			nDateHour);
+
+		// Write candidate information
+		int iCandidateCount = 0;
+
+		// Apply output operators
+		DataArray2D<float> dOutput(setCandidates.size(), vecOutputOp.size());
+		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 
 			// Load the search variable data
-			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
+			Variable & var = varreg.Get(vecOutputOp[outc].m_varix);
 			var.LoadGridData(varreg, vecFiles, grid, t);
 			const DataArray1D<float> & dataState = var.GetData();
 
@@ -1334,311 +1355,116 @@ void PointSearch(
 			std::set<int>::const_iterator iterCandidate
 				= setCandidates.begin();
 
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				// Determine if the threshold is satisfied
-				bool fSatisfiesThreshold =
-					SatisfiesThreshold<float>(
-						grid,
-						dataState,
-						*iterCandidate,
-						vecThresholdOp[tc].m_eOp,
-						vecThresholdOp[tc].m_dValue,
-						vecThresholdOp[tc].m_dDistance
-					);
-
-				// If not rejected, add to new pressure minima array
-				if (fSatisfiesThreshold) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					vecRejectedThreshold[tc]++;
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		// Eliminate based on closed contours
-		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
-			std::set<int> setNewCandidates;
-
-			// Load the search variable data
-			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataArray1D<float> & dataState = var.GetData();
-
-			// Loop through all pressure minima
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				// Determine if a closed contour is present
-				bool fHasClosedContour =
-					HasClosedContour<float>(
-						grid,
-						dataState,
-						*iterCandidate,
-						vecClosedContourOp[ccc].m_dDeltaAmount,
-						vecClosedContourOp[ccc].m_dDistance,
-						vecClosedContourOp[ccc].m_dMinMaxDist
-					);
-
-				// If not rejected, add to new pressure minima array
-				if (fHasClosedContour) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					vecRejectedClosedContour[ccc]++;
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		// Eliminate based on no closed contours
-		for (int ccc = 0; ccc < vecNoClosedContourOp.size(); ccc++) {
-			std::set<int> setNewCandidates;
-
-			// Load the search variable data
-			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataArray1D<float> & dataState = var.GetData();
-
-			// Loop through all pressure minima
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				// Determine if a closed contour is present
-				bool fHasClosedContour =
-					HasClosedContour<float>(
-						grid,
-						dataState,
-						*iterCandidate,
-						vecNoClosedContourOp[ccc].m_dDeltaAmount,
-						vecNoClosedContourOp[ccc].m_dDistance,
-						vecNoClosedContourOp[ccc].m_dMinMaxDist
-					);
-
-				// If a closed contour is present, reject this candidate
-				if (fHasClosedContour) {
-					vecRejectedNoClosedContour[ccc]++;
-				} else {
-					setNewCandidates.insert(*iterCandidate);
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		Announce("Total candidates: %i", setCandidates.size());
-		Announce("Rejected (  location): %i", nRejectedLocation);
-		Announce("Rejected (topography): %i", nRejectedTopography);
-		Announce("Rejected (    merged): %i", nRejectedMerge);
-
-		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
-			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-
-			Announce("Rejected (thresh. %s): %i",
-					var.m_strName.c_str(),
-					vecRejectedThreshold[tc]);
-		}
-
-		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
-			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-
-			Announce("Rejected (contour %s): %i",
-					var.m_strName.c_str(),
-					vecRejectedClosedContour[ccc]);
-		}
-
-		for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
-			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-
-			Announce("Rejected (nocontour %s): %i",
-					var.m_strName.c_str(),
-					vecRejectedNoClosedContour[ccc]);
-		}
-
-		// Write results to file
-		{
-			// Parse time information
-			//NcVar * varDate = ncInput.get_var("date");
-			//NcVar * varDateSec = ncInput.get_var("datesec");
-
-			int nDateYear;
-			int nDateMonth;
-			int nDateDay;
-			int nDateHour;
-
-			NcAtt * attTimeUnits = varTime->get_att("units");
-			if (attTimeUnits == NULL) {
-				_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
-			}
-
-			std::string strTimeUnits = attTimeUnits->as_string(0);
-
-			std::string strTimeCalendar = "standard";
-			NcAtt * attTimeCalendar = varTime->get_att("calendar");
-			if (attTimeCalendar != NULL) {
-				strTimeCalendar = attTimeCalendar->as_string(0);
-			}
-
-			ParseTimeDouble(
-				strTimeUnits,
-				strTimeCalendar,
-				dTime[t],
-				nDateYear,
-				nDateMonth,
-				nDateDay,
-				nDateHour);
-
-			// Write time information
-			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				nDateYear,
-				nDateMonth,
-				nDateDay,
-				static_cast<int>(setCandidates.size()),
-				nDateHour);
-
-			// Write candidate information
-			int iCandidateCount = 0;
-
-			// Apply output operators
-			DataArray2D<float> dOutput(setCandidates.size(), vecOutputOp.size());
-			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
-
-				// Load the search variable data
-				Variable & var = varreg.Get(vecOutputOp[outc].m_varix);
-				var.LoadGridData(varreg, vecFiles, grid, t);
-				const DataArray1D<float> & dataState = var.GetData();
-
-				// Loop through all pressure minima
-				std::set<int>::const_iterator iterCandidate
-					= setCandidates.begin();
-
-				iCandidateCount = 0;
-				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-					int ixExtremum;
-					float dValue;
-					float dRMax;
-
-					if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
-						FindLocalMinMax<float>(
-							grid,
-							false,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
-						FindLocalMinMax<float>(
-							grid,
-							false,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dRMax;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
-						FindLocalMinMax<float>(
-							grid,
-							true,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
-						FindLocalMinMax<float>(
-							grid,
-							true,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dRMax;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
-						FindLocalAverage<float>(
-							grid,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							dValue);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else {
-						_EXCEPTIONT("Invalid Output operator");
-					}
-
-					iCandidateCount++;
-				}
-			}
-
-			// Output all candidates
 			iCandidateCount = 0;
-
-			std::set<int>::const_iterator iterCandidate = setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				if (grid.m_nGridDim.size() == 1) {
-					fprintf(fpOutput, "\t%i", *iterCandidate);
+				int ixExtremum;
+				float dValue;
+				float dRMax;
 
-				} else if (grid.m_nGridDim.size() == 2) {
-					fprintf(fpOutput, "\t%i\t%i",
-						(*iterCandidate) % static_cast<int>(grid.m_nGridDim[1]),
-						(*iterCandidate) / static_cast<int>(grid.m_nGridDim[1]));
+				if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
+					FindLocalMinMax<float>(
+						grid,
+						false,
+						dataState,
+						*iterCandidate,
+						vecOutputOp[outc].m_dDistance,
+						ixExtremum,
+						dValue,
+						dRMax);
+
+					dOutput[iCandidateCount][outc] = dValue;
+
+				} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
+					FindLocalMinMax<float>(
+						grid,
+						false,
+						dataState,
+						*iterCandidate,
+						vecOutputOp[outc].m_dDistance,
+						ixExtremum,
+						dValue,
+						dRMax);
+
+					dOutput[iCandidateCount][outc] = dRMax;
+
+				} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
+					FindLocalMinMax<float>(
+						grid,
+						true,
+						dataState,
+						*iterCandidate,
+						vecOutputOp[outc].m_dDistance,
+						ixExtremum,
+						dValue,
+						dRMax);
+
+					dOutput[iCandidateCount][outc] = dValue;
+
+				} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
+					FindLocalMinMax<float>(
+						grid,
+						true,
+						dataState,
+						*iterCandidate,
+						vecOutputOp[outc].m_dDistance,
+						ixExtremum,
+						dValue,
+						dRMax);
+
+					dOutput[iCandidateCount][outc] = dRMax;
+
+				} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
+					FindLocalAverage<float>(
+						grid,
+						dataState,
+						*iterCandidate,
+						vecOutputOp[outc].m_dDistance,
+						dValue);
+
+					dOutput[iCandidateCount][outc] = dValue;
+
+				} else {
+					_EXCEPTIONT("Invalid Output operator");
 				}
-
-				fprintf(fpOutput, "\t%3.6f\t%3.6f",
-					grid.m_dLon[*iterCandidate] * 180.0 / M_PI,
-					grid.m_dLat[*iterCandidate] * 180.0 / M_PI);
-
-				for (int outc = 0; outc < vecOutputOp.size(); outc++) {
-					fprintf(fpOutput, "\t%3.6e",
-						dOutput[iCandidateCount][outc]);
-				}
-
-				fprintf(fpOutput, "\n");
 
 				iCandidateCount++;
 			}
 		}
 
-		AnnounceEndBlock("Done");
+		// Output all candidates
+		iCandidateCount = 0;
+
+		std::set<int>::const_iterator iterCandidate = setCandidates.begin();
+		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+			if (grid.m_nGridDim.size() == 1) {
+				fprintf(fpOutput, "\t%i", *iterCandidate);
+
+			} else if (grid.m_nGridDim.size() == 2) {
+				fprintf(fpOutput, "\t%i\t%i",
+					(*iterCandidate) % static_cast<int>(grid.m_nGridDim[1]),
+					(*iterCandidate) / static_cast<int>(grid.m_nGridDim[1]));
+			}
+
+			fprintf(fpOutput, "\t%3.6f\t%3.6f",
+				mesh.dLon[*iterCandidate] * 180.0 / M_PI,
+				mesh.dLat[*iterCandidate] * 180.0 / M_PI);
+
+			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+				fprintf(fpOutput, "\t%3.6e",
+					dOutput[iCandidateCount][outc]);
+			}
+
+			fprintf(fpOutput, "\n");
+
+			iCandidateCount++;
+		}
 	}
-
-	fclose(fpOutput);
-
-	for (int i = 0; i < vecFiles.size(); i++) {
-		vecFiles[i]->close();
-	}
-
-	// Reset the Announce buffer
-	AnnounceSetOutputBuffer(stdout);
-	AnnounceOnlyOutputOnRankZero();
-}
 */
+	AnnounceEndBlock("Done");
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string PointSearchFunction::Call(
@@ -1666,6 +1492,11 @@ std::string PointSearchFunction::Call(
 		return std::string("First argument is an invalid recap_configuration "
 			"object: Missing \"data\" or \"grid\" properties");
 	}
+
+	// Construct the adjacency list (needed for this routine)
+	Mesh & mesh = pobjConfig->GetGrid()->GetMesh();
+
+	mesh.ConstructAdjacencyList();
 /*
 	// Grid object
 	GridObject * pobjGrid =
@@ -1721,108 +1552,149 @@ std::string PointSearchFunction::Call(
 		dcuparam.fSearchByMinima = true;
 	}
 
+	// Maximum latitude for detection
+	StringObject * pobjMaximumLatitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("maxlat")));
+	if (pobjMaximumLatitude != NULL) {
+		bool fSuccess =
+			pobjMaximumLatitude->ToUnit(
+				"deg", &(dcuparam.dMaxLatitude));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("maxlat")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Minimum latitude for detection
+	StringObject * pobjMinimumLatitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("minlat")));
+	if (pobjMinimumLatitude != NULL) {
+		bool fSuccessMag =
+			pobjMinimumLatitude->ToUnit(
+				"deg", &(dcuparam.dMinLatitude));
+		if (!fSuccessMag) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("minlat")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Minimum absolute latitude for detection
+	StringObject * pobjMinimumAbsLatitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("minabslat")));
+	if (pobjMinimumAbsLatitude != NULL) {
+		bool fSuccess =
+			pobjMinimumAbsLatitude->ToUnit(
+				"deg", &(dcuparam.dMinAbsLatitude));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("minabslat")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Maximum longitude for detection
+	StringObject * pobjMaximumLongitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("maxlon")));
+	if (pobjMaximumLongitude != NULL) {
+		bool fSuccess =
+			pobjMaximumLongitude->ToUnit(
+				"deg", &(dcuparam.dMaxLongitude));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("maxlon")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Minimum longitude for detection
+	StringObject * pobjMinimumLongitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("minlon")));
+	if (pobjMinimumLongitude != NULL) {
+		bool fSuccess =
+			pobjMinimumLongitude->ToUnit(
+				"deg", &(dcuparam.dMinLongitude));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("minlon")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Merge distance for detection
+	StringObject * pobjMergeDist =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParam->ChildName("mergedist")));
+	if (pobjMergeDist != NULL) {
+		bool fSuccess =
+			pobjMergeDist->ToUnit(
+				"deg", &(dcuparam.dMergeDist));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParam->ChildName("mergedist")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
 	// Construct all closed contour objects
+	std::vector<ClosedContourOp> vecClosedContourOps;
+
 	ListObject * pobjClosedContourList =
 		dynamic_cast<ListObject *>(
 			objreg.GetObject(pobjParam->ChildName("closedcontourcmd")));
 
 	if (pobjClosedContourList != NULL) {
 		for (size_t i = 0; i < pobjClosedContourList->ChildrenCount(); i++) {
-
 			ClosedContourOp opCC;
 
 			Object * pobjChild = pobjClosedContourList->GetChild(i);
 
-			// Variable
-			StringObject * pobjClosedContourVar =
-				dynamic_cast<StringObject *>(
-					objreg.GetObject(pobjChild->ChildName("var")));
-			if (pobjClosedContourVar == NULL) {
-				return pobjChild->Name()
-					+ std::string(" has invalid \"var\" property");
-			}
-
-			Variable * pVar;
 			std::string strError =
-				pobjConfig->GetVariable(
-					pobjClosedContourVar->Value(),
-					&pVar);
+				opCC.InitializeFromObject(
+					objreg, pobjConfig, pobjChild);
 
 			if (strError != "") {
 				return strError;
 			}
 
-			// Magnitude
-			StringObject * pobjClosedContourMag =
-				dynamic_cast<StringObject *>(
-					objreg.GetObject(pobjChild->ChildName("mag")));
-			if (pobjClosedContourMag == NULL) {
-				return pobjChild->Name()
-					+ std::string(" has invalid \"mag\" property");
-			}
-
-			bool fSuccessMag =
-				pobjClosedContourMag->ToUnit(
-					pVar->Units(), &opCC.m_dDeltaAmount);
-			if (!fSuccessMag) {
-				return std::string("Cannot convert ")
-					+ pobjChild->ChildName("mag")
-					+ std::string(" to ")
-					+ pVar->Units();
-			}
-
-			// Distance
-			StringObject * pobjClosedContourDist =
-				dynamic_cast<StringObject *>(
-					objreg.GetObject(pobjChild->ChildName("dist")));
-			if (pobjClosedContourDist == NULL) {
-				return pobjChild->Name()
-					+ std::string(" has invalid \"dist\" property");
-			}
-
-			bool fSuccessDist =
-				pobjClosedContourDist->ToUnit(
-					"deg", &opCC.m_dDistance);
-			if (!fSuccessDist) {
-				return std::string("Cannot convert ")
-					+ pobjChild->ChildName("dist")
-					+ std::string(" to great-circle distance");
-			}
-
-			// Search distance
-			StringObject * pobjClosedContourMinMaxDist =
-				dynamic_cast<StringObject *>(
-					objreg.GetObject(pobjChild->ChildName("minmaxdist")));
-			if (pobjClosedContourMinMaxDist == NULL) {
-				return pobjChild->Name()
-					+ std::string(" has invalid \"minmaxdist\" property");
-			}
-
-			bool fSuccessMinMaxDist =
-				pobjClosedContourMinMaxDist->ToUnit(
-					"deg", &opCC.m_dMinMaxDist);
-			if (!fSuccessMinMaxDist) {
-				return std::string("Cannot convert ")
-					+ pobjChild->ChildName("minmaxdist")
-					+ std::string(" to great-circle distance");
-			}
-	
-/*
-			Object * pobjCC =
-				pobjClosedContourList->
- 
-warm_core_criteria = parameter_list()
-warm_core_criteria.var = "T(400hPa)"
-warm_core_criteria.mag = "-0.4K"
-warm_core_criteria.dist = "8.0deg"
-warm_core_criteria.minmaxdist = "1.1deg"
-
-			StringObject * pobjCCDelta =
-				dynamic_cast<StringObject *>(
-					pobjClosedContour
-*/
+			vecClosedContourOps.push_back(opCC);
 		}
 	}
+
+	dcuparam.pvecClosedContourOp = &vecClosedContourOps;
+
+	// Construct all no closed contour objects
+	std::vector<ClosedContourOp> vecNoClosedContourOps;
+
+	ListObject * pobjNoClosedContourList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(pobjParam->ChildName("noclosedcontourcmd")));
+
+	if (pobjNoClosedContourList != NULL) {
+		for (size_t i = 0; i < pobjNoClosedContourList->ChildrenCount(); i++) {
+			ClosedContourOp opCC;
+
+			Object * pobjChild = pobjNoClosedContourList->GetChild(i);
+
+			std::string strError =
+				opCC.InitializeFromObject(
+					objreg, pobjConfig, pobjChild);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			vecNoClosedContourOps.push_back(opCC);
+		}
+	}
+
+	dcuparam.pvecNoClosedContourOp = &vecNoClosedContourOps;
 
 	// Distribute time steps over ranks
 

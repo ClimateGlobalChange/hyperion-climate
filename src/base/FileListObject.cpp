@@ -25,6 +25,8 @@
 #include <fstream>
 
 ///////////////////////////////////////////////////////////////////////////////
+// FileListObject
+///////////////////////////////////////////////////////////////////////////////
 
 const size_t FileListObject::InvalidTimeIx = (-1);
 
@@ -90,6 +92,58 @@ std::string FileListObject::PopulateFromSearchString(
 	closedir(pDir);
 
 	return IndexVariableData();;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool FileListObject::LoadData_float(
+	size_t sTime,
+	VariableInfo * pinfo,
+	DataArray1D<float> & data
+) {
+	if (pinfo == NULL) {
+		_EXCEPTIONT("Invalid pinfo argument");
+	}
+
+	VariableInfo::VariableTimeFileMap::const_iterator iter =
+		pinfo->m_mapTimeFile.find(sTime);
+
+	if (iter == pinfo->m_mapTimeFile.end()) {
+		_EXCEPTIONT("sTime not found");
+	}
+
+	size_t sFile = iter->second.first;
+	int iTime = iter->second.second;
+
+	NcFile ncfile(m_vecFilenames[sFile].c_str());
+	if (!ncfile.is_valid()) {
+		_EXCEPTION1("Cannot open file \"%s\"", m_vecFilenames[sFile].c_str());
+	}
+
+	NcVar * var = ncfile.get_var(pinfo->m_strVariableName.c_str());
+	if (var == NULL) {
+		_EXCEPTION1("Variable \"%s\" no longer found in file",
+			pinfo->m_strVariableName.c_str());
+	}
+	if (var->type() != ncFloat) {
+		_EXCEPTION1("Variable \"%s\" is not of type float",
+			pinfo->m_strVariableName.c_str());
+	}
+
+	std::vector<long> iDims;
+	iDims.resize(pinfo->m_vecDimSizes.size());
+	iDims[pinfo->m_iTimeDimIx] = iTime;
+	var->set_cur(&(iDims[0]));
+
+	std::vector<long> vecDimSizes = pinfo->m_vecDimSizes;
+	for (int d = 0; d < vecDimSizes.size() - pinfo->m_nTimeSliceDims; d++) {
+		vecDimSizes[d] = 1;
+	}
+
+	var->get(&(data[0]), &(vecDimSizes[0]));
+	ncfile.close();
+
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -355,6 +409,7 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 	}
 
 	// Output variables across header
+	ofOutput << "time";
 	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
 		ofOutput << "," << m_vecVariableInfo[v].m_strVariableName;
 	}

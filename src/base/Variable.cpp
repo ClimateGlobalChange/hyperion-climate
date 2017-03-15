@@ -16,6 +16,7 @@
 
 #include "Variable.h"
 
+#include "RecapConfigObject.h"
 #include "FileListObject.h"
 
 #include <set>
@@ -100,7 +101,7 @@ Variable::Variable(
 	m_strUnits(),
 	m_nSpecifiedDim(0),
 	m_fNoTimeInNcFile(false),
-	m_iTime(-2)
+	m_sTime(-2)
 {
 	if (pvarinfo != NULL) {
 		m_strUnits = pvarinfo->m_strUnits;
@@ -273,7 +274,7 @@ std::string Variable::ToString(
 /*
 NcVar * Variable::GetFromNetCDF(
 	NcFileVector & vecFiles,
-	int iTime
+	int sTime
 ) {
 	if (m_fOp) {
 		_EXCEPTION1("Cannot call GetFromNetCDF() on operator \"%s\"",
@@ -296,20 +297,20 @@ NcVar * Variable::GetFromNetCDF(
 	// If the first dimension of the variable is not "time" then
 	// ignore any time index that has been specified.
 	int nVarDims = var->num_dims();
-	if ((nVarDims > 0) && (iTime != (-1))) {
+	if ((nVarDims > 0) && (sTime != (-1))) {
 		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
-			iTime = (-1);
+			sTime = (-1);
 			m_fNoTimeInNcFile = true;
 		} else {
 			if (var->get_dim(0)->size() == 1) {
-				iTime = 0;
+				sTime = 0;
 				m_fNoTimeInNcFile = true;
 			}
 		}
 	}
 
 	// Verify correct dimensionality
-	if (iTime != (-1)) {
+	if (sTime != (-1)) {
 		if ((nVarDims != m_nSpecifiedDim + 2) &&
 			(nVarDims != m_nSpecifiedDim + 3)
 		) {
@@ -329,8 +330,8 @@ NcVar * Variable::GetFromNetCDF(
 	long iDim[7];
 	memset(&(iDim[0]), 0, sizeof(int) * 7);
 
-	if (iTime != (-1)) {
-		iDim[0] = iTime;
+	if (sTime != (-1)) {
+		iDim[0] = sTime;
 		nSetDims++;
 	}
 
@@ -349,38 +350,47 @@ NcVar * Variable::GetFromNetCDF(
 }
 */
 ///////////////////////////////////////////////////////////////////////////////
-/*
+
 void Variable::LoadGridData(
 	VariableRegistry & varreg,
-	NcFileVector & vecFiles,
-	const GridObject & grid,
-	int iTime
+	RecapConfigObject * pobjConfig,
+	size_t sTime
 ) {
-	// The grid's mesh
-	const Mesh & mesh = grid.GetMesh();
+	// Verify argument
+	if (pobjConfig == NULL) {
+		_EXCEPTIONT("Invalid pobjConfig argument");
+	}
+
+	// Get Mesh
+	GridObject * pobjGrid = pobjConfig->GetGrid();
+	if (pobjGrid == NULL) {
+		_EXCEPTIONT("Invalid configuration: Missing grid");
+	}
+
+	const Mesh & mesh = pobjGrid->GetMesh();
+
+	// Get FileList
+	FileListObject * pobjFileList = pobjConfig->GetFileList();
+	if (pobjFileList == NULL) {
+		_EXCEPTIONT("Invalid configuration: Missing file_list");
+	}
 
 	// Check if data already loaded
-	if (iTime == m_iTime) {
+	if (sTime == m_sTime) {
 		if (m_data.GetRows() != mesh.faces.size()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
-	if (m_fNoTimeInNcFile) {
-		if (m_data.GetRows() != mesh.faces.size()) {
-			_EXCEPTIONT("Logic error");
-		}
-		return;
-	}
-
+/*
 	// Allocate data
 	m_data.Allocate(mesh.faces.size());
-	m_iTime = iTime;
+	m_sTime = sTime;
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
 		// Get pointer to variable
-		NcVar * var = GetFromNetCDF(vecFiles, iTime);
+		NcVar * var = GetFromNetCDF(vecFiles, sTime);
 		if (var == NULL) {
 			_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
 				m_strName.c_str());
@@ -459,8 +469,8 @@ void Variable::LoadGridData(
 		Variable & varLeft = varreg.Get(m_varArg[0]);
 		Variable & varRight = varreg.Get(m_varArg[1]);
 
-		varLeft.LoadGridData(varreg, vecFiles, grid, iTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, iTime);
+		varLeft.LoadGridData(varreg, vecFiles, grid, sTime);
+		varRight.LoadGridData(varreg, vecFiles, grid, sTime);
 
 		const DataArray1D<float> & dataLeft  = varLeft.GetData();
 		const DataArray1D<float> & dataRight = varRight.GetData();
@@ -481,7 +491,7 @@ void Variable::LoadGridData(
 		m_data.Zero();
 
 		Variable & varParam = varreg.Get(m_varArg[0]);
-		varParam.LoadGridData(varreg, vecFiles, grid, iTime);
+		varParam.LoadGridData(varreg, vecFiles, grid, sTime);
 		const DataArray1D<float> & dataParam  = varParam.m_data;
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
@@ -498,7 +508,7 @@ void Variable::LoadGridData(
 		m_data.Zero();
 		for (int v = 0; v < m_varArg.size(); v++) {
 			Variable & varParam = varreg.Get(m_varArg[v]);
-			varParam.LoadGridData(varreg, vecFiles, grid, iTime);
+			varParam.LoadGridData(varreg, vecFiles, grid, sTime);
 			const DataArray1D<float> & dataParam  = varParam.m_data;
 
 			for (int i = 0; i < m_data.GetRows(); i++) {
@@ -519,8 +529,8 @@ void Variable::LoadGridData(
 		Variable & varLeft = varreg.Get(m_varArg[0]);
 		Variable & varRight = varreg.Get(m_varArg[1]);
 
-		varLeft.LoadGridData(varreg, vecFiles, grid, iTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, iTime);
+		varLeft.LoadGridData(varreg, vecFiles, grid, sTime);
+		varRight.LoadGridData(varreg, vecFiles, grid, sTime);
 
 		const DataArray1D<float> & dataLeft  = varLeft.m_data;
 		const DataArray1D<float> & dataRight = varRight.m_data;
@@ -556,7 +566,7 @@ void Variable::LoadGridData(
 		Variable & varField = varreg.Get(m_varArg[0]);
 		Variable & varDist = varreg.Get(m_varArg[1]);
 
-		varField.LoadGridData(varreg, vecFiles, grid, iTime);
+		varField.LoadGridData(varreg, vecFiles, grid, sTime);
 
 		// Load distance (in degrees) and convert to radians
 		double dDist = atof(varDist.m_strName.c_str());
@@ -641,14 +651,15 @@ void Variable::LoadGridData(
 	} else {
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 	}
-}
 */
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void Variable::UnloadGridData() {
 
 	// Force data to be loaded within this structure
-	m_iTime = (-2);
+	m_sTime = (-2);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

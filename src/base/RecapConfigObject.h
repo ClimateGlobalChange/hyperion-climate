@@ -116,11 +116,13 @@ public:
 		if (pVariable == NULL) {
 			_EXCEPTIONT("Invalid argument");
 		}
+
 		(*pVariable) =
 			varreg.FindOrRegister(
 				strStandardName,
 				GetFileList());
 
+		// Variable could not be found or registered
 		if ((*pVariable) == NULL) {
 			return std::string("Invalid variable \"")
 				+ strVariableName + std::string("\"");

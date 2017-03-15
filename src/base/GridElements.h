@@ -600,7 +600,7 @@ typedef std::vector< std::set<int> > ReverseNodeArray;
 ///		The adjacency list for the Mesh, describing connectivity
 ///		between Faces.
 ///	</summary>
-typedef std::vector< std::set<int> > AdjacencyList;
+typedef std::vector< std::vector<int> > AdjacencyList;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -702,12 +702,16 @@ public:
 	///	<summary>
 	///		Construct the EdgeMap from the NodeVector and FaceVector.
 	///	</summary>
-	void ConstructEdgeMap();
+	void ConstructEdgeMap(
+		bool fForceReconstruct = false
+	);
 
 	///	<summary>
 	///		Construct the AdjacencyList.
 	///	</summary>
-	void ConstructAdjacencyList();
+	void ConstructAdjacencyList(
+		bool fForceReconstruct = false
+	);
 
 	///	<summary>
 	///		Construct the ReverseNodeArray from the NodeVector and FaceVector.

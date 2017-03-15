@@ -20,6 +20,7 @@
 #include "Announce.h"
 #include "Object.h"
 #include "TimeObj.h"
+#include "DataArray1D.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +45,8 @@ public:
 		const std::string & strVariableName
 	) :
 		m_strVariableName(strVariableName),
-		m_iTimeDimIx(-1)
+		m_iTimeDimIx(-1),
+		m_nTimeSliceDims(1)
 	{ } 
 
 public:
@@ -61,12 +63,17 @@ public:
 	///	<summary>
 	///		Dimension of time variable.
 	///	</summary>
-	std::vector<int> m_vecDimSizes;
+	std::vector<long> m_vecDimSizes;
 
 	///	<summary>
 	///		Index of time dimension or (-1) if time dimension doesn't exist.
 	///	</summary>
 	int m_iTimeDimIx;
+
+	///	<summary>
+	///		Dimensionality of one time slice of data.
+	///	</summary>
+	int m_nTimeSliceDims;
 
 	///	<summary>
 	///		Map from Times to filename index and time index.
@@ -151,7 +158,6 @@ public:
 		return NULL;
 	}
 
-	///	</summary>
 	///	<summary>
 	///		Populate from a search string.
 	///	</summary>
@@ -161,6 +167,16 @@ public:
 	std::string PopulateFromSearchString(
 		const std::string & strSearchString,
 		ObjectRegistry & objreg
+	);
+
+public:
+	///	<summary>
+	///		Load the data from a particular variable into the given array.
+	///	</summary>
+	bool LoadData_float(
+		size_t sTime,
+		VariableInfo * pinfo,
+		DataArray1D<float> & data
 	);
 
 protected:

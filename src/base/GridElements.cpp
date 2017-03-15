@@ -70,7 +70,15 @@ void Mesh::Clear() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Mesh::ConstructEdgeMap() {
+void Mesh::ConstructEdgeMap(
+	bool fForceReconstruct
+) {
+	// Check if edge map has already been constructed
+	if (edgemap.size() != 0) {
+		if (!fForceReconstruct) {
+			return;
+		}
+	}
 
 	// Construct the edge map
 	edgemap.clear();
@@ -99,14 +107,28 @@ void Mesh::ConstructEdgeMap() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Mesh::ConstructAdjacencyList() {
+void Mesh::ConstructAdjacencyList(
+	bool fForceReconstruct
+) {
+	// Check if adjacency list has already been constructed
+	if (adjlist.size() != 0) {
+		if (!fForceReconstruct) {
+			return;
+		}
+	}
 
 	// Construct the EdgeMap if it is not available
 	if (edgemap.size() == 0) {
-		ConstructEdgeMap();
+		ConstructEdgeMap(fForceReconstruct);
 	}
 
 	// For each Edge in the EdgeMap add a connection between the FacePair
+	adjlist.resize(faces.size());
+	adjlist.clear();
+
+	std::vector< std::set<int> > setadj;
+	setadj.resize(faces.size());
+
 	EdgeMapConstIterator iter = edgemap.begin();
 	for (; iter != edgemap.end(); iter++) {
 
@@ -122,8 +144,19 @@ void Mesh::ConstructAdjacencyList() {
 					iter->second[1]);
 			}
 
-			adjlist[iter->second[0]].insert(iter->second[1]);
-			adjlist[iter->second[1]].insert(iter->second[0]);
+			std::set<int>::const_iterator iter1 =
+				setadj[iter->second[0]].find(iter->second[1]);
+			std::set<int>::const_iterator iter0 =
+				setadj[iter->second[1]].find(iter->second[0]);
+
+			if (iter1 != setadj[iter->second[0]].end()) {
+				setadj[iter->second[0]].insert(iter->second[1]);
+				adjlist[iter->second[0]].push_back(iter->second[1]);
+			}
+			if (iter0 != setadj[iter->second[1]].end()) {
+				setadj[iter->second[1]].insert(iter->second[0]);
+				adjlist[iter->second[1]].push_back(iter->second[0]);
+			}
 		}
 	}
 }

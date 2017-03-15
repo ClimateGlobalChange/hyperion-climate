@@ -72,6 +72,13 @@ public:
 		return m_mesh;
 	}
 
+	///	<summary>
+	///		Get a reference to the Mesh.
+	///	</summary>
+	Mesh & GetMesh() {
+		return m_mesh;
+	}
+
 protected:
 	///	<summary>
 	///		Mesh associated with this Grid.

@@ -26,6 +26,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class RecapConfigObject;
+
 class FileListObject;
 
 class VariableInfo;
@@ -103,7 +105,7 @@ public:
 		m_strUnits(),
 		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
-		m_iTime(-2)
+		m_sTime(-2)
 	{
 		memset(m_iDim, 0, MaxArguments * sizeof(int));
 	}
@@ -153,17 +155,16 @@ public:
 		NcFileVector & vecFiles,
 		int iTime = (-1)
 	);
-
+*/
 	///	<summary>
 	///		Load a data block from the NcFileVector.
 	///	</summary>
 	void LoadGridData(
 		VariableRegistry & varreg,
-		NcFileVector & vecFiles,
-		const GridObject & grid,
-		int iTime = (-1)
+		RecapConfigObject * pobjConfig,
+		size_t sTime
 	);
-*/
+
 	///	<summary>
 	///		Unload the current data block.
 	///	</summary>
@@ -237,7 +238,7 @@ public:
 	///	<summary>
 	///		Time index associated with data loaded in this Variable.
 	///	</summary>
-	int m_iTime;
+	size_t m_sTime;
 
 	///	<summary>
 	///		Data associated with this Variable.
