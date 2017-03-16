@@ -11,7 +11,8 @@ HYPERIONCLIMATEDIR= ../..
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
 FILES= Pointwise.cpp \
-	   PointSearch.cpp 
+	   PointSearch.cpp \
+	   StitchNodes.cpp
 
 LIB_TARGET= libhyperionpointwise.a
 

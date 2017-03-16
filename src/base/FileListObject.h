@@ -189,7 +189,8 @@ public:
 	///	</summary>
 	///	<returns>
 	///		sTime if the load was successful
-	///		(-1) if the data does not have a time dimension
+	///		(-1) if the load was successful but the data does not
+	///            have a time dimension
 	///		(-2) if an error occurred
 	///	</returns>
 	size_t LoadData_float(

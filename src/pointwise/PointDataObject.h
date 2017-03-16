@@ -44,6 +44,33 @@ public:
 			objreg);
 	}
 
+	///	<summary>
+	///		Call a member function of this Object.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::string & strFunctionName,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	) {
+		if (strFunctionName == "output_csv") {
+			if ((vecCommandLineType.size() != 1) ||
+			    (vecCommandLineType[0] != ObjectType_String)
+			) {
+				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
+			}
+			return std::string("");
+		}
+		return
+			Object::Call(
+				objreg,
+				strFunctionName,
+				vecCommandLine,
+				vecCommandLineType,
+				ppReturn);
+	}
+
 public:
 	///	<summary>
 	///		Set the number of fields used by the object.

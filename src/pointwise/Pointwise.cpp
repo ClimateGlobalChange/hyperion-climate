@@ -16,6 +16,7 @@
 
 #include "Pointwise.h"
 #include "PointSearch.h"
+#include "StitchNodes.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +26,9 @@ void HPointwise::RegisterGlobalFunctions(
 	funcreg.Assign(
 		std::string("point_search"),
 		new PointSearchFunction(std::string("point_search")));
+	funcreg.Assign(
+		std::string("stitch_nodes"),
+		new StitchNodesFunction(std::string("stitch_nodes")));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

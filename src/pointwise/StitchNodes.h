@@ -1,8 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    Pointwise.h
+///	\file    StitchNodes.h
 ///	\author  Paul Ullrich
-///	\version March 14, 2017
+///	\version March 16, 2017
 ///
 ///	<remarks>
 ///		Copyright 2016- Paul Ullrich
@@ -14,8 +14,8 @@
 ///		or implied warranty.
 ///	</remarks>
 
-#ifndef _POINTWISE_H_
-#define _POINTWISE_H_
+#ifndef _STITCHNODES_H_
+#define _STITCHNODES_H_
 
 #include "GlobalFunction.h"
 
@@ -23,9 +23,27 @@ namespace HPointwise {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void RegisterGlobalFunctions(
-	GlobalFunctionRegistry & funcreg
-);
+class StitchNodesFunction : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	StitchNodesFunction(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
