@@ -113,7 +113,7 @@ Variable::Variable(
 	m_strUnits(),
 	m_nSpecifiedDim(0),
 	m_fNoTimeInNcFile(false),
-	m_sTime(-2)
+	m_sTime(InvalidTimeIndex)
 {
 	if (pvarinfo != NULL) {
 		m_strUnits = pvarinfo->m_strUnits;
@@ -312,6 +312,11 @@ void Variable::LoadGridData(
 		_EXCEPTIONT("Invalid pobjConfig argument");
 	}
 
+	// Single time index (variable already loaded)
+	if (m_sTime == SingleTimeIndex) {
+		return;
+	}
+
 	// Get Mesh
 	GridObject * pobjGrid = pobjConfig->GetGrid();
 	if (pobjGrid == NULL) {
@@ -336,14 +341,14 @@ void Variable::LoadGridData(
 
 	// Allocate data
 	m_data.Allocate(mesh.sDOFCount);
-	m_sTime = sTime;
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
-		pobjFileList->LoadData_float(
-			m_strName,
-			sTime,
-			m_data);
+		m_sTime =
+			pobjFileList->LoadData_float(
+				m_strName,
+				sTime,
+				m_data);
 
 		return;
 	}

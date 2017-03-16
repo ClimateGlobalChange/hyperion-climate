@@ -23,8 +23,9 @@ warm_core_criteria.dist = "8.0deg"
 warm_core_criteria.minmaxdist = "1.1deg"
 
 # Wind magnitude (output)
-wind_mag = variable("_VECMAG(U(850hPa),V(850hPa))")
-wind_mag.outputop = "max"
+wind_mag = parameter_list()
+wind_mag.var = "U(850hPa)" #variable("_VECMAG(U(850hPa),V(850hPa))")
+wind_mag.op = "max"
 wind_mag.dist = "4.0deg"
 
 # Parameters for point_search
@@ -32,7 +33,7 @@ dcu_param = parameter_list()
 dcu_param.searchbymin = "PS"
 dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
-dcu_param.output = ["lat", "lon", "PS", "ZS", wind_mag]
+dcu_param.output = ["lat", "lon", "PS", "ZBOT", wind_mag]
 
 candidates = point_search(config, dcu_param)
 

@@ -171,9 +171,28 @@ public:
 
 public:
 	///	<summary>
+	///		Get the number of time indices in the file list.
+	///	</summary>
+	size_t GetTimeCount() const {
+		return m_vecTimes.size();
+	}
+
+	///	<summary>
+	///		Distribute available time indices across MPI ranks.
+	///	</summary>
+	void GetOnRankTimeIndices(
+		std::vector<size_t> & vecTimeIndices
+	);
+
+	///	<summary>
 	///		Load the data from a particular variable into the given array.
 	///	</summary>
-	bool LoadData_float(
+	///	<returns>
+	///		sTime if the load was successful
+	///		(-1) if the data does not have a time dimension
+	///		(-2) if an error occurred
+	///	</returns>
+	size_t LoadData_float(
 		const std::string & strVariableName,
 		size_t sTime,
 		DataArray1D<float> & data

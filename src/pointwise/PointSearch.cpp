@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "PointSearch.h"
+#include "PointDataObject.h"
 
 #include "Variable.h"
 #include "Exception.h"
@@ -62,6 +63,89 @@ public:
 		EqualTo,
 		NotEqualTo
 	};
+
+public:
+	///	<summary>
+	///		Initialize from an Object.
+	///	</summary>
+	std::string InitializeFromObject(
+		const ObjectRegistry & objreg,
+		RecapConfigObject * pobjConfig,
+		const Object * pobj
+	) {
+		// Variable
+		StringObject * pobjThresholdCmdVar =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("var")));
+		if (pobjThresholdCmdVar == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"var\" property");
+		}
+
+		std::string strError =
+			pobjConfig->GetVariable(
+				pobjThresholdCmdVar->Value(),
+				&m_pvar);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		// Operator
+		StringObject * pobjThresholdCmdOp =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("op")));
+		if (pobjThresholdCmdOp == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"op\" property");
+		}
+
+		bool fSuccessThresholdOp =
+			SetOperatorFromString(pobjThresholdCmdOp->Value());
+		if (!fSuccessThresholdOp) {
+			return std::string("Invalid threshold operator in ")
+				+ pobj->ChildName("op");
+		}
+
+		// Value 
+		StringObject * pobjThresholdValue =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("value")));
+		if (pobjThresholdValue == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"value\" property");
+		}
+
+		bool fSuccessValue =
+			pobjThresholdValue->ToUnit(
+				m_pvar->Units(), &m_dValue);
+		if (!fSuccessValue) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("value")
+				+ std::string(" to ")
+				+ m_pvar->Units();
+		}
+
+		// Distance
+		StringObject * pobjThresholdCmdDist =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("dist")));
+		if (pobjThresholdCmdDist == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"dist\" property");
+		}
+
+		bool fSuccessDist =
+			pobjThresholdCmdDist->ToUnit(
+				"deg", &m_dDistance);
+		if (!fSuccessDist) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("dist")
+				+ std::string(" to great-circle distance");
+		}
+
+		return std::string("");
+	}
 
 public:
 	///	<summary>
@@ -299,6 +383,89 @@ public:
 		MaxDist,
 		MinDist
 	};
+
+public:
+	///	<summary>
+	///		Initialize from an Object.
+	///	</summary>
+	std::string InitializeFromObject(
+		const ObjectRegistry & objreg,
+		RecapConfigObject * pobjConfig,
+		const Object * pobj
+	) {
+		// Initialize output from a single variable
+		const StringObject * pobjString =
+			dynamic_cast<const StringObject *>(pobj);
+		if (pobjString != NULL) {
+			std::string strError =
+				pobjConfig->GetVariable(
+					pobjString->Value(),
+					&m_pvar);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			m_eOp = Max;
+			m_dDistance = 0.0;
+
+			return std::string("");
+		}
+
+		// Variable
+		StringObject * pobjOutputCmdVar =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("var")));
+		if (pobjOutputCmdVar == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"var\" property");
+		}
+
+		std::string strError =
+			pobjConfig->GetVariable(
+				pobjOutputCmdVar->Value(),
+				&m_pvar);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		// Operator
+		StringObject * pobjOutputCmdOp =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("op")));
+		if (pobjOutputCmdOp == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"op\" property");
+		}
+
+		bool fSuccessOutputOp =
+			SetOperatorFromString(pobjOutputCmdOp->Value());
+		if (!fSuccessOutputOp) {
+			return std::string("Invalid output operator in ")
+				+ pobj->ChildName("op");
+		}
+
+		// Distance
+		StringObject * pobjOutputCmdDist =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobj->ChildName("dist")));
+		if (pobjOutputCmdDist == NULL) {
+			return pobj->Name()
+				+ std::string(" has invalid \"dist\" property");
+		}
+
+		bool fSuccessDist =
+			pobjOutputCmdDist->ToUnit(
+				"deg", &m_dDistance);
+		if (!fSuccessDist) {
+			return std::string("Cannot convert ")
+				+ pobj->ChildName("dist")
+				+ std::string(" to great-circle distance");
+		}
+
+		return std::string("");
+	}
 
 public:
 	///	<summary>
@@ -937,10 +1104,10 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string PointSearch(
-	size_t sTime,
-	const Mesh & mesh,
 	RecapConfigObject * pobjConfig,
-	const PointSearchParam & param
+	size_t sTime,
+	const PointSearchParam & param,
+	PointDataObject * pobjPointData
 ) {
 	// Set the Announce buffer
 	if (param.fpLog == NULL) {
@@ -979,6 +1146,9 @@ std::string PointSearch(
 
 	std::vector<OutputOp> & vecOutputOp =
 		*(param.pvecOutputOp);
+
+	// Get a reference to the Mesh
+	const Mesh & mesh = pobjConfig->GetGrid()->GetMesh();
 
 	// Load the data for the search variable
 	if (param.strVariableSearchBy == "") {
@@ -1314,65 +1484,43 @@ std::string PointSearch(
 				vecRejectedNoClosedContour[ccc]);
 	}
 
-/*
-	// Write results to file
-	{
-		// Parse time information
-		//NcVar * varDate = ncInput.get_var("date");
-		//NcVar * varDateSec = ncInput.get_var("datesec");
+	// Write results to PointDataObject
+	if (pobjPointData != NULL) {
 
-		int nDateYear;
-		int nDateMonth;
-		int nDateDay;
-		int nDateHour;
+		// Resize the results structure
+		pobjPointData->SetFieldCount(2, vecOutputOp.size(), 0);
+		pobjPointData->Resize(setCandidates.size());
 
-		NcAtt * attTimeUnits = varTime->get_att("units");
-		if (attTimeUnits == NULL) {
-			_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
-		}
-
-		std::string strTimeUnits = attTimeUnits->as_string(0);
-
-		std::string strTimeCalendar = "standard";
-		NcAtt * attTimeCalendar = varTime->get_att("calendar");
-		if (attTimeCalendar != NULL) {
-			strTimeCalendar = attTimeCalendar->as_string(0);
-		}
-
-		ParseTimeDouble(
-			strTimeUnits,
-			strTimeCalendar,
-			dTime[t],
-			nDateYear,
-			nDateMonth,
-			nDateDay,
-			nDateHour);
-
-		// Write time information
-		fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-			nDateYear,
-			nDateMonth,
-			nDateDay,
-			static_cast<int>(setCandidates.size()),
-			nDateHour);
-
-		// Write candidate information
-		int iCandidateCount = 0;
-
-		// Apply output operators
-		DataArray2D<float> dOutput(setCandidates.size(), vecOutputOp.size());
-		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
-
-			// Load the search variable data
-			Variable & var = varreg.Get(vecOutputOp[outc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataArray1D<float> & dataState = var.GetData();
-
-			// Loop through all pressure minima
+		// Add time and location for all candidates
+		{
+			// Add all candidate data to PointDataObject
 			std::set<int>::const_iterator iterCandidate
 				= setCandidates.begin();
 
-			iCandidateCount = 0;
+			int iCandidateCount = 0;
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				pobjPointData->DataInt(iCandidateCount,0) = sTime;
+				pobjPointData->DataInt(iCandidateCount,1) = *iterCandidate;
+
+				iCandidateCount++;
+			}
+		}
+
+		// Apply output operators
+		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+
+			// Load the search variable data
+			vecOutputOp[outc].m_pvar->LoadGridData(pobjConfig, sTime);
+
+			const DataArray1D<float> & dataState =
+				vecOutputOp[outc].m_pvar->GetData();
+
+			// Add all candidate data to PointDataObject
+			std::set<int>::const_iterator iterCandidate
+				= setCandidates.begin();
+
+			int iCandidateCount = 0;
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 				int ixExtremum;
@@ -1381,7 +1529,7 @@ std::string PointSearch(
 
 				if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
 					FindLocalMinMax<float>(
-						grid,
+						mesh,
 						false,
 						dataState,
 						*iterCandidate,
@@ -1390,11 +1538,11 @@ std::string PointSearch(
 						dValue,
 						dRMax);
 
-					dOutput[iCandidateCount][outc] = dValue;
+					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
 
 				} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
 					FindLocalMinMax<float>(
-						grid,
+						mesh,
 						false,
 						dataState,
 						*iterCandidate,
@@ -1403,11 +1551,11 @@ std::string PointSearch(
 						dValue,
 						dRMax);
 
-					dOutput[iCandidateCount][outc] = dRMax;
+					pobjPointData->DataFloat(iCandidateCount,outc) = dRMax;
 
 				} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
 					FindLocalMinMax<float>(
-						grid,
+						mesh,
 						true,
 						dataState,
 						*iterCandidate,
@@ -1416,11 +1564,11 @@ std::string PointSearch(
 						dValue,
 						dRMax);
 
-					dOutput[iCandidateCount][outc] = dValue;
+					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
 
 				} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
 					FindLocalMinMax<float>(
-						grid,
+						mesh,
 						true,
 						dataState,
 						*iterCandidate,
@@ -1429,17 +1577,17 @@ std::string PointSearch(
 						dValue,
 						dRMax);
 
-					dOutput[iCandidateCount][outc] = dRMax;
+					pobjPointData->DataFloat(iCandidateCount,outc) = dRMax;
 
 				} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
 					FindLocalAverage<float>(
-						grid,
+						mesh,
 						dataState,
 						*iterCandidate,
 						vecOutputOp[outc].m_dDistance,
 						dValue);
 
-					dOutput[iCandidateCount][outc] = dValue;
+					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
 
 				} else {
 					_EXCEPTIONT("Invalid Output operator");
@@ -1448,7 +1596,7 @@ std::string PointSearch(
 				iCandidateCount++;
 			}
 		}
-
+/*
 		// Output all candidates
 		iCandidateCount = 0;
 
@@ -1477,8 +1625,8 @@ std::string PointSearch(
 
 			iCandidateCount++;
 		}
-	}
 */
+	}
 
 	return std::string("");
 }
@@ -1722,30 +1870,104 @@ std::string PointSearchFunction::Call(
 	// Threshold operators
 	std::vector<ThresholdOp> vecThresholdOps;
 
+	ListObject * pobjThresholdCmdList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(pobjParam->ChildName("thresholdcmd")));
+
+	if (pobjThresholdCmdList != NULL) {
+		for (size_t i = 0; i < pobjThresholdCmdList->ChildrenCount(); i++) {
+			ThresholdOp opThreshold;
+
+			Object * pobjChild = pobjNoClosedContourList->GetChild(i);
+
+			std::string strError =
+				opThreshold.InitializeFromObject(
+					objreg, pobjConfig, pobjChild);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			vecThresholdOps.push_back(opThreshold);
+		}
+	}
+
 	dcuparam.pvecThresholdOp = &vecThresholdOps;
 
 	// Output operators
 	std::vector<OutputOp> vecOutputOps;
 
+	ListObject * pobjOutputCmdList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(pobjParam->ChildName("output")));
+
+	if (pobjOutputCmdList != NULL) {
+		for (size_t i = 0; i < pobjOutputCmdList->ChildrenCount(); i++) {
+			OutputOp opOutput;
+
+			Object * pobjChild = pobjOutputCmdList->GetChild(i);
+
+			std::string strError =
+				opOutput.InitializeFromObject(
+					objreg, pobjConfig, pobjChild);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			vecOutputOps.push_back(opOutput);
+		}
+	}
+
 	dcuparam.pvecOutputOp = &vecOutputOps;
 
-	// Distribute time steps over ranks
+	// Distribute time steps over ranks and run the point search
 	dcuparam.fpLog = stdout;
 
-	std::string strError =
-		PointSearch(
-			0,
-			mesh,
-			pobjConfig,
-			dcuparam);
+	std::vector<size_t> vecTimeIndices;
+	pobjConfig->GetFileList()->GetOnRankTimeIndices(vecTimeIndices);
 
-	if (strError != "") {
-		return strError;
+	std::vector<PointDataObject *> vecpobjPointData;
+	vecpobjPointData.resize(vecTimeIndices.size(), NULL);
+
+	for (size_t t = 0; t < vecTimeIndices.size(); t++) {
+		if (ppReturn != NULL) {
+			vecpobjPointData[t] = new PointDataObject("");
+		}
+
+		std::string strError =
+			PointSearch(
+				pobjConfig,
+				vecTimeIndices[t],
+				dcuparam,
+				vecpobjPointData[t]);
+
+		if (strError != "") {
+			return strError;
+		}
 	}
 
 	// Check if a return value is needed
 	if (ppReturn != NULL) {
-		(*ppReturn) = new StringObject("NULL", "NULL");
+
+		// Concatenate all PointDataObjects into a single return value
+		PointDataObject * pobjPointDataCombined = new PointDataObject("");
+
+		pobjPointDataCombined->Concatenate(vecpobjPointData);
+
+		// Cleanup
+		for (size_t s = 0; s < vecpobjPointData.size(); s++) {
+			delete vecpobjPointData[s];
+		}
+
+		(*ppReturn) = pobjPointDataCombined;
+
+		Announce("Total candidates over all timesteps: %i",
+			pobjPointDataCombined->GetRows());
+
+		Announce("%lu int fields, %lu float fields",
+			pobjPointDataCombined->GetIntFieldCount(),
+			pobjPointDataCombined->GetFloatFieldCount());
 	}
 
 	AnnounceEndBlock("Done");
@@ -1753,428 +1975,6 @@ std::string PointSearchFunction::Call(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-/*
-///////////////////////////////////////////////////////////////////////////////
-
-int main(int argc, char** argv) {
-
-#if defined(TEMPEST_MPIOMP)
-	// Initialize MPI
-	MPI_Init(&argc, &argv);
-#endif
-
-	// Turn off fatal errors in NetCDF
-	NcError error(NcError::silent_nonfatal);
-
-	// Enable output only on rank zero
-	AnnounceOnlyOutputOnRankZero();
-
-try {
-	// Parameters for DetectCycloneUnstructured
-	PointSearchParam ptsparam;
-
-	// Input dat file
-	std::string strInputFile;
-
-	// Input list file
-	std::string strInputFileList;
-
-	// Connectivity file
-	std::string strConnectivity;
-
-	// Output file
-	std::string strOutput;
-
-	// Output file list
-	std::string strOutputFileList;
-
-	// Variable to search for the minimum
-	std::string strSearchByMin;
-
-	// Variable to search for the maximum
-	std::string strSearchByMax;
-
-	// Closed contour commands
-	std::string strClosedContourCmd;
-
-	// Closed contour commands
-	std::string strNoClosedContourCmd;
-
-	// Threshold commands
-	std::string strThresholdCmd;
-
-	// Output commands
-	std::string strOutputCmd;
-
-	// Parse the command line
-	BeginCommandLine()
-		CommandLineString(strInputFile, "in_data", "");
-		CommandLineString(strInputFileList, "in_data_list", "");
-		CommandLineString(strConnectivity, "in_connect", "");
-		CommandLineString(strOutput, "out", "");
-		CommandLineString(strOutputFileList, "out_file_list", "");
-		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
-		CommandLineString(strSearchByMax, "searchbymax", "");
-		CommandLineDoubleD(ptsparam.dMinLongitude, "minlon", 0.0, "(degrees)");
-		CommandLineDoubleD(ptsparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");
-		CommandLineDoubleD(ptsparam.dMinLatitude, "minlat", 0.0, "(degrees)");
-		CommandLineDoubleD(ptsparam.dMaxLatitude, "maxlat", 0.0, "(degrees)");
-		CommandLineDoubleD(ptsparam.dMinAbsLatitude, "minabslat", 0.0, "(degrees)");
-		CommandLineDoubleD(ptsparam.dMergeDist, "mergedist", 0.0, "(degrees)");
-		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
-		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
-		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
-		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
-		CommandLineInt(ptsparam.nTimeStride, "timestride", 1);
-		CommandLineBool(ptsparam.fRegional, "regional");
-		CommandLineBool(ptsparam.fOutputHeader, "out_header");
-		CommandLineInt(ptsparam.iVerbosityLevel, "verbosity", 0);
-
-		ParseCommandLine(argc, argv);
-	EndCommandLine(argv)
-
-	AnnounceBanner();
-
-	// Create Variable registry
-	VariableRegistry varreg;
-
-	// Set verbosity level
-	AnnounceSetVerbosityLevel(ptsparam.iVerbosityLevel);
-
-	// Check input
-	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
-		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
-			" specified");
-	}
-	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
-			" may be specified");
-	}
-
-	// Check output
-	if ((strOutput.length() != 0) && (strOutputFileList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--out) or (--out_data_list)"
-			" may be specified");
-	}
-
-	// Load input file list
-	std::vector<std::string> vecInputFiles;
-
-	if (strInputFile.length() != 0) {
-		vecInputFiles.push_back(strInputFile);
-
-	} else {
-		std::ifstream ifInputFileList(strInputFileList.c_str());
-		if (!ifInputFileList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strInputFileList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifInputFileList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			vecInputFiles.push_back(strFileLine);
-		}
-	}
-
-	// Load output file list
-	std::vector<std::string> vecOutputFiles;
-
-	if (strOutputFileList.length() != 0) {
-
-		std::ifstream ifOutputFileList(strOutputFileList.c_str());
-		if (!ifOutputFileList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strOutputFileList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifOutputFileList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			vecOutputFiles.push_back(strFileLine);
-		}
-
-		if (vecOutputFiles.size() != vecInputFiles.size()) {
-			_EXCEPTIONT("File --in_file_list must match --out_file_list");
-		}
-	}
-
-	// Only one of search by min or search by max should be specified
-	if ((strSearchByMin == "") && (strSearchByMax == "")) {
-		strSearchByMin = "PSL";
-	}
-	if ((strSearchByMin != "") && (strSearchByMax != "")) {
-		_EXCEPTIONT("Only one of --searchbymin or --searchbymax can"
-			" be specified");
-	}
-
-	ptsparam.fSearchByMinima = false;
-	{
-		Variable varSearchByArg;
-		if (strSearchByMin != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMin);
-			ptsparam.fSearchByMinima = true;
-		}
-		if (strSearchByMax != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMax);
-			ptsparam.fSearchByMinima = false;
-		}
-
-		ptsparam.ixSearchBy = varreg.FindOrRegister(varSearchByArg);
-	}
-
-	// Parse the closed contour command string
-	std::vector<ClosedContourOp> vecClosedContourOp;
-	ptsparam.pvecClosedContourOp = &vecClosedContourOp;
-
-	if (strClosedContourCmd != "") {
-		AnnounceStartBlock("Parsing closed contour operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
-
-			if ((i == strClosedContourCmd.length()) ||
-				(strClosedContourCmd[i] == ';') ||
-				(strClosedContourCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strClosedContourCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecClosedContourOp.size());
-				vecClosedContourOp.resize(iNextOp + 1);
-				vecClosedContourOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the no closed contour command string
-	std::vector<ClosedContourOp> vecNoClosedContourOp;
-	ptsparam.pvecNoClosedContourOp = &vecNoClosedContourOp;
-
-	if (strNoClosedContourCmd != "") {
-		AnnounceStartBlock("Parsing no closed contour operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strNoClosedContourCmd.length(); i++) {
-
-			if ((i == strNoClosedContourCmd.length()) ||
-				(strNoClosedContourCmd[i] == ';') ||
-				(strNoClosedContourCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strNoClosedContourCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecNoClosedContourOp.size());
-				vecNoClosedContourOp.resize(iNextOp + 1);
-				vecNoClosedContourOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the threshold operator command string
-	std::vector<ThresholdOp> vecThresholdOp;
-	ptsparam.pvecThresholdOp = &vecThresholdOp;
-
-	if (strThresholdCmd != "") {
-		AnnounceStartBlock("Parsing threshold operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strThresholdCmd.length(); i++) {
-
-			if ((i == strThresholdCmd.length()) ||
-				(strThresholdCmd[i] == ';') ||
-				(strThresholdCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strThresholdCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecThresholdOp.size());
-				vecThresholdOp.resize(iNextOp + 1);
-				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the output operator command string
-	std::vector<OutputOp> vecOutputOp;
-	ptsparam.pvecOutputOp = &vecOutputOp;
-
-	if (strOutputCmd != "") {
-		AnnounceStartBlock("Parsing output operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strOutputCmd.length(); i++) {
-
-			if ((i == strOutputCmd.length()) ||
-				(strOutputCmd[i] == ';') ||
-				(strOutputCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strOutputCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecOutputOp.size());
-				vecOutputOp.resize(iNextOp + 1);
-				vecOutputOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Check minimum/maximum latitude/longitude
-	if ((ptsparam.dMaxLatitude < -90.0) || (ptsparam.dMaxLatitude > 90.0)) {
-		_EXCEPTIONT("--maxlat must in the range [-90,90]");
-	}
-	if ((ptsparam.dMinLatitude < -90.0) || (ptsparam.dMinLatitude > 90.0)) {
-		_EXCEPTIONT("--minlat must in the range [-90,90]");
-	}
-	if (ptsparam.dMinLatitude > ptsparam.dMaxLatitude) {
-		_EXCEPTIONT("--minlat must be less than --maxlat");
-	}
-
-	ptsparam.dMaxLatitude *= M_PI / 180.0;
-	ptsparam.dMinLatitude *= M_PI / 180.0;
-
-	if (ptsparam.dMinLongitude < 0.0) {
-		int iMinLongitude =
-			static_cast<int>(-ptsparam.dMinLongitude / 360.0);
-		ptsparam.dMinLongitude +=
-			static_cast<double>(iMinLongitude + 1) * 360.0;
-	}
-	if (ptsparam.dMinLongitude >= 360.0) {
-		int iMinLongitude =
-			static_cast<int>(ptsparam.dMinLongitude / 360.0);
-		ptsparam.dMinLongitude -=
-			static_cast<double>(iMinLongitude - 1) * 360.0;
-	}
-	if (ptsparam.dMaxLongitude < 0.0) {
-		int iMaxLongitude =
-			static_cast<int>(-ptsparam.dMaxLatitude / 360.0);
-		ptsparam.dMaxLongitude +=
-			static_cast<double>(iMaxLongitude + 1) * 360.0;
-	}
-	if (ptsparam.dMaxLongitude >= 360.0) {
-		int iMaxLongitude =
-			static_cast<int>(ptsparam.dMaxLongitude / 360.0);
-		ptsparam.dMaxLongitude -=
-			static_cast<double>(iMaxLongitude - 1) * 360.0;
-	}
-
-	ptsparam.dMaxLongitude *= M_PI / 180.0;
-	ptsparam.dMinLongitude *= M_PI / 180.0;
-
-#if defined(TEMPEST_MPIOMP)
-	// Spread files across nodes
-	int nMPIRank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
-
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
-#endif
-
-	AnnounceStartBlock("Begin search operation");
-	if (vecInputFiles.size() != 1) {
-		if (vecOutputFiles.size() != 0) {
-			Announce("Output will be written following --out_file_list");
-		} else if (strOutput == "") {
-			Announce("Output will be written to outXXXXXX.dat");
-		} else {
-			Announce("Output will be written to %sXXXXXX.dat",
-				strOutput.c_str());
-		}
-		Announce("Logs will be written to logXXXXXX.txt");
-	}
-
-	// Loop over all files to be processed
-	for (int f = 0; f < vecInputFiles.size(); f++) {
-#if defined(TEMPEST_MPIOMP)
-		if (f % nMPISize != nMPIRank) {
-			continue;
-		}
-#endif
-		// Generate output file name
-		std::string strOutputFile;
-		if (vecInputFiles.size() == 1) {
-			ptsparam.fpLog = stdout;
-
-			if (strOutput == "") {
-				strOutputFile = "out.dat";
-			} else {
-				strOutputFile = strOutput;
-			}
-
-		} else {
-			char szFileIndex[32];
-			sprintf(szFileIndex, "%06i", f);
-
-			if (vecOutputFiles.size() != 0) {
-				strOutputFile = vecOutputFiles[f];
-			} else {
-				if (strOutput == "") {
-					strOutputFile =
-						"out" + std::string(szFileIndex) + ".dat";
-				} else {
-					strOutputFile =
-						strOutput + std::string(szFileIndex) + ".dat";
-				}
-			}
-
-			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
-			ptsparam.fpLog = fopen(strLogFile.c_str(), "w");
-		}
-
-		// Perform PointSearch
-		PointSearch(
-			f,
-			vecInputFiles[f],
-			strOutputFile,
-			strConnectivity,
-			varreg,
-			ptsparam);
-
-		// Close the log file
-		if (vecInputFiles.size() != 1) {
-			fclose(ptsparam.fpLog);
-		}
-	}
-
-	AnnounceEndBlock("Done");
-
-	AnnounceBanner();
-
-} catch(Exception & e) {
-	Announce(e.ToString().c_str());
-}
-
-#if defined(TEMPEST_MPIOMP)
-	// Deinitialize MPI
-	MPI_Finalize();
-#endif
-}
-*/
 
 }
 

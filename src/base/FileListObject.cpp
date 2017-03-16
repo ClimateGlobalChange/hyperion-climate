@@ -24,6 +24,10 @@
 #include <dirent.h>
 #include <fstream>
 
+#if defined(HYPERION_MPIOMP)
+#include <mpi.h>
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 // FileListObject
 ///////////////////////////////////////////////////////////////////////////////
@@ -96,7 +100,40 @@ std::string FileListObject::PopulateFromSearchString(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool FileListObject::LoadData_float(
+void FileListObject::GetOnRankTimeIndices(
+	std::vector<size_t> & vecTimeIndices
+) {
+#if defined(HYPERION_MPIOMP)
+	int nTimeCount = m_vecTimes.size();
+
+	int nCommRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nCommRank);
+
+	int nCommSize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nCommSize);
+
+	int nMaxTimesPerRank = nTimeCount / nCommSize;
+	if (nTimeCount % nCommSize != 0) {
+		nMaxTimesPerRank++;
+	}
+
+	int iBegin = nMaxTimesPerRank * nCommRank;
+	int iEnd = nMaxTimesPerRank * (nCommRank + 1);
+	if (iEnd > nTimeCount) {
+		iEnd = nTimeCount;
+	}
+
+	for (int i = iBegin; i < iEnd; i++) {
+		vecTimeIndices.push_back(i);
+	}
+#else
+	vecTimeIndices = m_vecTimes;
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t FileListObject::LoadData_float(
 	const std::string & strVariableName,
 	size_t sTime,
 	DataArray1D<float> & data
@@ -109,23 +146,30 @@ bool FileListObject::LoadData_float(
 		}
 	}
 	if (iVarInfo == m_vecVariableInfo.size()) {
-		return false;
-		//_EXCEPTION1("Variable \"%s\" not found in file",
-		//	strVariableName.c_str());
+		_EXCEPTION1("Variable \"%s\" not found in file",
+			strVariableName.c_str());
 	}
 
 	// Find the local file/time pair associated with this global time index
 	VariableInfo & varinfo = m_vecVariableInfo[iVarInfo];
 
+	// Ignore time index for variables with no time dimension
+	if (varinfo.m_iTimeDimIx == (-1)) {
+		sTime = (-1);
+	}
+
+	// Find local file/time index
 	VariableInfo::VariableTimeFileMap::const_iterator iter =
 		varinfo.m_mapTimeFile.find(sTime);
 
 	if (iter == varinfo.m_mapTimeFile.end()) {
-		_EXCEPTIONT("sTime not found");
+		_EXCEPTION1("sTime (%lu) not found", sTime);
 	}
 
 	size_t sFile = iter->second.first;
 	int iTime = iter->second.second;
+
+	Announce("Loading data [%s] [%lu]", strVariableName.c_str(), sTime);
 
 	// Open the correct NetCDF file
 	NcFile ncfile(m_vecFilenames[sFile].c_str());
@@ -139,8 +183,8 @@ bool FileListObject::LoadData_float(
 		_EXCEPTION1("Variable \"%s\" no longer found in file",
 			strVariableName.c_str());
 	}
-	if (var->type() != ncFloat) {
-		_EXCEPTION1("Variable \"%s\" is not of type float",
+	if ((var->type() != ncFloat) && (var->type() != ncDouble)) {
+		_EXCEPTION1("Variable \"%s\" is not of type float or double",
 			strVariableName.c_str());
 	}
 
@@ -165,7 +209,15 @@ bool FileListObject::LoadData_float(
 	if (data.GetRows() != lTotalSize) {
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
 	}
-	var->get(&(data[0]), &(vecDimSizes[0]));
+	if (var->type() == ncDouble) {
+		DataArray1D<double> data_dbl(data.GetRows());
+		var->get(&(data_dbl[0]), &(vecDimSizes[0]));
+		for (int i = 0; i < data.GetRows(); i++) {
+			data[i] = static_cast<float>(data_dbl[i]);
+		}
+	} else {
+		var->get(&(data[0]), &(vecDimSizes[0]));
+	}
 
 	NcError err;
 	if (err.get_err() != NC_NOERR) {
@@ -175,7 +227,7 @@ bool FileListObject::LoadData_float(
 	// Cleanup
 	ncfile.close();
 
-	return true;
+	return sTime;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

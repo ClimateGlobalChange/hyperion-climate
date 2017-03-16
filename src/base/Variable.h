@@ -98,6 +98,17 @@ public:
 	///	</summary>
 	static const int MaxArguments = 4;
 
+	///	<summary>
+	///		A sTime value indicating that this variable is not yet loaded
+	///	</summary>
+	static const size_t InvalidTimeIndex = (-2);
+
+	///	<summary>
+	///		A sTime value indicating that this variable has no time dimension
+	///		(so only load once).
+	///	</summary>
+	static const size_t SingleTimeIndex = (-1);
+
 public:
 	///	<summary>
 	///		Default constructor.
@@ -112,7 +123,7 @@ public:
 		m_strUnits(),
 		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
-		m_sTime(-2)
+		m_sTime(InvalidTimeIndex)
 	{
 		memset(m_iDim, 0, MaxArguments * sizeof(int));
 	}

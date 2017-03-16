@@ -131,6 +131,11 @@ bool ObjectRegistry::Assign(
 		Remove(strName);
 	}
 
+	// Assign the Object its name
+	if (pObject->m_strName == "") {
+		pObject->m_strName = strName;
+	}
+
 	// Add the Object to its parent
 	std::string strParent;
 	for (int i = strName.length()-1; i >= 0; i--) {

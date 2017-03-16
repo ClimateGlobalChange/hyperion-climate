@@ -815,6 +815,7 @@ try {
 							vecCommandLine[0].c_str(), iLine);
 
 					} else {
+
 						std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
 						std::string strError =
 							pFunc->Call(
@@ -830,6 +831,7 @@ try {
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
+} catch(...) {
 }
 
 #if defined(HYPERION_MPIOMP)
