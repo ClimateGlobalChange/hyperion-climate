@@ -57,12 +57,16 @@ public:
 	///		Register a variable.  Or return an index if the Variable already
 	///		exists in the registry.
 	///	</summary>
-	int FindOrRegister(const Variable & var);
+	bool FindOrRegister(
+		const Variable & var
+	);
 
 	///	<summary>
-	///		Get the variable with the specified index.
+	///		Get the variable with the specified name.
 	///	</summary>
-	Variable & Get(VariableIndex varix);
+	Variable * Get(
+		const std::string & strName
+	);
 
 	///	<summary>
 	///		Unload all data.
@@ -98,7 +102,10 @@ public:
 	///	<summary>
 	///		Default constructor.
 	///	</summary>
-	Variable() :
+	Variable(
+		VariableRegistry * pvarreg
+	) :
+		m_pvarreg(pvarreg),
 		m_strName(),
 		m_pvarinfo(NULL),
 		m_fOp(false),
@@ -114,6 +121,7 @@ public:
 	///		Primitive Variable constructor.
 	///	</summary>
 	Variable(
+		VariableRegistry * pvarreg,
 		const std::string & strName,
 		const VariableInfo * pvarinfo
 	);
@@ -137,30 +145,18 @@ public:
 	///		of the first character after the variable information.
 	///	</summary>
 	int ParseFromString(
-		VariableRegistry & varreg,
 		const std::string & strIn
 	);
 
 	///	<summary>
 	///		Get a string representation of this variable.
 	///	</summary>
-	std::string ToString(
-		VariableRegistry & varreg
-	) const;
-/*
-	///	<summary>
-	///		Get this variable in the given NcFile.
-	///	</summary>
-	NcVar * GetFromNetCDF(
-		NcFileVector & vecFiles,
-		int iTime = (-1)
-	);
-*/
+	std::string ToString() const;
+
 	///	<summary>
 	///		Load a data block from the NcFileVector.
 	///	</summary>
 	void LoadGridData(
-		VariableRegistry & varreg,
 		RecapConfigObject * pobjConfig,
 		size_t sTime
 	);
@@ -193,6 +189,11 @@ public:
 	}
 
 public:
+	///	<summary>
+	///		Pointer to the VariableRegistry.
+	///	</summary>
+	VariableRegistry * m_pvarreg;
+
 	///	<summary>
 	///		Variable name.
 	///	</summary>
@@ -228,6 +229,11 @@ public:
 	///		Specified operator arguments.
 	///	</summary>
 	VariableIndexVector m_varArg;
+
+	///	<summary>
+	///		Specified operator arguments.
+	///	</summary>
+	std::vector<std::string> m_vecArg;
 
 public:
 	///	<summary>

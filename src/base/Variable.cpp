@@ -45,7 +45,7 @@ Variable * VariableRegistry::FindOrRegister(
 			m_mapVariables.insert(
 				std::pair<std::string, Variable>(
 					strVariableName,
-					Variable(strVariableName, pvarinfo))).first;
+					Variable(this, strVariableName, pvarinfo))).first;
 
 		return &(iterVar->second);
 	}
@@ -56,34 +56,44 @@ Variable * VariableRegistry::FindOrRegister(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int VariableRegistry::FindOrRegister(
+bool VariableRegistry::FindOrRegister(
 	const Variable & var
 ) {
-	for (int i = 0; i < m_vecVariables.size(); i++) {
-		if (m_vecVariables[i] == var) {
-			return i;
-		}
+	std::map<std::string, Variable>::const_iterator iter =
+		m_mapVariables.find(var.m_strName);
+
+	if (iter == m_mapVariables.end()) {
+		m_mapVariables.insert(
+			std::pair<std::string, Variable>(var.m_strName, var));
+
+		return true;
 	}
-	m_vecVariables.push_back(var);
-	return (m_vecVariables.size()-1);
+
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Variable & VariableRegistry::Get(
-	VariableIndex varix
+Variable * VariableRegistry::Get(
+	const std::string & strName
 ) {
-	if ((varix < 0) || (varix >= m_vecVariables.size())) {
-		_EXCEPTIONT("Variable index out of range");
+	std::map<std::string, Variable>::iterator iter =
+		m_mapVariables.find(strName);
+
+	if (iter == m_mapVariables.end()) {
+		return NULL;
+	} else {
+		return &(iter->second);
 	}
-	return m_vecVariables[varix];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void VariableRegistry::UnloadAllGridData() {
-	for (int i = 0; i < m_vecVariables.size(); i++) {
-		m_vecVariables[i].UnloadGridData();
+	std::map<std::string, Variable>::iterator iter =
+		m_mapVariables.begin();
+	for (; iter != m_mapVariables.end(); iter++) {
+		iter->second.UnloadGridData();
 	}
 }
 
@@ -92,9 +102,11 @@ void VariableRegistry::UnloadAllGridData() {
 ///////////////////////////////////////////////////////////////////////////////
 
 Variable::Variable(
+	VariableRegistry * pvarreg,
 	const std::string & strName,
 	const VariableInfo * pvarinfo
 ) :
+	m_pvarreg(pvarreg),
 	m_strName(strName),
 	m_pvarinfo(pvarinfo),
 	m_fOp(false),
@@ -139,9 +151,13 @@ bool Variable::operator==(
 ///////////////////////////////////////////////////////////////////////////////
 
 int Variable::ParseFromString(
-	VariableRegistry & varreg,
 	const std::string & strIn
 ) {
+	// Verify initialization
+	if (m_pvarreg == NULL) {
+		_EXCEPTIONT("Invalid VariableRegistry");
+	}
+
 	m_fOp = false;
 	m_strName = "";
 	m_nSpecifiedDim = 0;
@@ -226,10 +242,11 @@ int Variable::ParseFromString(
 			// Parse arguments
 			m_varArg.resize(m_nSpecifiedDim+1);
 
-			Variable var;
-			n += var.ParseFromString(varreg, strIn.substr(n));
+			Variable var(m_pvarreg);
+			n += var.ParseFromString(strIn.substr(n));
 
-			m_varArg[m_nSpecifiedDim] = varreg.FindOrRegister(var);
+			m_pvarreg->FindOrRegister(var);
+			m_vecArg.push_back(var.m_strName);
 
 			m_nSpecifiedDim++;
 
@@ -244,9 +261,14 @@ int Variable::ParseFromString(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-std::string Variable::ToString(
-	VariableRegistry & varreg
-) const {
+std::string Variable::ToString() const {
+
+	// Verify initialization
+	if (m_pvarreg == NULL) {
+		_EXCEPTIONT("Invalid VariableRegistry");
+	}
+
+	// Convert to string
 	char szBuffer[20];
 	std::string strOut = m_strName;
 	if (m_nSpecifiedDim == 0) {
@@ -255,8 +277,12 @@ std::string Variable::ToString(
 	strOut += "(";
 	for (int d = 0; d < m_nSpecifiedDim; d++) {
 		if (m_fOp) {
-			Variable & var = varreg.Get(m_varArg[d]);
-			strOut += var.ToString(varreg);
+			Variable * var = m_pvarreg->Get(m_vecArg[d]);
+			if (var == NULL) {
+				_EXCEPTION();
+			} else {
+				strOut += var->ToString();
+			}
 		} else {
 			sprintf(szBuffer, "%i", m_iDim[d]);
 			strOut += szBuffer;
@@ -271,91 +297,16 @@ std::string Variable::ToString(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/*
-NcVar * Variable::GetFromNetCDF(
-	NcFileVector & vecFiles,
-	int sTime
-) {
-	if (m_fOp) {
-		_EXCEPTION1("Cannot call GetFromNetCDF() on operator \"%s\"",
-			m_strName.c_str());
-	}
-
-	// Find the NcVar in all open NcFiles
-	NcVar * var = NULL;
-	for (int i = 0; i < vecFiles.size(); i++) {
-		var = vecFiles[i]->get_var(m_strName.c_str());
-		if (var != NULL) {
-			break;
-		}
-	}
-	if (var == NULL) {
-		_EXCEPTION1("Variable \"%s\" not found in input files",
-			m_strName.c_str());
-	}
-
-	// If the first dimension of the variable is not "time" then
-	// ignore any time index that has been specified.
-	int nVarDims = var->num_dims();
-	if ((nVarDims > 0) && (sTime != (-1))) {
-		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
-			sTime = (-1);
-			m_fNoTimeInNcFile = true;
-		} else {
-			if (var->get_dim(0)->size() == 1) {
-				sTime = 0;
-				m_fNoTimeInNcFile = true;
-			}
-		}
-	}
-
-	// Verify correct dimensionality
-	if (sTime != (-1)) {
-		if ((nVarDims != m_nSpecifiedDim + 2) &&
-			(nVarDims != m_nSpecifiedDim + 3)
-		) {
-			_EXCEPTION1("Dimension size inconsistency in \"%s\"",
-				m_strName.c_str());
-		}
-	} else {
-		if ((nVarDims != m_nSpecifiedDim + 1) &&
-			(nVarDims != m_nSpecifiedDim + 2)
-		) {
-			_EXCEPTION1("Dimension size inconsistency in \"%s\"",
-				m_strName.c_str());
-		}
-	}
-
-	int nSetDims = 0;
-	long iDim[7];
-	memset(&(iDim[0]), 0, sizeof(int) * 7);
-
-	if (sTime != (-1)) {
-		iDim[0] = sTime;
-		nSetDims++;
-	}
-
-	if (m_nSpecifiedDim != 0) {
-		for (int i = 0; i < m_nSpecifiedDim; i++) {
-			iDim[nSetDims] = m_iDim[i];
-			nSetDims++;
-		}
-		iDim[nSetDims  ] = 0;
-		iDim[nSetDims+1] = 0;
-	}
-
-	var->set_cur(&(iDim[0]));
-
-	return var;
-}
-*/
-///////////////////////////////////////////////////////////////////////////////
 
 void Variable::LoadGridData(
-	VariableRegistry & varreg,
 	RecapConfigObject * pobjConfig,
 	size_t sTime
 ) {
+	// Verify initialization
+	if (m_pvarreg == NULL) {
+		_EXCEPTIONT("Invalid VariableRegistry");
+	}
+
 	// Verify argument
 	if (pobjConfig == NULL) {
 		_EXCEPTIONT("Invalid pobjConfig argument");
@@ -377,89 +328,26 @@ void Variable::LoadGridData(
 
 	// Check if data already loaded
 	if (sTime == m_sTime) {
-		if (m_data.GetRows() != mesh.faces.size()) {
+		if (m_data.GetRows() != mesh.sDOFCount) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
-/*
+
 	// Allocate data
-	m_data.Allocate(mesh.faces.size());
+	m_data.Allocate(mesh.sDOFCount);
 	m_sTime = sTime;
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
-		// Get pointer to variable
-		NcVar * var = GetFromNetCDF(vecFiles, sTime);
-		if (var == NULL) {
-			_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
-				m_strName.c_str());
-		}
-
-		// Check grid dimensions
-		int nVarDims = var->num_dims();
-		if (nVarDims < grid.m_nGridDim.size()) {
-			_EXCEPTION1("Variable \"%s\" has insufficient dimensions",
-				m_strName.c_str());
-		}
-
-		int nSize = 0;
-		int nLat = 0;
-		int nLon = 0;
-
-		long nDataSize[7];
-		for (int i = 0; i < 7; i++) {
-			nDataSize[i] = 1;
-		}
-
-		// Latitude/longitude grid
-		if (grid.m_nGridDim.size() == 2) {
-			nLat = grid.m_nGridDim[0];
-			nLon = grid.m_nGridDim[1];
-
-			int nVarDimX0 = var->get_dim(nVarDims-2)->size();
-			int nVarDimX1 = var->get_dim(nVarDims-1)->size();
-
-			if (nVarDimX0 != nLat) {
-				_EXCEPTION1("Dimension mismatch with variable"
-					" \"%s\" on \"lat\"",
-					m_strName.c_str());
-			}
-			if (nVarDimX1 != nLon) {
-				_EXCEPTION1("Dimension mismatch with variable"
-					" \"%s\" on \"lon\"",
-					m_strName.c_str());
-			}
-
-			nDataSize[nVarDims-2] = nLat;
-			nDataSize[nVarDims-1] = nLon;
-
-		// Unstructured grid
-		} else if (grid.m_nGridDim.size() == 1) {
-			nSize = grid.m_nGridDim[0];
-
-			int nVarDimX0 = var->get_dim(nVarDims-1)->size();
-
-			if (nVarDimX0 != nSize) {
-				_EXCEPTION1("Dimension mismatch with variable"
-					" \"%s\" on \"ncol\"",
-					m_strName.c_str());
-			}
-
-			nDataSize[nVarDims-1] = nSize;
-		}
-
-		// Load the data
-		var->get(&(m_data[0]), &(nDataSize[0]));
-
-		NcError err;
-		if (err.get_err() != NC_NOERR) {
-			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
-		}
+		pobjFileList->LoadData_float(
+			m_strName,
+			sTime,
+			m_data);
 
 		return;
 	}
-
+/*
 	// Evaluate the vector magnitude operator
 	if (m_strName == "_VECMAG") {
 		if (m_varArg.size() != 2) {

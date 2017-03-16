@@ -97,50 +97,82 @@ std::string FileListObject::PopulateFromSearchString(
 ///////////////////////////////////////////////////////////////////////////////
 
 bool FileListObject::LoadData_float(
+	const std::string & strVariableName,
 	size_t sTime,
-	VariableInfo * pinfo,
 	DataArray1D<float> & data
 ) {
-	if (pinfo == NULL) {
-		_EXCEPTIONT("Invalid pinfo argument");
+	// Find the VariableInfo structure for this Variable
+	size_t iVarInfo = 0;
+	for (; iVarInfo < m_vecVariableInfo.size(); iVarInfo++) {
+		if (strVariableName == m_vecVariableInfo[iVarInfo].m_strVariableName) {
+			break;
+		}
+	}
+	if (iVarInfo == m_vecVariableInfo.size()) {
+		return false;
+		//_EXCEPTION1("Variable \"%s\" not found in file",
+		//	strVariableName.c_str());
 	}
 
-	VariableInfo::VariableTimeFileMap::const_iterator iter =
-		pinfo->m_mapTimeFile.find(sTime);
+	// Find the local file/time pair associated with this global time index
+	VariableInfo & varinfo = m_vecVariableInfo[iVarInfo];
 
-	if (iter == pinfo->m_mapTimeFile.end()) {
+	VariableInfo::VariableTimeFileMap::const_iterator iter =
+		varinfo.m_mapTimeFile.find(sTime);
+
+	if (iter == varinfo.m_mapTimeFile.end()) {
 		_EXCEPTIONT("sTime not found");
 	}
 
 	size_t sFile = iter->second.first;
 	int iTime = iter->second.second;
 
+	// Open the correct NetCDF file
 	NcFile ncfile(m_vecFilenames[sFile].c_str());
 	if (!ncfile.is_valid()) {
 		_EXCEPTION1("Cannot open file \"%s\"", m_vecFilenames[sFile].c_str());
 	}
 
-	NcVar * var = ncfile.get_var(pinfo->m_strVariableName.c_str());
+	// Get the correct variable from the file
+	NcVar * var = ncfile.get_var(strVariableName.c_str());
 	if (var == NULL) {
 		_EXCEPTION1("Variable \"%s\" no longer found in file",
-			pinfo->m_strVariableName.c_str());
+			strVariableName.c_str());
 	}
 	if (var->type() != ncFloat) {
 		_EXCEPTION1("Variable \"%s\" is not of type float",
-			pinfo->m_strVariableName.c_str());
+			strVariableName.c_str());
 	}
 
+	// Set the dimension index and size
 	std::vector<long> iDims;
-	iDims.resize(pinfo->m_vecDimSizes.size());
-	iDims[pinfo->m_iTimeDimIx] = iTime;
+	iDims.resize(varinfo.m_vecDimSizes.size());
+	iDims[varinfo.m_iTimeDimIx] = iTime;
 	var->set_cur(&(iDims[0]));
 
-	std::vector<long> vecDimSizes = pinfo->m_vecDimSizes;
-	for (int d = 0; d < vecDimSizes.size() - pinfo->m_nTimeSliceDims; d++) {
+	std::vector<long> vecDimSizes = varinfo.m_vecDimSizes;
+
+	long lTotalSize = 1;
+	for (int d = 0; d < varinfo.m_nTimeSliceDims; d++) {
+		lTotalSize *= 
+			vecDimSizes[vecDimSizes.size()-d-1];
+	}
+	for (int d = 0; d < vecDimSizes.size() - varinfo.m_nTimeSliceDims; d++) {
 		vecDimSizes[d] = 1;
 	}
 
+	// Load the data
+	if (data.GetRows() != lTotalSize) {
+		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
+	}
 	var->get(&(data[0]), &(vecDimSizes[0]));
+
+	NcError err;
+	if (err.get_err() != NC_NOERR) {
+		_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+	}
+
+	// Cleanup
 	ncfile.close();
 
 	return true;

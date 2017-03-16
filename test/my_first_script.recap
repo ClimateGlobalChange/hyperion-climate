@@ -2,7 +2,7 @@
 # i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "grid=/mydata/mygrid.g" "varlookup=/mydata/mylookup.txt"
 config = recap_configuration()
 config.data = file_list("*.nc")
-config.grid = grid("nhemi_30_x4.g")
+config.grid = grid("nhemi_30_x4.g", "sem_np4")
 config.lookup = variable_lookup("nhemi_lookup.txt")
 
 # Output the data index associated with this configuration
@@ -27,6 +27,7 @@ wind_mag = variable("_VECMAG(U(850hPa),V(850hPa))")
 wind_mag.outputop = "max"
 wind_mag.dist = "4.0deg"
 
+# Parameters for point_search
 dcu_param = parameter_list()
 dcu_param.searchbymin = "PS"
 dcu_param.mergedist = "2.0deg"
@@ -35,19 +36,22 @@ dcu_param.output = ["lat", "lon", "PS", "ZS", wind_mag]
 
 candidates = point_search(config, dcu_param)
 
+# Topography threshold for stitch_nodes
 topo_threshold = parameter_list()
 topo_threshold.var = "ZS"
 topo_threshold.op = "<="
 topo_threshold.value = "70.0m"
 topo_threshold.number = 8
 
+# Parameters for stitch_nodes
 stitch_param = parameter_list()
 stitch_param.range = "8.0deg"
 stitch_param.minduration = 8
 stitch_param.maxgap = 2
 stitch_param.threshold = [topo_threshold]
 
-cyclone_paths = stitch_nodes(stitch_param)
+cyclone_paths = stitch_nodes(config, stitch_param)
 
-write_csv(cyclone_paths)
+# Output cyclone_paths to a CSV file
+cyclone_paths.output_csv("nhemi_cyclone_paths.csv")
 

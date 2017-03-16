@@ -462,9 +462,9 @@ void FindLocalMinMax(
 	// Set of nodes that have already been visited
 	std::set<int> setNodesVisited;
 
-	// Latitude and longitude at the origin
-	double dLat0 = mesh.dLat[ix0];
-	double dLon0 = mesh.dLon[ix0];
+	// Latitude and longitude at the origin (in radians)
+	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -477,8 +477,8 @@ void FindLocalMinMax(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = mesh.dLat[ix];
-		double dLonThis = mesh.dLon[ix];
+		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
 
 		// Great circle distance to this element
 		double dR =
@@ -579,12 +579,12 @@ bool HasClosedContour(
 	// Reference value
 	real dRefValue = dataState[ixOrigin];
 
-	const double dLat0 = mesh.dLat[ixOrigin];
-	const double dLon0 = mesh.dLon[ixOrigin];
+	// Latitude and longitude at origin (in radians)
+	const double dLat0 = mesh.dLat[ixOrigin] * M_PI / 180.0;
+	const double dLon0 = mesh.dLon[ixOrigin] * M_PI / 180.0;
 
 	Announce(2, "Checking (%lu) : (%1.5f %1.5f)",
 		ixOrigin, dLat0, dLon0);
-
 
 	// Build up nodes
 	while (queueToVisit.size() != 0) {
@@ -598,8 +598,8 @@ bool HasClosedContour(
 		setNodesVisited.insert(ix);
 
 		// Great circle distance to this element
-		double dLatThis = mesh.dLat[ix];
-		double dLonThis = mesh.dLon[ix];
+		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -680,8 +680,8 @@ bool SatisfiesThreshold(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = mesh.dLat[ix0];
-	double dLon0 = mesh.dLon[ix0];
+	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -694,9 +694,9 @@ bool SatisfiesThreshold(
 
 		setNodesVisited.insert(ix);
 
-		// Great circle distance to this element
-		double dLatThis = mesh.dLat[ix];
-		double dLonThis = mesh.dLon[ix];
+		// Great circle distance to this element (in degrees)
+		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -797,9 +797,9 @@ void FindLocalAverage(
 	// Set of nodes that have already been visited
 	std::set<int> setNodesVisited;
 
-	// Latitude and longitude at the origin
-	double dLat0 = mesh.dLat[ix0];
-	double dLon0 = mesh.dLon[ix0];
+	// Latitude and longitude at the origin (in radians)
+	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
 
 	// Number of points
 	float dSum = 0.0;
@@ -816,10 +816,10 @@ void FindLocalAverage(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = mesh.dLat[ix];
-		double dLonThis = mesh.dLon[ix];
+		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
 
-		// Great circle distance to this element
+		// Great circle distance to this element (in degrees)
 		double dR =
 			sin(dLat0) * sin(dLatThis)
 			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
@@ -862,7 +862,7 @@ public:
 	///	</summary>
 	PointSearchParam() :
 		fpLog(NULL),
-		pvarSearchBy(NULL),
+		strVariableSearchBy(),
 		fSearchByMinima(false),
 		dMaxLatitude(0.0),
 		dMinLatitude(0.0),
@@ -885,7 +885,7 @@ public:
 	FILE * fpLog;
 
 	// Variable to search on
-	Variable * pvarSearchBy;
+	std::string strVariableSearchBy;
 
 	// Serach on minima
 	bool fSearchByMinima;
@@ -936,9 +936,8 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void PointSearch(
-	size_t iFileIx,
-	size_t iTimeIx,
+std::string PointSearch(
+	size_t sTime,
 	const Mesh & mesh,
 	RecapConfigObject * pobjConfig,
 	const PointSearchParam & param
@@ -953,19 +952,19 @@ void PointSearch(
 
 	// Check minimum longitude / latitude
 	if ((param.dMinLongitude < 0.0) || (param.dMinLongitude >= 360.0)) {
-		_EXCEPTIONT("Invalid MinLongitude");
+		_EXCEPTIONT("minlon must be in the range [0,360]");
 	}
 	if ((param.dMaxLongitude < 0.0) || (param.dMaxLongitude >= 360.0)) {
-		_EXCEPTIONT("Invalid MaxLongitude");
+		_EXCEPTIONT("maxlon must be in the range [0,360]");
 	}
 	if ((param.dMaxLatitude < -90.0) || (param.dMaxLatitude > 90.0)) {
-		_EXCEPTIONT("--maxlat must in the range [-90,90]");
+		_EXCEPTIONT("maxlat must be in the range [-90,90]");
 	}
 	if ((param.dMinLatitude < -90.0) || (param.dMinLatitude > 90.0)) {
-		_EXCEPTIONT("--minlat must in the range [-90,90]");
+		_EXCEPTIONT("minlat must be in the range [-90,90]");
 	}
 	if ((param.dMinAbsLatitude < 0.0) || (param.dMinAbsLatitude > 90.0)) {
-		_EXCEPTIONT("--minabslat must in the range [0,90]");
+		_EXCEPTIONT("minabslat must be in the range [0,90]");
 	}
 
 	// Dereference pointers to operators
@@ -982,10 +981,23 @@ void PointSearch(
 		*(param.pvecOutputOp);
 
 	// Load the data for the search variable
-	if (param.pvarSearchBy == NULL) {
+	if (param.strVariableSearchBy == "") {
 		_EXCEPTION();
 	}
-	const DataArray1D<float> & dataSearch = param.pvarSearchBy->GetData();
+
+	Variable * pvarSearchBy = NULL;
+	std::string strError =
+		pobjConfig->GetVariable(
+			param.strVariableSearchBy,
+			&pvarSearchBy);
+
+	if (strError != "") {
+		return strError;
+	}
+
+	pvarSearchBy->LoadGridData(pobjConfig, sTime);
+
+	const DataArray1D<float> & dataSearch = pvarSearchBy->GetData();
 
 	// Tag all minima
 	std::set<int> setCandidates;
@@ -1003,9 +1015,14 @@ void PointSearch(
 	int nRejectedTopography = 0;
 	int nRejectedMerge = 0;
 
-	DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
-	DataArray1D<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
-	DataArray1D<int> vecRejectedThreshold(vecThresholdOp.size());
+	std::vector<int> vecRejectedClosedContour;
+	vecRejectedClosedContour.resize(vecClosedContourOp.size());
+
+	std::vector<int> vecRejectedNoClosedContour;
+	vecRejectedNoClosedContour.resize(vecNoClosedContourOp.size());
+
+	std::vector<int> vecRejectedThreshold;
+	vecRejectedThreshold.resize(vecThresholdOp.size());
 
 	// Eliminate based on interval
 	if ((param.dMinLatitude != param.dMaxLatitude) ||
@@ -1017,6 +1034,8 @@ void PointSearch(
 		std::set<int>::const_iterator iterCandidate
 			= setCandidates.begin();
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+			// Get latitude and longitude in degrees
 			double dLat = mesh.dLat[*iterCandidate];
 			double dLon = mesh.dLon[*iterCandidate];
 
@@ -1032,12 +1051,12 @@ void PointSearch(
 			}
 			if (param.dMinLongitude != param.dMaxLongitude) {
 				if (dLon < 0.0) {
-					int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
-					dLon += static_cast<double>(iLonShift + 1) * 2.0 * M_PI;
+					int iLonShift = static_cast<int>(dLon / 360.0);
+					dLon += static_cast<double>(iLonShift + 1) * 360.0;
 				}
-				if (dLon >= 2.0 * M_PI) {
-					int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
-					dLon -= static_cast<double>(iLonShift - 1) * 2.0 * M_PI;
+				if (dLon >= 360.0) {
+					int iLonShift = static_cast<int>(dLon / 360.0);
+					dLon -= static_cast<double>(iLonShift - 1) * 360.0;
 				}
 				if (param.dMinLongitude < param.dMaxLongitude) {
 					if (dLon < param.dMinLongitude) {
@@ -1069,7 +1088,7 @@ void PointSearch(
 
 		setCandidates = setNewCandidates;
 	}
-/*
+
 	// Eliminate based on merge distance
 	if (param.dMergeDist != 0.0) {
 		std::set<int> setNewCandidates;
@@ -1084,8 +1103,8 @@ void PointSearch(
 		std::set<int>::const_iterator iterCandidate
 			= setCandidates.begin();
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-			double dLat = mesh.dLat[*iterCandidate];
-			double dLon = mesh.dLon[*iterCandidate];
+			double dLat = mesh.dLat[*iterCandidate] * M_PI / 180.0;
+			double dLon = mesh.dLon[*iterCandidate] * M_PI / 180.0;
 
 			double dX = cos(dLon) * cos(dLat);
 			double dY = sin(dLon) * cos(dLat);
@@ -1097,8 +1116,8 @@ void PointSearch(
 		// Loop through all candidates find set of nearest neighbors
 		iterCandidate = setCandidates.begin();
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-			double dLat = mesh.dLat[*iterCandidate];
-			double dLon = mesh.dLon[*iterCandidate];
+			double dLat = mesh.dLat[*iterCandidate] * M_PI / 180.0;
+			double dLon = mesh.dLon[*iterCandidate] * M_PI / 180.0;
 
 			double dX = cos(dLon) * cos(dLat);
 			double dY = sin(dLon) * cos(dLat);
@@ -1163,9 +1182,10 @@ void PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-		var.LoadGridData(varreg, vecFiles, grid, t);
-		const DataArray1D<float> & dataState = var.GetData();
+		vecThresholdOp[tc].m_pvar->LoadGridData(pobjConfig, sTime);
+
+		const DataArray1D<float> & dataState =
+			vecThresholdOp[tc].m_pvar->GetData();
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1176,7 +1196,7 @@ void PointSearch(
 			// Determine if the threshold is satisfied
 			bool fSatisfiesThreshold =
 				SatisfiesThreshold<float>(
-					grid,
+					mesh,
 					dataState,
 					*iterCandidate,
 					vecThresholdOp[tc].m_eOp,
@@ -1200,9 +1220,10 @@ void PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-		var.LoadGridData(varreg, vecFiles, grid, t);
-		const DataArray1D<float> & dataState = var.GetData();
+		vecClosedContourOp[ccc].m_pvar->LoadGridData(pobjConfig, sTime);
+
+		const DataArray1D<float> & dataState =
+			vecClosedContourOp[ccc].m_pvar->GetData();
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1213,7 +1234,7 @@ void PointSearch(
 			// Determine if a closed contour is present
 			bool fHasClosedContour =
 				HasClosedContour<float>(
-					grid,
+					mesh,
 					dataState,
 					*iterCandidate,
 					vecClosedContourOp[ccc].m_dDeltaAmount,
@@ -1237,9 +1258,10 @@ void PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-		var.LoadGridData(varreg, vecFiles, grid, t);
-		const DataArray1D<float> & dataState = var.GetData();
+		vecNoClosedContourOp[ccc].m_pvar->LoadGridData(pobjConfig, sTime);
+
+		const DataArray1D<float> & dataState =
+			vecNoClosedContourOp[ccc].m_pvar->GetData();
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1250,7 +1272,7 @@ void PointSearch(
 			// Determine if a closed contour is present
 			bool fHasClosedContour =
 				HasClosedContour<float>(
-					grid,
+					mesh,
 					dataState,
 					*iterCandidate,
 					vecNoClosedContourOp[ccc].m_dDeltaAmount,
@@ -1274,30 +1296,25 @@ void PointSearch(
 	Announce("Rejected (topography): %i", nRejectedTopography);
 	Announce("Rejected (    merged): %i", nRejectedMerge);
 
-	for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
-		Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-
+	for (int tc = 0; tc < vecRejectedThreshold.size(); tc++) {
 		Announce("Rejected (thresh. %s): %i",
-				var.m_strName.c_str(),
+				vecThresholdOp[tc].m_pvar->Name().c_str(),
 				vecRejectedThreshold[tc]);
 	}
 
-	for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
-		Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-
+	for (int ccc = 0; ccc < vecRejectedClosedContour.size(); ccc++) {
 		Announce("Rejected (contour %s): %i",
-				var.m_strName.c_str(),
+				vecClosedContourOp[ccc].m_pvar->Name().c_str(),
 				vecRejectedClosedContour[ccc]);
 	}
 
-	for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
-		Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-
+	for (int ccc = 0; ccc < vecRejectedNoClosedContour.size(); ccc++) {
 		Announce("Rejected (nocontour %s): %i",
-				var.m_strName.c_str(),
+				vecNoClosedContourOp[ccc].m_pvar->Name().c_str(),
 				vecRejectedNoClosedContour[ccc]);
 	}
 
+/*
 	// Write results to file
 	{
 		// Parse time information
@@ -1462,7 +1479,8 @@ void PointSearch(
 		}
 	}
 */
-	AnnounceEndBlock("Done");
+
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1550,6 +1568,11 @@ std::string PointSearchFunction::Call(
 
 	if (pobjSearchByMin != NULL) {
 		dcuparam.fSearchByMinima = true;
+		dcuparam.strVariableSearchBy = pobjSearchByMin->Value();
+	}
+	if (pobjSearchByMax != NULL) {
+		dcuparam.fSearchByMinima = false;
+		dcuparam.strVariableSearchBy = pobjSearchByMax->Value();
 	}
 
 	// Maximum latitude for detection
@@ -1696,7 +1719,29 @@ std::string PointSearchFunction::Call(
 
 	dcuparam.pvecNoClosedContourOp = &vecNoClosedContourOps;
 
+	// Threshold operators
+	std::vector<ThresholdOp> vecThresholdOps;
+
+	dcuparam.pvecThresholdOp = &vecThresholdOps;
+
+	// Output operators
+	std::vector<OutputOp> vecOutputOps;
+
+	dcuparam.pvecOutputOp = &vecOutputOps;
+
 	// Distribute time steps over ranks
+	dcuparam.fpLog = stdout;
+
+	std::string strError =
+		PointSearch(
+			0,
+			mesh,
+			pobjConfig,
+			dcuparam);
+
+	if (strError != "") {
+		return strError;
+	}
 
 	// Check if a return value is needed
 	if (ppReturn != NULL) {

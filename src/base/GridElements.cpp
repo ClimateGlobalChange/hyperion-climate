@@ -16,9 +16,12 @@
 
 #include "GridElements.h"
 
-#include "DataArray2D.h"
 #include "Announce.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "GaussQuadrature.h"
+#include "GaussLobattoQuadrature.h"
 #include "STLStringHelper.h"
 #include "MeshUtilitiesFuzzy.h"
 
@@ -70,6 +73,214 @@ void Mesh::Clear() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Mesh::InitializeAsFiniteElement(
+	DataLayout a_eDataLayout,
+	int nP
+) {
+	if ((a_eDataLayout != DataLayout_SpectralElementGLL) &&
+	    (a_eDataLayout != DataLayout_DiscontinuousGLL)
+	) {
+		_EXCEPTIONT("Invalid DataLayout");
+	}
+
+	// Clear existing adjacency list
+	if (edgemap.size() != 0) {
+		edgemap.clear();
+	}
+	if (adjlist.size() != 0) {
+		adjlist.clear();
+	}
+	if (dLat.GetRows() != 0) {
+		dLat.Deallocate();
+	}
+	if (dLon.GetRows() != 0) {
+		dLon.Deallocate();
+	}
+
+	// Gauss-Lobatto quadrature nodes and weights
+	DataArray1D<double> dG;
+	DataArray1D<double> dW;
+
+	GaussLobattoQuadrature::GetPoints(nP, 0.0, 1.0, dG, dW);
+
+	// Accumulated weight vector
+	DataArray1D<double> dAccumW(nP+1);
+	dAccumW[0] = 0.0;
+	for (int i = 1; i < nP+1; i++) {
+		dAccumW[i] = dAccumW[i-1] + dW[i-1];
+	}
+	if (fabs(dAccumW[dAccumW.GetRows()-1] - 1.0) > 1.0e-14) {
+		_EXCEPTIONT("Logic error in accumulated weight");
+	}
+
+	// Merge face map
+	DataArray3D<int> dataGLLnodes(nP, nP, faces.size());
+	std::vector<Node> vecGLLNodes;
+	std::map<Node, int> mapFaces;
+
+	// Build the face map
+	for (size_t f = 0; f < faces.size(); f++) {
+
+		const Face & face = faces[f];
+
+		if (face.edges.size() != 4) {
+			_EXCEPTIONT("Only quadrilateral elements supported "
+				"for spectral element layouts");
+		}
+
+		const Node & node0 = nodes[face[0]];
+		const Node & node1 = nodes[face[1]];
+		const Node & node2 = nodes[face[2]];
+		const Node & node3 = nodes[face[3]];
+
+		for (int q = 0; q < nP; q++) {
+		for (int p = 0; p < nP; p++) {
+
+			// Build unique node array if CGLL
+			if (a_eDataLayout == DataLayout_SpectralElementGLL) {
+
+				// Get local nodal location
+				Node nodeGLL;
+				Node dDx1G;
+				Node dDx2G;
+
+				ApplyLocalQuadMap(
+					face,
+					nodes,
+					dG[p],
+					dG[q],
+					nodeGLL,
+					dDx1G,
+					dDx2G);
+
+				// Determine if this is a unique Node
+				std::map<Node, int>::const_iterator iter =
+					mapFaces.find(nodeGLL);
+
+				if (iter == mapFaces.end()) {
+
+					// Insert new unique node into map
+					int ixNode = static_cast<int>(mapFaces.size());
+					mapFaces.insert(std::pair<Node, int>(nodeGLL, ixNode));
+					dataGLLnodes[q][p][f] = ixNode + 1;
+					vecGLLNodes.push_back(nodeGLL);
+
+				} else {
+					dataGLLnodes[q][p][f] = iter->second + 1;
+				}
+
+			// Non-unique node array if DGLL
+			} else if (a_eDataLayout == DataLayout_DiscontinuousGLL) {
+				dataGLLnodes[q][p][f] = nP * nP * f + q * nP + p;
+			}
+/*
+			// Get volumetric region
+			Node nodeOut0 =
+				InterpolateQuadrilateralNode(
+					node0, node1, node2, node3,
+					dAccumW[p], dAccumW[q]);
+
+			Node nodeOut1 =
+				InterpolateQuadrilateralNode(
+					node0, node1, node2, node3,
+					dAccumW[p+1], dAccumW[q]);
+
+			Node nodeOut2 =
+				InterpolateQuadrilateralNode(
+					node0, node1, node2, node3,
+					dAccumW[p+1], dAccumW[q+1]);
+
+			Node nodeOut3 =
+				InterpolateQuadrilateralNode(
+					node0, node1, node2, node3,
+					dAccumW[p], dAccumW[q+1]);
+
+			int nNodeStart = meshOut.nodes.size();
+			meshOut.nodes.push_back(nodeOut0);
+			meshOut.nodes.push_back(nodeOut1);
+			meshOut.nodes.push_back(nodeOut2);
+			meshOut.nodes.push_back(nodeOut3);
+
+			Face faceNew(4);
+			faceNew.SetNode(0, nNodeStart);
+			faceNew.SetNode(1, nNodeStart+1);
+			faceNew.SetNode(2, nNodeStart+2);
+			faceNew.SetNode(3, nNodeStart+3);
+
+			meshOut.faces.push_back(faceNew);
+*/
+		}
+		}
+	}
+
+	// Set number of degrees of freedom
+	sDOFCount = vecGLLNodes.size();
+
+	// Calculate latitude and longitude of nodes
+	dLat.Allocate(sDOFCount);
+	dLon.Allocate(sDOFCount);
+	for (size_t i = 0; i < sDOFCount; i++) {
+		double dR = sqrt(
+			  vecGLLNodes[i].x * vecGLLNodes[i].x
+			+ vecGLLNodes[i].y * vecGLLNodes[i].y
+			+ vecGLLNodes[i].z * vecGLLNodes[i].z);
+
+		dLat[i] = asin(vecGLLNodes[i].z / dR);
+		dLat[i] *= 180.0 / M_PI;
+
+		dLon[i] = atan2(vecGLLNodes[i].y, vecGLLNodes[i].x);
+		dLon[i] *= 180.0 / M_PI;
+	}
+
+	// Build adjacency list set
+	std::vector< std::set<int> > vecConnectivity;
+	vecConnectivity.resize(vecGLLNodes.size());
+
+	for (size_t f = 0; f < faces.size(); f++) {
+
+		for (int q = 0; q < nP; q++) {
+		for (int p = 0; p < nP; p++) {
+
+			std::set<int> & setLocalConnectivity =
+				vecConnectivity[dataGLLnodes[q][p][f]-1];
+
+			// Connect in all directions
+			if (p != 0) {
+				setLocalConnectivity.insert(
+					dataGLLnodes[q][p-1][f]);
+			}
+			if (p != (nP-1)) {
+				setLocalConnectivity.insert(
+					dataGLLnodes[q][p+1][f]);
+			}
+			if (q != 0) {
+				setLocalConnectivity.insert(
+					dataGLLnodes[q-1][p][f]);
+			}
+			if (q != (nP-1)) {
+				setLocalConnectivity.insert(
+					dataGLLnodes[q+1][p][f]);
+			}
+		}
+		}
+	}
+
+	// Translate to adjacency list
+	adjlist.resize(sDOFCount);
+
+	for (size_t f = 0; f < sDOFCount; f++) {
+		std::set<int>::iterator iterConnect =
+			vecConnectivity[f].begin();
+		for (; iterConnect != vecConnectivity[f].end(); iterConnect++) {
+			adjlist[f].push_back(*iterConnect);
+		}
+	}
+
+	Announce("Mesh: SEM Nodes [%i]", sDOFCount);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void Mesh::ConstructEdgeMap(
 	bool fForceReconstruct
 ) {
@@ -78,6 +289,10 @@ void Mesh::ConstructEdgeMap(
 		if (!fForceReconstruct) {
 			return;
 		}
+	}
+
+	if (eDataLayout != DataLayout_Volumetric) {
+		_EXCEPTIONT("Only volumetric data layout supported");
 	}
 
 	// Construct the edge map
@@ -115,6 +330,10 @@ void Mesh::ConstructAdjacencyList(
 		if (!fForceReconstruct) {
 			return;
 		}
+	}
+
+	if (eDataLayout != DataLayout_Volumetric) {
+		_EXCEPTIONT("Only volumetric data layout supported");
 	}
 
 	// Construct the EdgeMap if it is not available
@@ -892,6 +1111,9 @@ void Mesh::Read(const std::string & strFile) {
 		NcVar * varGridCenterLat = ncFile.get_var("grid_center_lat");
 		NcVar * varGridCenterLon = ncFile.get_var("grid_center_lon");
 
+		std::string strLatUnits;
+		std::string strLonUnits;
+
 		if (varGridCenterLat != NULL) {
 			if (varGridCenterLat->get_dim(0)->size() != nGridSize) {
 				_EXCEPTIONT("Invalid dimension for \"grid_center_lat\"");
@@ -928,6 +1150,24 @@ void Mesh::Read(const std::string & strFile) {
 
 			if (attGridCenterLonUnits != NULL) {
 				strLonUnits = attGridCenterLonUnits->as_string(0);
+			}
+		}
+
+		if (dLon.GetRows() != dLat.GetRows()) {
+			_EXCEPTIONT("lat/lon size mismatch in grid file");
+		}
+		if (strLatUnits != strLonUnits) {
+			_EXCEPTIONT("lat/lon unit mismatch in grid file");
+		} else {
+			if (strLatUnits == "") {
+			} else if ((strLatUnits == "rad") || (strLatUnits == "radians")) {
+				for (int i = 0; i < dLat.GetRows(); i++) {
+					dLat[i] *= 180.0 / M_PI;
+					dLon[i] *= 180.0 / M_PI;
+				}
+			} else if ((strLatUnits == "deg") || (strLatUnits == "degrees")) {
+			} else {
+				_EXCEPTION1("Unknown units for lat/lon: %s", strLatUnits.c_str());
 			}
 		}
 
@@ -1256,6 +1496,9 @@ void Mesh::Read(const std::string & strFile) {
 			dNodeCoords.Deallocate();
 		}
 	}
+
+	// Set number of degrees of freedom
+	sDOFCount = faces.size();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2250,6 +2493,88 @@ void ConvexifyMesh(
 	if (meshout.vecMultiFaceMap.size() != meshout.faces.size()) {
 		_EXCEPTIONT("Logic error");
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ApplyLocalQuadMap(
+	const Face & face,
+	const NodeVector & nodes,
+	double dAlpha,
+	double dBeta,
+	Node & nodeG,
+	Node & dDx1G,
+	Node & dDx2G
+) {
+	// Calculate nodal locations on the plane
+	double dXc =
+		  nodes[face[0]].x * (1.0 - dAlpha) * (1.0 - dBeta)
+		+ nodes[face[1]].x *        dAlpha  * (1.0 - dBeta)
+		+ nodes[face[2]].x *        dAlpha  *        dBeta
+		+ nodes[face[3]].x * (1.0 - dAlpha) *        dBeta;
+
+	double dYc =
+		  nodes[face[0]].y * (1.0 - dAlpha) * (1.0 - dBeta)
+		+ nodes[face[1]].y *        dAlpha  * (1.0 - dBeta)
+		+ nodes[face[2]].y *        dAlpha  *        dBeta
+		+ nodes[face[3]].y * (1.0 - dAlpha) *        dBeta;
+
+	double dZc =
+		  nodes[face[0]].z * (1.0 - dAlpha) * (1.0 - dBeta)
+		+ nodes[face[1]].z *        dAlpha  * (1.0 - dBeta)
+		+ nodes[face[2]].z *        dAlpha  *        dBeta
+		+ nodes[face[3]].z * (1.0 - dAlpha) *        dBeta;
+
+	double dR = sqrt(dXc * dXc + dYc * dYc + dZc * dZc);
+
+	// Mapped node location
+	nodeG.x = dXc / dR;
+	nodeG.y = dYc / dR;
+	nodeG.z = dZc / dR;
+
+	// Pointwise basis vectors in Cartesian geometry
+	Node dDx1F(
+		(1.0 - dBeta) * (nodes[face[1]].x - nodes[face[0]].x)
+		+      dBeta  * (nodes[face[2]].x - nodes[face[3]].x),
+		(1.0 - dBeta) * (nodes[face[1]].y - nodes[face[0]].y)
+		+      dBeta  * (nodes[face[2]].y - nodes[face[3]].y),
+		(1.0 - dBeta) * (nodes[face[1]].z - nodes[face[0]].z)
+		+      dBeta  * (nodes[face[2]].z - nodes[face[3]].z));
+
+	Node dDx2F(
+		(1.0 - dAlpha) * (nodes[face[3]].x - nodes[face[0]].x)
+		+      dAlpha  * (nodes[face[2]].x - nodes[face[1]].x),
+		(1.0 - dAlpha) * (nodes[face[3]].y - nodes[face[0]].y)
+		+      dAlpha  * (nodes[face[2]].y - nodes[face[1]].y),
+		(1.0 - dAlpha) * (nodes[face[3]].z - nodes[face[0]].z)
+		+      dAlpha  * (nodes[face[2]].z - nodes[face[1]].z));
+
+	// Pointwise basis vectors in spherical geometry
+	double dDenomTerm = 1.0 / (dR * dR * dR);
+
+	dDx1G = Node(
+		- dXc * (dYc * dDx1F.y + dZc * dDx1F.z)
+			+ (dYc * dYc + dZc * dZc) * dDx1F.x,
+		- dYc * (dXc * dDx1F.x + dZc * dDx1F.z)
+			+ (dXc * dXc + dZc * dZc) * dDx1F.y,
+		- dZc * (dXc * dDx1F.x + dYc * dDx1F.y)
+			+ (dXc * dXc + dYc * dYc) * dDx1F.z);
+
+	dDx2G = Node(
+		- dXc * (dYc * dDx2F.y + dZc * dDx2F.z)
+			+ (dYc * dYc + dZc * dZc) * dDx2F.x,
+		- dYc * (dXc * dDx2F.x + dZc * dDx2F.z)
+			+ (dXc * dXc + dZc * dZc) * dDx2F.y,
+		- dZc * (dXc * dDx2F.x + dYc * dDx2F.y)
+			+ (dXc * dXc + dYc * dYc) * dDx2F.z);
+
+	dDx1G.x *= dDenomTerm;
+	dDx1G.y *= dDenomTerm;
+	dDx1G.z *= dDenomTerm;
+
+	dDx2G.x *= dDenomTerm;
+	dDx2G.y *= dDenomTerm;
+	dDx2G.z *= dDenomTerm;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -99,6 +99,13 @@ public:
 	}
 
 	///	<summary>
+	///		Get a reference to the VariableRegistry.
+	///	</summary>
+	VariableRegistry & GetVariableRegistry() {
+		return varreg;
+	}
+
+	///	<summary>
 	///		Get the Variable with the specified name.
 	///	</summary>
 	std::string GetVariable(

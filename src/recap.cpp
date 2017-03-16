@@ -619,28 +619,28 @@ try {
 
 				// grid(STRING) type
 				} else if (vecCommandLine[2] == "grid") {
-					if (vecFuncArguments.size() != 1) {
-						Announce("ERROR: grid filename argument missing"
-							" on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLine[3] != "(") {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid grid declaration on line %i", iLine);
-						return (-1);
-					}
-
 					printf("GRID: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					bool fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new GridObject(
-								vecCommandLine[0], vecCommandLine[4]));
+					GridObject * pobjGrid = new GridObject(vecCommandLine[0]);
+					if (pobjGrid == NULL) {
+						_EXCEPTIONT("Unable to initial GridObject");
+					}
 
+					bool fSuccess = objreg.Assign(vecCommandLine[0], pobjGrid);
 					if (!fSuccess) {
+						return (-1);
+					}
+
+					std::string strError =
+						pobjGrid->Initialize(
+							vecFuncArguments,
+							vecFuncArgumentsType);
+
+					if (strError != "") {
+						strError += std::string(" (line ")
+							+ std::to_string(iLine)
+							+ std::string(")");
+
+						Announce(strError.c_str());
 						return (-1);
 					}
 

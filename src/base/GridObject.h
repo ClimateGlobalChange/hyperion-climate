@@ -23,6 +23,7 @@
 #include "GridElements.h"
 
 #include <vector>
+#include <cstdlib>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -63,6 +64,15 @@ public:
 		Announce("ERROR: Grid objects cannot be duplicated");
 		return (NULL);
 	}
+
+public:
+	///	<summary>
+	///		Initialize the Grid from command-line arguments.
+	///	</summary>
+	std::string Initialize(
+		const std::vector<std::string> & vecFuncArguments,
+		const std::vector<ObjectType> & vecFuncArgumentsType
+	);
 
 public:
 	///	<summary>

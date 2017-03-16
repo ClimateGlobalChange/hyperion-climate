@@ -174,8 +174,8 @@ public:
 	///		Load the data from a particular variable into the given array.
 	///	</summary>
 	bool LoadData_float(
+		const std::string & strVariableName,
 		size_t sTime,
-		VariableInfo * pinfo,
 		DataArray1D<float> & data
 	);
 

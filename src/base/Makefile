@@ -15,6 +15,7 @@ FILES= Announce.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
 	   Object.cpp \
+	   GridObject.cpp \
 	   FileListObject.cpp \
 	   VariableLookupObject.cpp \
 	   GlobalFunction.cpp \
@@ -22,6 +23,7 @@ FILES= Announce.cpp \
        kdtree.cpp \
 	   LegendrePolynomial.cpp \
 	   GaussQuadrature.cpp \
+	   GaussLobattoQuadrature.cpp \
 	   MeshUtilitiesFuzzy.cpp \
 	   GridElements.cpp
 

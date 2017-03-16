@@ -611,6 +611,21 @@ class Mesh {
 
 public:
 	///	<summary>
+	///		Data layout in mesh.
+	///	</summary>
+	enum DataLayout {
+		DataLayout_Volumetric,
+		DataLayout_SpectralElementGLL,
+		DataLayout_DiscontinuousGLL,
+	};
+
+public:
+	///	<summary>
+	///		Data layout in mesh.
+	///	</summary>
+	DataLayout eDataLayout;
+
+	///	<summary>
 	///		Vector of Nodes for this mesh.
 	///	</summary>
 	NodeVector nodes;
@@ -631,22 +646,18 @@ public:
 	std::vector<int> vecTargetFaceIx;
 
 	///	<summary>
-	///		Units for latitude.
+	///		Number of degrees of freedom on mesh, typically equal to
+	///		faces.size() unless the DataLayout is a finite element type.
 	///	</summary>
-	std::string strLatUnits;
+	size_t sDOFCount;
 
 	///	<summary>
-	///		Vector of the latitude of the Face centerpoint.
+	///		Vector of the latitude of the Face centerpoint (in degrees).
 	///	</summary>
 	DataArray1D<double> dLat;
 
 	///	<summary>
-	///		Units for longitude.
-	///	</summary>
-	std::string strLonUnits;
-
-	///	<summary>
-	///		Vector of the longitude of the Face centerpoint.
+	///		Vector of the longitude of the Face centerpoint (in degrees).
 	///	</summary>
 	DataArray1D<double> dLon;
 
@@ -683,15 +694,29 @@ public:
 	///	<summary>
 	///		Default constructor.
 	///	</summary>
-	Mesh() {
-	}
+	Mesh() :
+		eDataLayout(DataLayout_Volumetric),
+		sDOFCount(0)
+	{ }
 
 	///	<summary>
 	///		Constructor with input mesh parameter.
 	///	</summary>
-	Mesh(const std::string & strFile) {
+	Mesh(const std::string & strFile) :
+		eDataLayout(DataLayout_Volumetric),
+		sDOFCount(0)
+	{
 		Read(strFile);
 	}
+
+public:
+	///	<summary>
+	///		Initialize as a spectral element mesh.
+	///	</summary>
+	void InitializeAsFiniteElement(
+		DataLayout a_eDataLayout,
+		int nP
+	);
 
 public:
 	///	<summary>
@@ -975,6 +1000,21 @@ void ConvexifyMesh(
 	Mesh & meshin,
 	Mesh & meshout,
 	bool fVerbose = false
+);
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Apply the local quadrilateral map.
+///	</summary>
+void ApplyLocalQuadMap(
+	const Face & face,
+	const NodeVector & nodes,
+	double dAlpha,
+	double dBeta,
+	Node & node,
+	Node & dDx1G,
+	Node & dDx2G
 );
 
 ///////////////////////////////////////////////////////////////////////////////
