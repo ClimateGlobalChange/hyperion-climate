@@ -27,7 +27,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 class PointDataObject :
-	public Object,
+	public DistributedObject,
 	public MultiTypeDataArray2D
 {
 
@@ -36,7 +36,7 @@ public:
 	///		Constructor.
 	///	</summary>
 	PointDataObject(const std::string & strName) :
-		Object(strName),
+		DistributedObject(strName),
 		MultiTypeDataArray2D()
 	{ }
 
@@ -111,6 +111,17 @@ public:
 			vecpMultiTypeData[i] = vecpobjPointData[i];
 		}
 		MultiTypeDataArray2D::Concatenate(vecpMultiTypeData);
+	}
+
+	///	<summary>
+	///		Gather data to the head rank.
+	///	</summary>
+	virtual void Gather() {
+		if (IsDistributed()) {
+			MultiTypeDataArray2D::Gather();
+		}
+
+		DistributedObject::UnsetDistributed();
 	}
 
 public:

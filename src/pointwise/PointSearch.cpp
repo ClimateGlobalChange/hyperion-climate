@@ -38,7 +38,7 @@
 #include <set>
 #include <queue>
 
-#if defined(TEMPEST_MPIOMP)
+#if defined(HYPERION_MPIOMP)
 #include <mpi.h>
 #endif
 
@@ -1115,7 +1115,7 @@ std::string PointSearch(
 	}
 
 	AnnounceSetOutputBuffer(param.fpLog);
-	AnnounceOutputOnAllRanks();
+	//AnnounceOutputOnAllRanks();
 
 	// Check minimum longitude / latitude
 	if ((param.dMinLongitude < 0.0) || (param.dMinLongitude >= 360.0)) {

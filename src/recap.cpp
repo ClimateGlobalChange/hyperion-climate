@@ -50,6 +50,9 @@ int main(int argc, char** argv) {
 
 try {
 
+	// Set Announce to only output on head node
+	AnnounceOnlyOutputOnRankZero();
+
 	// Output usage information
 	if (argc < 2) {
 		Announce("recap version 0.1, March 8th, 2017");

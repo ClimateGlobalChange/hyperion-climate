@@ -229,6 +229,61 @@ protected:
 	ObjectChildrenVector m_vecChildren;
 };
 
+///	<summary>
+///		A class for representing Objects that may be distributed
+///		across MPI ranks.
+///	</summary>
+class DistributedObject : public Object {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DistributedObject(const std::string & strName) :
+		Object(strName),
+		m_fDistributed(true)
+	{ }
+
+	///	<summary>
+	///		Self-duplicator.
+	///	</summary>
+	virtual Object * Duplicate(
+		const std::string & strDuplicateName,
+		ObjectRegistry & objreg
+	) const {
+		return _Duplicate(
+			new DistributedObject(strDuplicateName),
+			objreg);
+	}
+
+	///	<summary>
+	///		Set the distributed flag to true.
+	///	</summary>
+	void SetDistributed() {
+		m_fDistributed = true;
+	}
+
+	///	<summary>
+	///		Set the distributed flag to false.
+	///	</summary>
+	void UnsetDistributed() {
+		m_fDistributed = false;
+	}
+
+	///	<summary>
+	///		Get the state of the distributed flag.
+	///	</summary>
+	bool IsDistributed() const {
+		return m_fDistributed;
+	}
+
+protected:
+	///	<summary>
+	///		A flag indicating data remains distributed across ranks.
+	///	</summary>
+	bool m_fDistributed;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>

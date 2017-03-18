@@ -75,6 +75,20 @@ public:
 				ppReturn);
 	}
 
+	///	<summary>
+	///		Get the vector of path data information.
+	///	</summary>
+	std::vector< MultiTypeDataArray2D > & GetData() {
+		return m_vecPathData;
+	}
+
+	///	<summary>
+	///		Get the vector of path data information.
+	///	</summary>
+	const std::vector< MultiTypeDataArray2D > & GetData() const {
+		return m_vecPathData;
+	}
+
 protected:
 	///	<summary>
 	///		A vector of path data information.

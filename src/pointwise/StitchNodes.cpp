@@ -723,6 +723,42 @@ std::string StitchNodes(
 	Announce("Total paths found: %i", vecPaths.size());
 	AnnounceEndBlock("Done");
 
+	// Store results
+	if (pobjPathData != NULL) {
+		std::vector< MultiTypeDataArray2D > & vecPathData =
+			pobjPathData->GetData();
+
+		vecPathData.resize(vecPaths.size());
+
+		for (int i = 0; i < vecPaths.size(); i++) {
+			vecPathData[i].SetFieldCount(
+				2,
+				pobjPointData->GetFloatFieldCount(),
+				pobjPointData->GetDoubleFieldCount());
+
+			vecPathData[i].Resize(vecPaths[i].m_iTimes.size());
+
+			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
+				int iTime = vecPaths[i].m_iTimes[t];
+				int iCandidate = vecPaths[i].m_iCandidates[t];
+
+				int iGlobalIx = vecFirstCandidate[t] + iCandidate;
+
+				vecPathData[i].DataInt(t,0) =
+					pobjPointData->DataInt(iCandidate,0);
+				vecPathData[i].DataInt(t,1) =
+					pobjPointData->DataInt(iCandidate,1);
+				for (int j = 0; j < pobjPointData->GetFloatFieldCount(); j++) {
+					vecPathData[i].DataFloat(t,j) =
+						pobjPointData->DataFloat(iCandidate,j);
+				}
+				for (int j = 0; j < pobjPointData->GetDoubleFieldCount(); j++) {
+					vecPathData[i].DataDouble(t,j) =
+						pobjPointData->DataDouble(iCandidate,j);
+				}
+			}
+		}
+	}
 /*
 	// Write results out
 	AnnounceStartBlock("Writing results");

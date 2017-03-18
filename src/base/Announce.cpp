@@ -16,7 +16,7 @@
 
 #include "Announce.h"
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 #include <mpi.h>
 #endif
 
@@ -107,7 +107,7 @@ void AnnounceStartBlock(const char * szText) {
 		return;
 	}
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 	// Only output on rank zero
 	if (g_fOnlyOutputOnRankZero) {
 		int nRank;
@@ -162,7 +162,7 @@ void AnnounceEndBlock(const char * szText) {
 		return;
 	}
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 	// Only output on rank zero
 	if (g_fOnlyOutputOnRankZero) {
 		int nRank;
@@ -211,7 +211,7 @@ void AnnounceEndBlock(
 
 void Announce(const char * szText, ...) {
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 	// Only output on rank zero
 	if (g_fOnlyOutputOnRankZero) {
 		int nRank;
@@ -268,7 +268,7 @@ void Announce(
 	...
 ) {
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 	// Only output on rank zero
 	if (g_fOnlyOutputOnRankZero) {
 		int nRank;
@@ -326,7 +326,7 @@ void Announce(
 
 void AnnounceBanner(const char * szText) {
 
-#ifdef TEMPEST_MPIOMP
+#ifdef HYPERION_MPIOMP
 	// Only output on rank zero
 	if (g_fOnlyOutputOnRankZero) {
 		int nRank;
