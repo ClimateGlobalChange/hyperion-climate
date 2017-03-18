@@ -16,6 +16,8 @@
 
 #include "MultiTypeDataArray2D.h"
 
+#include "DataArray1D.h"
+
 #if defined(HYPERION_MPIOMP)
 #include <mpi.h>
 #endif
@@ -174,23 +176,87 @@ void MultiTypeDataArray2D::Gather() {
 #if defined(HYPERION_MPIOMP)
 	// Record the total number of rows across all threads
 	int nLocalRows = GetRows();
-	int nTotalRows = 0;
+
+	int nRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+
+	int nSize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nSize);
+
+	// Gather total row count on each process
+	DataArray1D<int> vecAllRows;
+	DataArray1D<int> vecAllRowsInt;
+	DataArray1D<int> vecAllRowsIntDispl;
+	DataArray1D<int> vecAllRowsFloat;
+	DataArray1D<int> vecAllRowsFloatDispl;
+	DataArray1D<int> vecAllRowsDouble;
+	DataArray1D<int> vecAllRowsDoubleDispl;
+
+	if (nRank == 0) {
+		vecAllRows.Allocate(nSize);
+		vecAllRowsInt.Allocate(nSize);
+		vecAllRowsIntDispl.Allocate(nSize);
+		vecAllRowsFloat.Allocate(nSize);
+		vecAllRowsFloatDispl.Allocate(nSize);
+		vecAllRowsDouble.Allocate(nSize);
+		vecAllRowsDoubleDispl.Allocate(nSize);
+	}
 
 	int iError =
-		MPI_Reduce(
+		MPI_Gather(
 			&nLocalRows,
-			&nTotalRows,
 			1,
 			MPI_INT,
-			MPI_SUM,
+			&(vecAllRows[0]),
+			1,
+			MPI_INT,
 			0,
 			MPI_COMM_WORLD);
 
 	if (iError != MPI_SUCCESS) {
-		_EXCEPTION1("MPI_Reduce error: %i", iError);
+		_EXCEPTION1("MPI_Gather error: %i", iError);
 	}
 
-	Resize(nTotalRows);
+	// Determine recv buffer sizes and displacements
+	int nTotalRows = 0;
+	if (nRank == 0) {
+		for (int i = 0; i < nSize; i++) {
+			nTotalRows += vecAllRows[i];
+			vecAllRowsInt[i] = vecAllRows[i] * m_nIntFields;
+			vecAllRowsFloat[i] = vecAllRows[i] * m_nFloatFields;
+			vecAllRowsDouble[i] = vecAllRows[i] * m_nDoubleFields;
+		}
+
+		vecAllRowsIntDispl[0] = 0;
+		vecAllRowsFloatDispl[0] = 0;
+		vecAllRowsDoubleDispl[0] = 0;
+		for (int i = 1; i < nSize; i++) {
+			vecAllRowsIntDispl[i] =
+				vecAllRowsIntDispl[i-1] + vecAllRowsInt[i-1];
+			vecAllRowsFloatDispl[i] =
+				vecAllRowsFloatDispl[i-1] + vecAllRowsFloat[i-1];
+			vecAllRowsDoubleDispl[i] =
+				vecAllRowsDoubleDispl[i-1] + vecAllRowsDouble[i-1];
+		}
+
+		Resize(nTotalRows);
+	}
+
+	// Send total number of rows to all processes
+	iError =
+		MPI_Scatter(
+			&nTotalRows,
+			1,
+			MPI_INT,
+			&nTotalRows,
+			1,
+			MPI_INT,
+			0,
+			MPI_COMM_WORLD);
+
+	if (iError != MPI_SUCCESS) {
+		_EXCEPTION1("MPI_Scatter error: %i", iError);
+	}
 
 	if (nTotalRows == 0) {
 		return;
@@ -198,55 +264,59 @@ void MultiTypeDataArray2D::Gather() {
 
 	// Gather int fields
 	if (m_nIntFields != 0) {
-		int iError =
-			MPI_Gather(
+		iError =
+			MPI_Gatherv(
 				&(m_dDataInt(0,0)),
-				m_nRows * m_nIntFields,
+				nLocalRows * m_nIntFields,
 				MPI_INT,
 				&(m_dDataInt(0,0)),
-				nTotalRows * m_nIntFields,
+				&(vecAllRowsInt[0]),
+				&(vecAllRowsIntDispl[0]),
 				MPI_INT,
 				0,
 				MPI_COMM_WORLD);
 
 		if (iError != MPI_SUCCESS) {
-			_EXCEPTION1("MPI_Gather error: %i", iError);
+			_EXCEPTION1("MPI_Gatherv error: %i", iError);
 		}
 	}
 
 	if (m_nFloatFields != 0) {
-		int iError =
-			MPI_Gather(
+		iError =
+			MPI_Gatherv(
 				&(m_dDataFloat(0,0)),
-				m_nRows * m_nFloatFields,
+				nLocalRows * m_nFloatFields,
 				MPI_FLOAT,
 				&(m_dDataFloat(0,0)),
-				nTotalRows * m_nFloatFields,
+				&(vecAllRowsFloat[0]),
+				&(vecAllRowsFloatDispl[0]),
 				MPI_FLOAT,
 				0,
 				MPI_COMM_WORLD);
 
 		if (iError != MPI_SUCCESS) {
-			_EXCEPTION1("MPI_Gather error: %i", iError);
+			_EXCEPTION1("MPI_Gatherv error: %i", iError);
 		}
 	}
 
 	if (m_nDoubleFields != 0) {
-		int iError =
-			MPI_Gather(
+		iError =
+			MPI_Gatherv(
 				&(m_dDataDouble(0,0)),
-				m_nRows * m_nDoubleFields,
+				nLocalRows * m_nDoubleFields,
 				MPI_DOUBLE,
 				&(m_dDataDouble(0,0)),
-				nTotalRows * m_nDoubleFields,
+				&(vecAllRowsDouble[0]),
+				&(vecAllRowsDoubleDispl[0]),
 				MPI_DOUBLE,
 				0,
 				MPI_COMM_WORLD);
 
 		if (iError != MPI_SUCCESS) {
-			_EXCEPTION1("MPI_Gather error: %i", iError);
+			_EXCEPTION1("MPI_Gatherv error: %i", iError);
 		}
 	}
+
 #endif
 }
 

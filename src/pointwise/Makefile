@@ -11,7 +11,6 @@ HYPERIONCLIMATEDIR= ../..
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
 FILES= Pointwise.cpp \
-	   PointDataObject.cpp \
 	   PointSearch.cpp \
 	   StitchNodes.cpp
 

@@ -973,8 +973,6 @@ std::string StitchNodesFunction::Call(
 			pobjPathData = new PathDataObject("");
 		}
 
-		std::string strError = "";
-/*
 		std::string strError =
 			StitchNodes(
 				pobjConfig,
@@ -982,7 +980,7 @@ std::string StitchNodesFunction::Call(
 				pobjPointData,
 				pobjPathData
 			);
-*/
+
 		if (ppReturn != NULL) {
 			(*ppReturn) = pobjPathData;
 		}
