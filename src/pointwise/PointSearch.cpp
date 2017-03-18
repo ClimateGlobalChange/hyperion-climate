@@ -1645,7 +1645,7 @@ std::string PointSearchFunction::Call(
 		return std::string("point_search(config, param) expects 2 arguments");
 	}
 
-	// Check validity of configuration
+	// Check that first argument is of type RecapConfigObject
 	RecapConfigObject * pobjConfig =
 		dynamic_cast<RecapConfigObject *>(objreg.GetObject(vecCommandLine[0]));
 	if (pobjConfig == NULL) {
@@ -1663,37 +1663,12 @@ std::string PointSearchFunction::Call(
 	Mesh & mesh = pobjConfig->GetGrid()->GetMesh();
 
 	mesh.ConstructAdjacencyList();
-/*
-	// Grid object
-	GridObject * pobjGrid =
-		dynamic_cast<GridObject *>(pobjConfig->GetChild("data"));
 
-	// Grid object
-	GridObject * pobjGrid =
-		dynamic_cast<GridObject *>(objreg.GetObject(vecCommandLine[0]));
-	if (pobjGrid == NULL) {
-		return std::string("First argument to point_search must be of type grid");
-	}
-
-	// FileList object
-	FileListObject * pobjFileList =
-		dynamic_cast<FileListObject *>(objreg.GetObject(vecCommandLine[1]));
-	if (pobjFileList == NULL) {
-		return std::string("Second argument to point_search must be of type file_list");
-	}
-
-	// Lookup object
-	VariableLookupObject * pobjVarLookup =
-		dynamic_cast<VariableLookupObject *>(objreg.GetObject(vecCommandLine[2]));
-	if (pobjVarLookup == NULL) {
-		return std::string("Third argument to point_search must be of type variable_lookup");
-	}
-*/
 	// Parameters
 	Object * pobjParam =
 		dynamic_cast<Object *>(objreg.GetObject(vecCommandLine[1]));
 	if (pobjParam == NULL) {
-		return std::string("Fourth argument to point_search must be of type parameter_list");
+		return std::string("Second argument to point_search must be of type parameter_list");
 	}
 
 	// Construct PointSearchParam object
@@ -1955,6 +1930,25 @@ std::string PointSearchFunction::Call(
 
 		pobjPointDataCombined->Concatenate(vecpobjPointData);
 
+		if (pobjPointDataCombined->GetIntFieldCount() != 2) {
+			_EXCEPTIONT("Logic error");
+		}
+		if (pobjPointDataCombined->GetFloatFieldCount() != vecOutputOps.size()) {
+			_EXCEPTIONT("Logic error");
+		}
+
+		// Set field headers
+		pobjPointDataCombined->SetIntFieldHeader(0, "TimeIx");
+		pobjPointDataCombined->SetIntFieldHeader(1, "Candidate");
+
+		for (size_t i = 0; i < vecOutputOps.size(); i++) {
+			pobjPointDataCombined->SetFloatFieldHeader(
+				i, vecOutputOps[i].m_pvar->Name());
+
+			pobjPointDataCombined->SetFloatFieldUnits(
+				i, vecOutputOps[i].m_pvar->Units());
+		}
+
 		// Cleanup
 		for (size_t s = 0; s < vecpobjPointData.size(); s++) {
 			delete vecpobjPointData[s];
@@ -1964,10 +1958,11 @@ std::string PointSearchFunction::Call(
 
 		Announce("Total candidates over all timesteps: %i",
 			pobjPointDataCombined->GetRows());
-
+/*
 		Announce("%lu int fields, %lu float fields",
 			pobjPointDataCombined->GetIntFieldCount(),
 			pobjPointDataCombined->GetFloatFieldCount());
+*/
 	}
 
 	AnnounceEndBlock("Done");

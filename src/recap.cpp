@@ -676,7 +676,7 @@ try {
 							objreg);
 
 					if (strError != "") {
-						Announce("ERROR: %s", strError.c_str());
+						Announce("%s", strError.c_str());
 						return (-1);
 					}
 
@@ -711,7 +711,7 @@ try {
 							vecCommandLine[4]);
 
 					if (strError != "") {
-						Announce("ERROR: %s", strError.c_str());
+						Announce("%s", strError.c_str());
 						return (-1);
 					}
 
@@ -743,7 +743,7 @@ try {
 								&pObjReturn);
 
 						if (strError != "") {
-							Announce("ERROR: %s", strError.c_str());
+							Announce("%s", strError.c_str());
 							return (-1);
 						}
 

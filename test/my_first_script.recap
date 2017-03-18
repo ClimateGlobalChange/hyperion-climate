@@ -39,7 +39,7 @@ candidates = point_search(config, dcu_param)
 
 # Topography threshold for stitch_nodes
 topo_threshold = parameter_list()
-topo_threshold.var = "ZS"
+topo_threshold.var = "ZBOT"
 topo_threshold.op = "<="
 topo_threshold.value = "70.0m"
 topo_threshold.number = 8
@@ -51,7 +51,7 @@ stitch_param.minduration = 8
 stitch_param.maxgap = 2
 stitch_param.threshold = [topo_threshold]
 
-cyclone_paths = stitch_nodes(config, stitch_param)
+cyclone_paths = stitch_nodes(config, candidates, stitch_param)
 
 # Output cyclone_paths to a CSV file
 cyclone_paths.output_csv("nhemi_cyclone_paths.csv")

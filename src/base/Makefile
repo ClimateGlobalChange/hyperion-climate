@@ -14,6 +14,7 @@ FILES= Announce.cpp \
 	   Exception.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
+	   MultiTypeDataArray2D.cpp \
 	   Object.cpp \
 	   GridObject.cpp \
 	   FileListObject.cpp \

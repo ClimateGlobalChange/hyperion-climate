@@ -232,41 +232,6 @@ protected:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A class for representing Objects that may be distributed
-///		across MPI ranks.
-///	</summary>
-class DistributedObject : public Object {
-
-public:
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	DistributedObject(const std::string & strName) :
-		Object(strName)
-	{ }
-
-	///	<summary>
-	///		Self-duplicator.
-	///	</summary>
-	virtual Object * Duplicate(
-		const std::string & strDuplicateName,
-		ObjectRegistry & objreg
-	) const {
-		return _Duplicate(
-			new DistributedObject(strDuplicateName),
-			objreg);
-	}
-
-	///	<summary>
-	///		Reduce data to the head rank.
-	///	</summary>
-	virtual void Reduce()
-	{ }
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
 ///		A class for representing String objects.
 ///	</summary>
 class StringObject : public Object {
@@ -349,6 +314,13 @@ public:
 		return _Duplicate(
 			new IntegerObject(strDuplicateName, m_iValue),
 			objreg);
+	}
+
+	///	<summary>
+	///		Get the integer value.
+	///	</summary>
+	const int & Value() const {
+		return m_iValue;
 	}
 
 protected:

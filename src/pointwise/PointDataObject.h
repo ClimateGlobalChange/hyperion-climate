@@ -19,17 +19,25 @@
 
 #include "Announce.h"
 #include "Object.h"
+#include "MultiTypeDataArray2D.h"
+
+#include <string>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class PointDataObject : public DistributedObject {
+class PointDataObject :
+	public Object,
+	public MultiTypeDataArray2D
+{
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
 	PointDataObject(const std::string & strName) :
-		DistributedObject(strName)
+		Object(strName),
+		MultiTypeDataArray2D()
 	{ }
 
 	///	<summary>
@@ -75,189 +83,178 @@ public:
 	///	<summary>
 	///		Set the number of fields used by the object.
 	///	</summary>
-	void SetFieldCount(
+	virtual void SetFieldCount(
 		size_t nIntFields = 0,
 		size_t nFloatFields = 0,
 		size_t nDoubleFields = 0
 	) {
-		m_nIntFields = nIntFields;
-		m_nFloatFields = nFloatFields;
-		m_nDoubleFields = nDoubleFields;
+		m_strIntFieldHeaders.resize(nIntFields);
+		m_strFloatFieldHeaders.resize(nFloatFields);
+		m_strDoubleFieldHeaders.resize(nDoubleFields);
 
-		for (size_t i = 0; i < m_vecDataInt.size(); i++) {
-			m_vecDataInt[i].resize(m_nIntFields);
-		}
-		for (size_t i = 0; i < m_vecDataFloat.size(); i++) {
-			m_vecDataFloat[i].resize(m_nFloatFields);
-		}
-		for (size_t i = 0; i < m_vecDataDouble.size(); i++) {
-			m_vecDataDouble[i].resize(m_nDoubleFields);
-		}
-	}
+		m_strFloatFieldUnits.resize(nFloatFields);
+		m_strDoubleFieldUnits.resize(nDoubleFields);
 
-	///	<summary>
-	///		Change the number of rows in the data.
-	///	</summary>
-	void Resize(
-		size_t nRows
-	) {
-		int nIntSize = m_vecDataInt.size();
-		m_vecDataInt.resize(nRows);
-		for (size_t i = nIntSize; i < m_vecDataInt.size(); i++) {
-			m_vecDataInt[i].resize(m_nIntFields);
-		}
-
-		int nFloatSize = m_vecDataFloat.size();
-		m_vecDataFloat.resize(nRows);
-		for (size_t i = nFloatSize; i < m_vecDataFloat.size(); i++) {
-			m_vecDataFloat[i].resize(m_nFloatFields);
-		}
-
-		int nDoubleSize = m_vecDataDouble.size();
-		m_vecDataDouble.resize(nRows);
-		for (size_t i = nDoubleSize; i < m_vecDataDouble.size(); i++) {
-			m_vecDataDouble[i].resize(m_nDoubleFields);
-		}
-	}
-
-	///	<summary>
-	///		Get the number of rows in the data.
-	///	</summary>
-	size_t GetRows() const {
-		return m_vecDataInt.size();
-	}
-
-	///	<summary>
-	///		Get the number of integer fields in the data.
-	///	</summary>
-	size_t GetIntFieldCount() const {
-		return m_nIntFields;
-	}
-
-	///	<summary>
-	///		Get the number of float fields in the data.
-	///	</summary>
-	size_t GetFloatFieldCount() const {
-		return m_nFloatFields;
-	}
-
-	///	<summary>
-	///		Get the number of double fields in the data.
-	///	</summary>
-	size_t GetDoubleFieldCount() const {
-		return m_nDoubleFields;
-	}
-
-	///	<summary>
-	///		Data accessor to integer data.
-	///	</summary>
-	int & DataInt(size_t i, size_t j) {
-		return m_vecDataInt[i][j];
-	}
-
-	///	<summary>
-	///		Data accessor to float data.
-	///	</summary>
-	float & DataFloat(size_t i, size_t j) {
-		return m_vecDataFloat[i][j];
-	}
-
-	///	<summary>
-	///		Data accessor to float data.
-	///	</summary>
-	double & DataDouble(size_t i, size_t j) {
-		return m_vecDataDouble[i][j];
+		MultiTypeDataArray2D::SetFieldCount(
+			nIntFields, nFloatFields, nDoubleFields);
 	}
 
 	///	<summary>
 	///		Concatenate multiple PointDataObjects.
 	///	</summary>
-	void Concatenate(
-		const std::vector<PointDataObject *> vecpobjPointData
+	virtual void Concatenate(
+		const std::vector<PointDataObject *> & vecpobjPointData
 	) {
-		if (vecpobjPointData.size() == 0) {
-			return;
+		std::vector<MultiTypeDataArray2D *> vecpMultiTypeData;
+		vecpMultiTypeData.resize(vecpobjPointData.size());
+		for (size_t i = 0; i < vecpobjPointData.size(); i++) {
+			vecpMultiTypeData[i] = vecpobjPointData[i];
 		}
+		MultiTypeDataArray2D::Concatenate(vecpMultiTypeData);
+	}
 
-		size_t sRows = 0;
-		for (size_t s = 0; s < vecpobjPointData.size(); s++) {
-			sRows += vecpobjPointData[s]->GetRows();
+public:
+	///	<summary>
+	///		Get the integer field header.
+	///	</summary>
+	const std::string & GetIntFieldHeader(size_t sFieldHeader) const {
+		if (sFieldHeader > m_strIntFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
 		}
-
-		SetFieldCount(
-			vecpobjPointData[0]->m_nIntFields,
-			vecpobjPointData[0]->m_nFloatFields,
-			vecpobjPointData[0]->m_nDoubleFields);
-
-		Resize(sRows);
-
-		sRows = 0;
-		for (size_t s = 0; s < vecpobjPointData.size(); s++) {
-			if (vecpobjPointData[s]->m_nIntFields != m_nIntFields) {
-				_EXCEPTIONT("int field count mismatch");
-			}
-			if (vecpobjPointData[s]->m_nFloatFields != m_nFloatFields) {
-				_EXCEPTIONT("float field count mismatch");
-			}
-			if (vecpobjPointData[s]->m_nDoubleFields != m_nDoubleFields) {
-				_EXCEPTIONT("double field count mismatch");
-			}
-
-			memcpy(
-				&(m_vecDataInt[sRows][0]),
-				&(vecpobjPointData[s]->m_vecDataInt[0][0]),
-				m_nIntFields * sizeof(int));
-
-			memcpy(
-				&(m_vecDataFloat[sRows][0]),
-				&(vecpobjPointData[s]->m_vecDataFloat[0][0]),
-				m_nFloatFields * sizeof(float));
-
-			memcpy(
-				&(m_vecDataDouble[sRows][0]),
-				&(vecpobjPointData[s]->m_vecDataDouble[0][0]),
-				m_nDoubleFields * sizeof(double));
-
-			sRows += vecpobjPointData[s]->GetRows();
-		}
+		return m_strIntFieldHeaders[sFieldHeader];
 	}
 
 	///	<summary>
-	///		Reduce data to the head rank.
+	///		Set the integer field header.
 	///	</summary>
-	virtual void Reduce()
-	{ }
-
-protected:
-	///	<summary>
-	///		Number of integer data fields required.
-	///	</summary>
-	size_t m_nIntFields;
-
-	///	<summary>
-	///		Integer data fields.
-	///	</summary>
-	std::vector< std::vector<int> > m_vecDataInt;
+	void SetIntFieldHeader(
+		size_t sFieldHeader,
+		const std::string & strIntFieldHeader
+	) {
+		if (sFieldHeader > m_strIntFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		m_strIntFieldHeaders[sFieldHeader] = strIntFieldHeader;
+	}
 
 	///	<summary>
-	///		Number of float data fields required.
+	///		Get the float field header.
 	///	</summary>
-	size_t m_nFloatFields;
+	const std::string & GetFloatFieldHeader(size_t sFieldHeader) const {
+		if (sFieldHeader > m_strFloatFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		return m_strFloatFieldHeaders[sFieldHeader];
+	}
 
 	///	<summary>
-	///		Float data fields.
+	///		Set the float field header.
 	///	</summary>
-	std::vector< std::vector<float> > m_vecDataFloat;
+	void SetFloatFieldHeader(
+		size_t sFieldHeader,
+		const std::string & strFloatFieldHeader
+	) {
+		if (sFieldHeader > m_strFloatFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		m_strFloatFieldHeaders[sFieldHeader] = strFloatFieldHeader;
+	}
 
 	///	<summary>
-	///		Number of double data fields required.
+	///		Get the double field header.
 	///	</summary>
-	size_t m_nDoubleFields;
+	const std::string & GetDoubleFieldHeader(size_t sFieldHeader) const {
+		if (sFieldHeader > m_strDoubleFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		return m_strDoubleFieldHeaders[sFieldHeader];
+	}
 
 	///	<summary>
-	///		Double data fields.
+	///		Set the double field header.
 	///	</summary>
-	std::vector< std::vector<double> > m_vecDataDouble;
+	void SetDoubleFieldHeader(
+		size_t sFieldHeader,
+		const std::string & strDoubleFieldHeader
+	) {
+		if (sFieldHeader > m_strDoubleFieldHeaders.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		m_strDoubleFieldHeaders[sFieldHeader] = strDoubleFieldHeader;
+	}
+
+public:
+	///	<summary>
+	///		Get the float field header.
+	///	</summary>
+	const std::string & GetFloatFieldUnits(size_t sFieldUnits) const {
+		if (sFieldUnits > m_strFloatFieldUnits.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		return m_strFloatFieldUnits[sFieldUnits];
+	}
+
+	///	<summary>
+	///		Set the float field header.
+	///	</summary>
+	void SetFloatFieldUnits(
+		size_t sFieldUnits,
+		const std::string & strFloatFieldUnits
+	) {
+		if (sFieldUnits > m_strFloatFieldUnits.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		m_strFloatFieldUnits[sFieldUnits] = strFloatFieldUnits;
+	}
+
+	///	<summary>
+	///		Get the double field header.
+	///	</summary>
+	const std::string & GetDoubleFieldUnits(size_t sFieldUnits) const {
+		if (sFieldUnits > m_strDoubleFieldUnits.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		return m_strDoubleFieldUnits[sFieldUnits];
+	}
+
+	///	<summary>
+	///		Set the double field header.
+	///	</summary>
+	void SetDoubleFieldUnits(
+		size_t sFieldUnits,
+		const std::string & strDoubleFieldUnits
+	) {
+		if (sFieldUnits > m_strDoubleFieldUnits.size()) {
+			_EXCEPTIONT("Field header index out of range");
+		}
+		m_strDoubleFieldUnits[sFieldUnits] = strDoubleFieldUnits;
+	}
+
+public:
+	///	<summary>
+	///		Column headers for integer fields.
+	///	</summary>
+	std::vector<std::string> m_strIntFieldHeaders;
+
+	///	<summary>
+	///		Column headers for float fields.
+	///	</summary>
+	std::vector<std::string> m_strFloatFieldHeaders;
+
+	///	<summary>
+	///		Column headers for double fields.
+	///	</summary>
+	std::vector<std::string> m_strDoubleFieldHeaders;
+
+	///	<summary>
+	///		Column units for float fields.
+	///	</summary>
+	std::vector<std::string> m_strFloatFieldUnits;
+
+	///	<summary>
+	///		Column units for double fields.
+	///	</summary>
+	std::vector<std::string> m_strDoubleFieldUnits;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
