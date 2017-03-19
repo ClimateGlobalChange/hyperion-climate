@@ -152,9 +152,13 @@ public:
 	///		Convert to string.
 	///	</summary>
 	std::string ToString() const {
-/*
+
+		if (m_pvar == NULL) {
+			return std::string("Invalid ThresholdOp");
+		}
+
 		// Output announcement
-		std::string strDescription = var.ToString(varreg);
+		std::string strDescription = m_pvar->Name();
 		if (m_eOp == GreaterThan) {
 			strDescription += " is greater than ";
 		} else if (m_eOp == LessThan) {
@@ -169,14 +173,12 @@ public:
 			strDescription += " is not equal to ";
 		}
 
-		char szBuffer[128];
-		sprintf(szBuffer, "%f within %f degrees",
-			m_dValue, m_dDistance);
-		strDescription += szBuffer;
+		strDescription += std::to_string(m_dValue)
+			+ std::string(" within ")
+			+ std::to_string(m_dDistance)
+			+ std::string(" degrees");
 
-		Announce("%s", strDescription.c_str());
-*/
-		return std::string("");
+		return strDescription;
 	}
 
 	///	<summary>
@@ -321,24 +323,38 @@ public:
 	///		Convert to string.
 	///	</summary>
 	std::string ToString() const {
-/*
+
+		if (m_pvar == NULL) {
+			return std::string("Invalid ThresholdOp");
+		}
+
 		if (m_dDeltaAmount < 0.0) {
-			Announce("%s decreases by %f over %f degrees"
-				   " (max search %f deg)",
-				var.ToString(varreg).c_str(),
-				-m_dDeltaAmount,
-				m_dDistance,
-				m_dMinMaxDist);
+			std::string strDescription =
+				m_pvar->Name() + std::string(" decreases by ")
+				+ std::to_string(-m_dDeltaAmount)
+				+ m_pvar->Units()
+				+ std::string(" over ")
+				+ std::to_string(m_dDistance)
+				+ std::string("deg (max search ")
+				+ std::to_string(m_dMinMaxDist)
+				+ std::string("deg)");
+
+			return strDescription;
 
 		} else {
-			Announce("%s increases by %f over %f degrees"
-					" (min search %f deg)",
-				var.ToString(varreg).c_str(),
-				m_dDeltaAmount,
-				m_dDistance,
-				m_dMinMaxDist);
+			std::string strDescription =
+				m_pvar->Name() + std::string(" increases by ")
+				+ std::to_string(m_dDeltaAmount)
+				+ m_pvar->Units()
+				+ std::string(" over ")
+				+ std::to_string(m_dDistance)
+				+ std::string("deg (min search ")
+				+ std::to_string(m_dMinMaxDist)
+				+ std::string("deg)");
+
+			return strDescription;
 		}
-*/
+
 		return std::string("");
 	}
 
@@ -472,16 +488,32 @@ public:
 	///		Convert to string.
 	///	</summary>
 	std::string ToString() const {
-/*
-		sprintf(szBuffer, "%s", var.ToString(varreg).c_str());
-		strDescription += szBuffer;
 
-		sprintf(szBuffer, " within %f degrees", m_dDistance);
-		strDescription += szBuffer;
+		if (m_pvar == NULL) {
+			return std::string("Invalid ThresholdOp");
+		}
 
-		Announce("%s", strDescription.c_str());
-*/
-		return std::string("");
+		std::string strDescription;
+
+		if (m_eOp == Max) {
+			strDescription += "Maximum of ";
+		} else if (m_eOp == Min) {
+			strDescription += "Minimum of ";
+		} else if (m_eOp == Avg) {
+			strDescription += "Average of ";
+		} else if (m_eOp == MaxDist) {
+			strDescription += "Distance to maximum of ";
+		} else if (m_eOp == MinDist) {
+			strDescription += "Distance to minimum of ";
+		}
+
+		strDescription +=
+			m_pvar->Name()
+			+ std::string(" within ")
+			+ std::to_string(m_dDistance)
+			+ " degrees";
+
+		return strDescription;
 	}
 
 	///	<summary>
@@ -1810,6 +1842,8 @@ std::string PointSearchFunction::Call(
 			}
 
 			vecClosedContourOps.push_back(opCC);
+
+			Announce(opCC.ToString().c_str());
 		}
 	}
 
@@ -1837,6 +1871,8 @@ std::string PointSearchFunction::Call(
 			}
 
 			vecNoClosedContourOps.push_back(opCC);
+
+			Announce(opCC.ToString().c_str());
 		}
 	}
 
@@ -1864,6 +1900,8 @@ std::string PointSearchFunction::Call(
 			}
 
 			vecThresholdOps.push_back(opThreshold);
+
+			Announce(opThreshold.ToString().c_str());
 		}
 	}
 

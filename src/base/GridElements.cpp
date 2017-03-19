@@ -162,11 +162,11 @@ void Mesh::InitializeAsFiniteElement(
 					// Insert new unique node into map
 					int ixNode = static_cast<int>(mapFaces.size());
 					mapFaces.insert(std::pair<Node, int>(nodeGLL, ixNode));
-					dataGLLnodes[q][p][f] = ixNode + 1;
+					dataGLLnodes[q][p][f] = ixNode;
 					vecGLLNodes.push_back(nodeGLL);
 
 				} else {
-					dataGLLnodes[q][p][f] = iter->second + 1;
+					dataGLLnodes[q][p][f] = iter->second;
 				}
 
 			// Non-unique node array if DGLL
@@ -242,7 +242,7 @@ void Mesh::InitializeAsFiniteElement(
 		for (int p = 0; p < nP; p++) {
 
 			std::set<int> & setLocalConnectivity =
-				vecConnectivity[dataGLLnodes[q][p][f]-1];
+				vecConnectivity[dataGLLnodes[q][p][f]];
 
 			// Connect in all directions
 			if (p != 0) {
