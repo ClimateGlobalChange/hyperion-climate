@@ -25,19 +25,34 @@
 // VariableRegistry
 ///////////////////////////////////////////////////////////////////////////////
 
-Variable * VariableRegistry::FindOrRegister(
+std::string VariableRegistry::FindOrRegister(
+	RecapConfigObject * pobjConfig,
 	const std::string & strVariableName,
-	const FileListObject * pobjFileList
+	Variable ** ppVariable
 ) {
+	if (!pobjConfig->IsValid()) {
+		_EXCEPTIONT("Invalid RecapConfigObject pointer");
+	}
+	if (strVariableName.length() == 0) {
+		_EXCEPTIONT("Attempting to find/register zero length Variable name");
+	}
+	if (ppVariable == NULL) {
+		_EXCEPTIONT("Invalid ppVariable argument");
+	}
+
+	// Chck if Variable exists in registry
 	std::map<std::string, Variable>::iterator iterVar =
 		m_mapVariables.find(strVariableName);
 
-	// Variable exists in registry
 	if (iterVar != m_mapVariables.end()) {
-		return &(iterVar->second);
+		(*ppVariable) = &(iterVar->second);
+
+		return std::string("");
 	}
 
-	// Check if variable is in the FileList, and add to registry if present
+	// Check if Variable is in the FileList, and add to registry if present
+	const FileListObject * pobjFileList =
+		pobjConfig->GetFileList();
 	const VariableInfo * pvarinfo =
 		pobjFileList->GetVariableInfo(strVariableName);
 	if (pvarinfo != NULL) {
@@ -47,11 +62,99 @@ Variable * VariableRegistry::FindOrRegister(
 					strVariableName,
 					Variable(this, strVariableName, pvarinfo))).first;
 
-		return &(iterVar->second);
+		(*ppVariable) = &(iterVar->second);
+
+		return std::string("");
 	}
 
-	// Combinations not yet supported
-	return NULL;
+	// Check if Variable is an operator combination
+	if (strVariableName[0] == '_') {
+		Variable varNew(this, strVariableName, true);
+
+		// Parse arguments
+		int iArgBegin = 0;
+		int iArgEnd = strVariableName.length()-1;
+
+		for (; iArgBegin < strVariableName.length(); iArgBegin++) {
+			if (strVariableName[iArgBegin] == '(') {
+				break;
+			}
+		}
+		if (iArgBegin == strVariableName.length()) {
+			return
+				std::string("ERROR: Variable operator")
+				+ strVariableName + std::string(" missing open parenthesis");
+		}
+
+		for (; iArgEnd >= 0; iArgEnd--) {
+			if (strVariableName[iArgEnd] == ')') {
+				break;
+			}
+		}
+		if (iArgEnd < 0) {
+			return
+				std::string("ERROR: Variable operator")
+				+ strVariableName + std::string(" missing close parenthesis");
+		}
+
+		// Operator name
+		varNew.m_strOpName = strVariableName.substr(0, iArgBegin);
+
+		// Parse argument list
+		int iPos = iArgBegin+1;
+		int iParenthesisNest = 0;
+		for (int i = iArgBegin+1; i <= iArgEnd; i++) {
+			if (strVariableName[i] == '(') {
+				iParenthesisNest++;
+			}
+			if (((strVariableName[i] == ',') && (iParenthesisNest == 0)) ||
+			    ((strVariableName[i] == ')') && (i == iArgEnd) && (iParenthesisNest == 0))
+			) {
+				// Add argument to Variable's argument list
+				std::string strArg = strVariableName.substr(iPos, i-iPos);
+				varNew.m_vecArg.push_back(strArg);
+
+				// Recursively register Variables
+				Variable * ppVariableArgument = NULL;
+				std::string strError =
+					pobjConfig->GetVariable(
+						strArg,
+						&ppVariableArgument);
+
+				if (strError != "") {
+					return strError;
+				}
+				iPos = i+1;
+
+				if (i == iArgEnd) {
+					break;
+				}
+			}
+
+			if (strVariableName[i] == ')') {
+				if (iParenthesisNest > 0) {
+					iParenthesisNest--;
+				} else {
+					return
+						std::string("ERROR: Variable operator")
+						+ strVariableName + std::string(" has unbalanced parentheses");
+				}
+			}
+		}
+
+		iterVar =
+			m_mapVariables.insert(
+				std::pair<std::string, Variable>(
+					strVariableName, varNew)).first;
+
+		(*ppVariable) = &(iterVar->second);
+
+		return std::string("");
+	}
+
+	// Invalid variable name
+	return std::string("Invalid variable name \"")
+		+ strVariableName + std::string("\"");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,6 +162,7 @@ Variable * VariableRegistry::FindOrRegister(
 bool VariableRegistry::FindOrRegister(
 	const Variable & var
 ) {
+	_EXCEPTIONT("Deprecated -- don't call this routine");
 	std::map<std::string, Variable>::const_iterator iter =
 		m_mapVariables.find(var.m_strName);
 
@@ -112,7 +216,6 @@ Variable::Variable(
 	m_fOp(false),
 	m_strUnits(),
 	m_nSpecifiedDim(0),
-	m_fNoTimeInNcFile(false),
 	m_sTime(InvalidTimeIndex)
 {
 	if (pvarinfo != NULL) {
@@ -132,16 +235,14 @@ bool Variable::operator==(
 	if (m_strName != var.m_strName) {
 		return false;
 	}
+	if (m_strUnits != var.m_strUnits) {
+		return false;
+	}
 	if (m_nSpecifiedDim != var.m_nSpecifiedDim) {
 		return false;
 	}
 	for (int i = 0; i < m_nSpecifiedDim; i++) {
 		if (m_iDim[i] != var.m_iDim[i]) {
-			return false;
-		}
-	}
-	for (int i = 0; i < m_varArg.size(); i++) {
-		if (m_varArg[i] != var.m_varArg[i]) {
 			return false;
 		}
 	}
@@ -153,6 +254,8 @@ bool Variable::operator==(
 int Variable::ParseFromString(
 	const std::string & strIn
 ) {
+	_EXCEPTIONT("Deprecated -- don't call this routine");
+/*
 	// Verify initialization
 	if (m_pvarreg == NULL) {
 		_EXCEPTIONT("Invalid VariableRegistry");
@@ -245,7 +348,7 @@ int Variable::ParseFromString(
 			Variable var(m_pvarreg);
 			n += var.ParseFromString(strIn.substr(n));
 
-			m_pvarreg->FindOrRegister(var);
+			m_pvarreg->FindOrRegister(var.m_strName);
 			m_vecArg.push_back(var.m_strName);
 
 			m_nSpecifiedDim++;
@@ -257,6 +360,7 @@ int Variable::ParseFromString(
 	}
 
 	_EXCEPTION1("Malformed variable string \"%s\"", strIn.c_str());
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -352,30 +456,42 @@ void Variable::LoadGridData(
 
 		return;
 	}
-/*
+
 	// Evaluate the vector magnitude operator
-	if (m_strName == "_VECMAG") {
-		if (m_varArg.size() != 2) {
+	if (m_strOpName == "_VECMAG") {
+		if (m_vecArg.size() != 2) {
 			_EXCEPTION1("_VECMAG expects two arguments: %i given",
-				m_varArg.size());
+				m_vecArg.size());
 		}
-		Variable & varLeft = varreg.Get(m_varArg[0]);
-		Variable & varRight = varreg.Get(m_varArg[1]);
+		Variable * pvarLeft = NULL;
+		Variable * pvarRight = NULL;
 
-		varLeft.LoadGridData(varreg, vecFiles, grid, sTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, sTime);
+		std::string strErrorLeft =
+			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strErrorLeft != "") {
+			_EXCEPTION();
+		}
 
-		const DataArray1D<float> & dataLeft  = varLeft.GetData();
-		const DataArray1D<float> & dataRight = varRight.GetData();
+		std::string strErrorRight =
+			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strErrorRight != "") {
+			_EXCEPTION();
+		}
+
+		pvarLeft->LoadGridData(pobjConfig, sTime);
+		pvarRight->LoadGridData(pobjConfig, sTime);
+
+		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
+		const DataArray1D<float> & dataRight = pvarRight->GetData();
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
 			m_data[i] =
 				sqrt(dataLeft[i] * dataLeft[i]
 					+ dataRight[i] * dataRight[i]);
 		}
-
+/*
 	// Evaluate the absolute value operator
-	} else if (m_strName == "_ABS") {
+	} else if (m_strOpName == "_ABS") {
 		if (m_varArg.size() != 1) {
 			_EXCEPTION1("_ABS expects one argument: %i given",
 				m_varArg.size());
@@ -392,7 +508,7 @@ void Variable::LoadGridData(
 		}
 
 	// Evaluate the average operator
-	} else if (m_strName == "_AVG") {
+	} else if (m_strOpName == "_AVG") {
 		if (m_varArg.size() <= 1) {
 			_EXCEPTION1("_AVG expects at least two arguments: %i given",
 				m_varArg.size());
@@ -414,7 +530,7 @@ void Variable::LoadGridData(
 		}
 
 	// Evaluate the minus operator
-	} else if (m_strName == "_DIFF") {
+	} else if (m_strOpName == "_DIFF") {
 		if (m_varArg.size() != 2) {
 			_EXCEPTION1("_VECMAG expects two arguments: %i given",
 				m_varArg.size());
@@ -433,7 +549,7 @@ void Variable::LoadGridData(
 		}
 
 	// Evaluate the Coriolis parameter operator
-	} else if (m_strName == "_F") {
+	} else if (m_strOpName == "_F") {
 		if (m_varArg.size() != 0) {
 			_EXCEPTION1("_F expects zero arguments: %i given",
 				m_varArg.size());
@@ -444,7 +560,7 @@ void Variable::LoadGridData(
 		}
 
 	// Evaluate the mean operator
-	} else if (m_strName == "_MEAN") {
+	} else if (m_strOpName == "_MEAN") {
 		if (m_varArg.size() != 2) {
 			_EXCEPTION1("_MEAN expects two arguments: %i given",
 				m_varArg.size());
@@ -540,11 +656,11 @@ void Variable::LoadGridData(
 
 			m_data[i] /= static_cast<float>(setNodesVisited.size());
 		}
+*/
 
 	} else {
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 	}
-*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////

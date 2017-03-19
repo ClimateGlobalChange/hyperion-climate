@@ -28,8 +28,6 @@
 
 class RecapConfigObject;
 
-class FileListObject;
-
 class VariableInfo;
 
 class Variable;
@@ -48,9 +46,10 @@ public:
 	///	<summary>
 	///		Find or register a variable.
 	///	</summary>
-	Variable * FindOrRegister(
+	std::string FindOrRegister(
+		RecapConfigObject * pobjConfig,
 		const std::string & strVariableName,
-		const FileListObject * pobjFileList
+		Variable ** ppVariable
 	);
 
 	///	<summary>
@@ -92,6 +91,8 @@ private:
 ///	</summary>
 class Variable {
 
+friend class VariableRegistry;
+
 public:
 	///	<summary>
 	///		Maximum number of arguments in variable.
@@ -114,15 +115,16 @@ public:
 	///		Default constructor.
 	///	</summary>
 	Variable(
-		VariableRegistry * pvarreg
+		VariableRegistry * pvarreg,
+		const std::string & strName,
+		bool fOp
 	) :
 		m_pvarreg(pvarreg),
-		m_strName(),
+		m_strName(strName),
 		m_pvarinfo(NULL),
-		m_fOp(false),
+		m_fOp(fOp),
 		m_strUnits(),
 		m_nSpecifiedDim(0),
-		m_fNoTimeInNcFile(false),
 		m_sTime(InvalidTimeIndex)
 	{
 		memset(m_iDim, 0, MaxArguments * sizeof(int));
@@ -177,13 +179,6 @@ public:
 	///	</summary>
 	void UnloadGridData();
 
-	///	<summary>
-	///		Get the data associated with this variable.
-	///	</summary>
-	const DataArray1D<float> & GetData() const {
-		return m_data;
-	}
-
 public:
 	///	<summary>
 	///		Name accessor.
@@ -199,7 +194,14 @@ public:
 		return m_strUnits;
 	}
 
-public:
+	///	<summary>
+	///		Get the data associated with this variable.
+	///	</summary>
+	const DataArray1D<float> & GetData() const {
+		return m_data;
+	}
+
+protected:
 	///	<summary>
 	///		Pointer to the VariableRegistry.
 	///	</summary>
@@ -209,6 +211,11 @@ public:
 	///		Variable name.
 	///	</summary>
 	std::string m_strName;
+
+	///	<summary>
+	///		Variable units.
+	///	</summary>
+	std::string m_strUnits;
 
 	///	<summary>
 	///		Pointer to the associated VariableInfo structure in
@@ -222,11 +229,6 @@ public:
 	bool m_fOp;
 
 	///	<summary>
-	///		Variable units.
-	///	</summary>
-	std::string m_strUnits;
-
-	///	<summary>
 	///		Number of dimensions specified.
 	///	</summary>
 	int m_nSpecifiedDim;
@@ -237,21 +239,21 @@ public:
 	int m_iDim[MaxArguments];
 
 	///	<summary>
+	///		Name of the operator.
+	///	</summary>
+	std::string m_strOpName;
+/*
+	///	<summary>
 	///		Specified operator arguments.
 	///	</summary>
 	VariableIndexVector m_varArg;
-
+*/
 	///	<summary>
 	///		Specified operator arguments.
 	///	</summary>
 	std::vector<std::string> m_vecArg;
 
-public:
-	///	<summary>
-	///		Flag indicating this Variable has no time index in NetCDF file.
-	///	</summary>
-	bool m_fNoTimeInNcFile;
-
+protected:
 	///	<summary>
 	///		Time index associated with data loaded in this Variable.
 	///	</summary>

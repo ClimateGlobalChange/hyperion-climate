@@ -25,7 +25,7 @@ warm_core_criteria.minmaxdist = "1.1deg"
 
 # Wind magnitude (output)
 wind_mag = parameter_list()
-wind_mag.var = "U(850hPa)" #variable("_VECMAG(U(850hPa),V(850hPa))")
+wind_mag.var = "_VECMAG(U(850hPa),V(850hPa))"
 wind_mag.op = "max"
 wind_mag.dist = "4.0deg"
 

@@ -110,7 +110,7 @@ public:
 	///	</summary>
 	std::string GetVariable(
 		const std::string & strVariableName,
-		Variable ** pVariable
+		Variable ** ppVariable
 	) {
 		// Convert the name from native to standard
 		std::string strStandardName = strVariableName;
@@ -120,19 +120,19 @@ public:
 		}
 
 		// Find the Variable in the VariableRegistry
-		if (pVariable == NULL) {
+		if (ppVariable == NULL) {
 			_EXCEPTIONT("Invalid argument");
 		}
 
-		(*pVariable) =
+		std::string strError =
 			varreg.FindOrRegister(
+				this,
 				strStandardName,
-				GetFileList());
+				ppVariable);
 
 		// Variable could not be found or registered
-		if ((*pVariable) == NULL) {
-			return std::string("Invalid variable \"")
-				+ strVariableName + std::string("\"");
+		if (strError != "") {
+			return strError;
 		}
 		return std::string("");
 	}

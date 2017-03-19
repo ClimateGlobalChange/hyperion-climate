@@ -325,7 +325,7 @@ public:
 	std::string ToString() const {
 
 		if (m_pvar == NULL) {
-			return std::string("Invalid ThresholdOp");
+			return std::string("Invalid ClosedContourOp");
 		}
 
 		if (m_dDeltaAmount < 0.0) {
@@ -490,7 +490,7 @@ public:
 	std::string ToString() const {
 
 		if (m_pvar == NULL) {
-			return std::string("Invalid ThresholdOp");
+			return std::string("Invalid OutputOp");
 		}
 
 		std::string strDescription;
