@@ -23,6 +23,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -67,6 +68,13 @@ public:
 	///		Gather data to the head rank.
 	///	</summary>
 	virtual void Gather();
+
+	///	<summary>
+	///		Output as a comma-separated list to the given stream.
+	///	</summary>
+	virtual void OutputCSV(
+		std::ostream & osOutput
+	) const;
 
 public:
 	///	<summary>

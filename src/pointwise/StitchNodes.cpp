@@ -142,7 +142,7 @@ public:
 
 		bool fColFound = false;
 		for (size_t i = 0; i < pobjPointData->GetFloatFieldCount(); i++) {
-			if (pobjPointData->GetFloatFieldHeader(i) == pobjColumnName->Name()) {
+			if (pobjPointData->GetFloatFieldHeader(i) == pobjColumnName->Value()) {
 				m_iColumn = i;
 				fColFound = true;
 				break;
@@ -150,7 +150,7 @@ public:
 		}
 		if (!fColFound) {
 			return std::string("ERROR: No column \"")
-				+ pobjColumnName->Name()
+				+ pobjColumnName->Value()
 				+ std::string("\" in point_data ")
 				+ pobjPointData->Name();
 		}
@@ -360,7 +360,7 @@ public:
 	///	</summary>
 	StitchNodesParam() :
 		dRange(0.0),
-		nMinPathLength(0),
+		nMinDuration(0),
 		dMinEndpointDistance(0.0),
 		dMinPathDistance(0.0),
 		nMaxGapSize(0),
@@ -373,7 +373,7 @@ public:
 	double dRange;
 
 	// Minimum path length
-	int nMinPathLength;
+	int nMinDuration;
 
 	// Minimum distance between endpoints of path
 	double dMinEndpointDistance;
@@ -509,15 +509,19 @@ std::string StitchNodes(
 		// Loop through all points at the current time level
 		for (int i = 0; i < vecNodes[t].size(); i++) {
 
-			if (vecNodes[t+1].size() == 0) {
-				break;
-			}
+			//if (vecNodes[t+1].size() == 0) {
+			//	break;
+			//}
 
 			double dX = vecNodes[t][i].x;
 			double dY = vecNodes[t][i].y;
 			double dZ = vecNodes[t][i].z;
 
 			for (int g = 1; g <= param.nMaxGapSize+1; g++) {
+
+				if (vecNodes[t+g].size() == 0) {
+					continue;
+				}
 				if (t+g >= sTimes) {
 					break;
 				}
@@ -623,7 +627,7 @@ std::string StitchNodes(
 			}
 
 			// Reject path due to minimum length
-			if (path.m_iTimes.size() < param.nMinPathLength) {
+			if (path.m_iTimes.size() < param.nMinDuration) {
 				nRejectedMinLengthPaths++;
 				continue;
 			}
@@ -742,105 +746,25 @@ std::string StitchNodes(
 				int iTime = vecPaths[i].m_iTimes[t];
 				int iCandidate = vecPaths[i].m_iCandidates[t];
 
-				int iGlobalIx = vecFirstCandidate[t] + iCandidate;
+				int tlocal = vecPaths[i].m_iTimes[t];
+				int iGlobalIx = vecFirstCandidate[tlocal] + iCandidate;
 
 				vecPathData[i].DataInt(t,0) =
-					pobjPointData->DataInt(iCandidate,0);
+					pobjPointData->DataInt(iGlobalIx,0);
 				vecPathData[i].DataInt(t,1) =
-					pobjPointData->DataInt(iCandidate,1);
+					pobjPointData->DataInt(iGlobalIx,1);
 				for (int j = 0; j < pobjPointData->GetFloatFieldCount(); j++) {
 					vecPathData[i].DataFloat(t,j) =
-						pobjPointData->DataFloat(iCandidate,j);
+						pobjPointData->DataFloat(iGlobalIx,j);
 				}
 				for (int j = 0; j < pobjPointData->GetDoubleFieldCount(); j++) {
 					vecPathData[i].DataDouble(t,j) =
-						pobjPointData->DataDouble(iCandidate,j);
+						pobjPointData->DataDouble(iGlobalIx,j);
 				}
 			}
 		}
 	}
-/*
-	// Write results out
-	AnnounceStartBlock("Writing results");
-	if (strOutputFormat == "std") {
-		FILE * fp = fopen(strOutputFile.c_str(), "w");
-		if (fp == NULL) {
-			_EXCEPTION1("Failed to open output file \"%s\"",
-				strOutputFile.c_str());
-		}
 
-		for (int i = 0; i < vecPaths.size(); i++) {
-			int iStartTime = vecPaths[i].m_iTimes[0];
-
-			fprintf(fp, "start\t");
-			fprintf(fp, "%li\t", vecPaths[i].m_iTimes.size());
-			for (int j = 0; j < vecTimes[iStartTime].size(); j++) {
-				if (j == 3) {
-					continue;
-				}
-				fprintf(fp, "%s\t", vecTimes[iStartTime][j].c_str());
-			}
-			fprintf(fp, "\n");
-
-			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
-				int iTime = vecPaths[i].m_iTimes[t];
-				int iCandidate = vecPaths[i].m_iCandidates[t];
-
-				fprintf(fp, "\t");
-				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
-					fprintf(fp, "%s\t",
-						vecCandidates[iTime][iCandidate][j].c_str());
-				}
-				for (int j = 0; j < vecTimes[iTime].size(); j++) {
-					if (j == 3) {
-						continue;
-					}
-					fprintf(fp, "%s\t", vecTimes[iTime][j].c_str());
-				}
-				fprintf(fp, "\n");
-			}
-		}
-		fclose(fp);
-
-	} else if (strOutputFormat == "visit") {
-		FILE * fp = fopen(strOutputFile.c_str(), "w");
-		if (fp == NULL) {
-			_EXCEPTION1("Failed to open output file \"%s\"",
-				strOutputFile.c_str());
-		}
-
-		// Write output format
-		fprintf(fp, "#id,time_id,year,month,day,hour,");
-		fprintf(fp, "%s", strFormat.c_str());
-		fprintf(fp, "\n");
-
-		for (int i = 0; i < vecPaths.size(); i++) {
-			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
-				int iTime = vecPaths[i].m_iTimes[t];
-				int iCandidate = vecPaths[i].m_iCandidates[t];
-
-				fprintf(fp, "%i,\t%i,\t%s,\t%s,\t%s,\t%s,\t",
-					i+1, t+1,
-					vecTimes[iTime][2].c_str(),
-					vecTimes[iTime][1].c_str(),
-					vecTimes[iTime][0].c_str(),
-					vecTimes[iTime][4].c_str());
-
-				fprintf(fp, "\t");
-				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
-					fprintf(fp, "%s",
-						vecCandidates[iTime][iCandidate][j].c_str());
-					if (j != vecCandidates[iTime][iCandidate].size()-1) {
-						fprintf(fp, ",\t");
-					}
-				}
-				fprintf(fp, "\n");
-			}
-		}
-	}
-
-	AnnounceEndBlock("Done");
-*/
 	// Cleanup
 	AnnounceStartBlock("Cleanup");
 
@@ -912,12 +836,12 @@ std::string StitchNodesFunction::Call(
 		}
 	}
 
-	// Minimum path length (in time units)
-	IntegerObject * pobjMinPathLength =
+	// Minimum duration (in time units)
+	IntegerObject * pobjMinDuration =
 		dynamic_cast<IntegerObject *>(
-			objreg.GetObject(pobjParam->ChildName("minpathlength")));
-	if (pobjMinPathLength != NULL) {
-		snparam.nMinPathLength = pobjMinPathLength->Value();
+			objreg.GetObject(pobjParam->ChildName("minduration")));
+	if (pobjMinDuration != NULL) {
+		snparam.nMinDuration = pobjMinDuration->Value();
 	}
 
 	// Minimum distance between endpoints (in degrees)

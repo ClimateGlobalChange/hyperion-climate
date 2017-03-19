@@ -10,7 +10,7 @@ config.data.output_csv("nhemi_data_index.csv")
 
 # Surface pressure minima criteria
 ps_min_criteria = parameter_list()
-ps_min_criteria.var = "PS"
+ps_min_criteria.var = "PSL"
 ps_min_criteria.mag = "200Pa"
 ps_min_criteria.dist = "4.0deg"
 ps_min_criteria.minmaxdist = "0.0deg"
@@ -30,26 +30,28 @@ wind_mag.dist = "4.0deg"
 
 # Parameters for point_search
 dcu_param = parameter_list()
-dcu_param.searchbymin = "PS"
+dcu_param.searchbymin = "PSL"
 dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
-dcu_param.output = ["lat", "lon", "PS", "ZBOT", wind_mag]
+dcu_param.output = ["lat", "lon", "PSL", "ZBOT", wind_mag]
 
 candidates = point_search(config, dcu_param)
+
+candidates.output_csv("nhemi_candidates.csv")
 
 # Topography threshold for stitch_nodes
 topo_threshold = parameter_list()
 topo_threshold.var = "ZBOT"
 topo_threshold.op = "<="
 topo_threshold.value = "70.0m"
-topo_threshold.number = 8
+topo_threshold.count = 8
 
 # Parameters for stitch_nodes
 stitch_param = parameter_list()
 stitch_param.range = "8.0deg"
 stitch_param.minduration = 8
 stitch_param.maxgap = 2
-stitch_param.threshold = [topo_threshold]
+stitch_param.thresholdcmd = [topo_threshold]
 
 cyclone_paths = stitch_nodes(config, candidates, stitch_param)
 

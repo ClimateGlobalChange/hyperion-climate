@@ -1938,8 +1938,8 @@ std::string PointSearchFunction::Call(
 		}
 
 		// Set field headers
-		pobjPointDataCombined->SetIntFieldHeader(0, "TimeIx");
-		pobjPointDataCombined->SetIntFieldHeader(1, "Candidate");
+		pobjPointDataCombined->SetIntFieldHeader(0, "time_ix");
+		pobjPointDataCombined->SetIntFieldHeader(1, "space_ix");
 
 		for (size_t i = 0; i < vecOutputOps.size(); i++) {
 			pobjPointDataCombined->SetFloatFieldHeader(

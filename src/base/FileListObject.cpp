@@ -483,10 +483,19 @@ std::string FileListObject::IndexVariableData() {
 std::string FileListObject::OutputTimeVariableIndexCSV(
 	const std::string & strCSVOutputFilename
 ) {
+#if defined(HYPERION_MPIOMP)
+	// Only output on root thread
+	int nRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+	if (nRank != 0) {
+		return std::string("");
+	}
+#endif
+
 	std::vector< std::pair<size_t,int> > iTimeVariableIndex;
 	iTimeVariableIndex.resize(m_vecVariableInfo.size());
 
-	// Load input file
+	// Open output file
 	std::ofstream ofOutput(strCSVOutputFilename.c_str());
 	if (!ofOutput.is_open()) {
 		return std::string("Unable to open output file \"") + strCSVOutputFilename + "\"";

@@ -319,6 +319,46 @@ void MultiTypeDataArray2D::Gather() {
 
 #endif
 }
+	
+///////////////////////////////////////////////////////////////////////////////
+
+void MultiTypeDataArray2D::OutputCSV(
+	std::ostream & osOutput
+) const {
+	bool fInitialComma;
+
+	// Loop through all rows
+	for (int i = 0; i < GetRows(); i++) {
+		fInitialComma = false;
+
+		// Output integer data
+		for (int j = 0; j < GetIntFieldCount(); j++) {
+			if (!fInitialComma) {
+				fInitialComma = true;
+			} else {
+				osOutput << ",";
+			}
+			osOutput << DataInt(i,j);
+		}
+		for (int j = 0; j < GetFloatFieldCount(); j++) {
+			if (!fInitialComma) {
+				fInitialComma = true;
+			} else {
+				osOutput << ",";
+			}
+			osOutput << DataFloat(i,j);
+		}
+		for (int j = 0; j < GetDoubleFieldCount(); j++) {
+			if (!fInitialComma) {
+				fInitialComma = true;
+			} else {
+				osOutput << ",";
+			}
+			osOutput << DataDouble(i,j);
+		}
+		osOutput << std::endl;
+	}
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 

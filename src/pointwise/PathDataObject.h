@@ -20,13 +20,17 @@
 #include "Announce.h"
 #include "Object.h"
 #include "MultiTypeDataArray2D.h"
+#include "MultiTypeDataHeaders.h"
 
 #include <string>
 #include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class PathDataObject : public Object {
+class PathDataObject :
+	public Object,
+	public MultiTypeDataHeaders
+{
 
 public:
 	///	<summary>
@@ -64,7 +68,7 @@ public:
 			) {
 				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
 			}
-			return std::string("");
+			return OutputCSV(vecCommandLine[0]);
 		}
 		return
 			Object::Call(
@@ -74,6 +78,13 @@ public:
 				vecCommandLineType,
 				ppReturn);
 	}
+
+	///	<summary>
+	///		Output this object as a CSV file.
+	///	</summary>
+	std::string OutputCSV(
+		const std::string & strCSVOutputFilename
+	);
 
 	///	<summary>
 	///		Get the vector of path data information.
