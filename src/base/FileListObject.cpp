@@ -127,7 +127,9 @@ void FileListObject::GetOnRankTimeIndices(
 		vecTimeIndices.push_back(i);
 	}
 #else
-	vecTimeIndices = m_vecTimes;
+	for (int i = 0; i < m_vecTimes.size(); i++) {
+		vecTimeIndices.push_back(i);
+	}
 #endif
 }
 
