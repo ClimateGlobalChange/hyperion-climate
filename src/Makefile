@@ -4,29 +4,32 @@
 # Distributed under the Boost Software License, Version 1.0. (See accompanying 
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-ifeq ($(NETCDF), TRUE)
-  BUILD_TARGETS= netcdf-cxx-4.2
-  NETCDFCXX42LIB= $(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2/libnetcdfcxx4.2.a
-endif
-
-BUILD_TARGETS+= base pointwise
-CLEAN_TARGETS= $(addsuffix .clean,$(BUILD_TARGETS))
-
 # Base directory.
 HYPERIONCLIMATEDIR= ..
 
 # Load Makefile framework. 
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
-HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2/libnetcdf_c++.a
+ifeq ($(NETCDF), TRUE)
+  BUILD_TARGETS= netcdf-cxx-4.2
+  NETCDFCXX42LIB= $(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2/libnetcdfcxx4.2.a
+  HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2/libnetcdf_c++.a
+  HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
+endif
+
+BUILD_TARGETS+= base pointwise
+CLEAN_TARGETS= $(addsuffix .clean,$(BUILD_TARGETS))
+
 HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/base/libhyperionbase.a
 HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/pointwise/libhyperionpointwise.a
 
-HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
 HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/base
 HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/pointwise
 
-LIBRARIES+= -lhyperionpointwise -lhyperionbase -lnetcdf_c++
+LIBRARIES+= -lhyperionpointwise -lhyperionbase
+ifeq ($(NETCDF), TRUE)
+  LIBRARIES+= -lnetcdf_c++
+endif
 
 EXEC_FILES= recap.cpp
 
