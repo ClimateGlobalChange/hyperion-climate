@@ -44,6 +44,30 @@ else ifeq ($(UNAME),Linux)
     SYSTEM= YELLOWSTONE
     SYSTEM_MAKEFILE= yellowstone.make
   endif
+  ifeq ($(HOSTNAME),cheyenne1)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
+  ifeq ($(HOSTNAME),cheyenne2)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
+  ifeq ($(HOSTNAME),cheyenne3)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
+  ifeq ($(HOSTNAME),cheyenne4)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
+  ifeq ($(HOSTNAME),cheyenne5)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
+  ifeq ($(HOSTNAME),cheyenne6)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
   ifeq ($(SYSTEM),)
     SYSTEM= AGRI
     SYSTEM_MAKEFILE= agri.make

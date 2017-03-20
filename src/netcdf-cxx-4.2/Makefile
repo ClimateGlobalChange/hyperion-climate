@@ -10,28 +10,10 @@ HYPERIONCLIMATEDIR= ../..
 # Load Makefile framework. 
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
-CXXFLAGS+=-I$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
+FILES= ncvalues.cpp \
+	netcdf.cpp
 
-FILES= Announce.cpp \
-	   Exception.cpp \
-       NetCDFUtilities.cpp \
-       TimeObj.cpp \
-	   MultiTypeDataArray2D.cpp \
-	   MultiTypeDataHeaders.cpp \
-	   Object.cpp \
-	   GridObject.cpp \
-	   FileListObject.cpp \
-	   VariableLookupObject.cpp \
-	   GlobalFunction.cpp \
-       Variable.cpp \
-       kdtree.cpp \
-	   LegendrePolynomial.cpp \
-	   GaussQuadrature.cpp \
-	   GaussLobattoQuadrature.cpp \
-	   MeshUtilitiesFuzzy.cpp \
-	   GridElements.cpp
-
-LIB_TARGET= libhyperionbase.a
+LIB_TARGET= libnetcdf_c++.a
 
 .PHONY: all clean
 

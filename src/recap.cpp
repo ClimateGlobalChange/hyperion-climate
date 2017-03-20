@@ -23,7 +23,7 @@
 #include "VariableLookupObject.h"
 #include "RecapConfigObject.h"
 
-#include "Pointwise/Pointwise.h"
+#include "pointwise/Pointwise.h"
 
 #include <iostream>
 #include <fstream>

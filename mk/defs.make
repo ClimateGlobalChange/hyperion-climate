@@ -18,6 +18,11 @@ endif
 # Add the source directories to the include path
 CXXFLAGS+= -I$(HYPERIONCLIMATEDIR)/src/base
 
+ifeq ($(NETCDF),TRUE)
+  CXXFLAGS+= -I$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
+  LDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
+endif
+
 ###############################################################################
 # Configuration-dependent configuration.
 
