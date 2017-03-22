@@ -10,30 +10,11 @@ HYPERIONCLIMATEDIR= ../..
 # Load Makefile framework. 
 include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
-CXXFLAGS+=-I$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
+FILES= Regrid.cpp \
+	   OverlapMesh.cpp \
+	   TempestRegridObject.cpp
 
-FILES= Announce.cpp \
-	   Exception.cpp \
-       NetCDFUtilities.cpp \
-       TimeObj.cpp \
-	   MultiTypeDataArray2D.cpp \
-	   MultiTypeDataHeaders.cpp \
-	   Object.cpp \
-	   RecapConfigObject.cpp \
-	   GridObject.cpp \
-	   FileListObject.cpp \
-	   VariableLookupObject.cpp \
-	   GlobalFunction.cpp \
-       Variable.cpp \
-       kdtree.cpp \
-	   LegendrePolynomial.cpp \
-	   GaussQuadrature.cpp \
-	   GaussLobattoQuadrature.cpp \
-	   MeshUtilities.cpp \
-	   MeshUtilitiesFuzzy.cpp \
-	   GridElements.cpp
-
-LIB_TARGET= libhyperionbase.a
+LIB_TARGET= libhyperionregrid.a
 
 .PHONY: all clean
 

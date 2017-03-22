@@ -37,6 +37,7 @@ std::string GridObjectConstructor::Call(
 	// Initialize the grid with given parameters
 	std::string strError =
 		pobjGrid->Initialize(
+			objreg,
 			vecCommandLine,
 			vecCommandLineType);
 
@@ -53,53 +54,192 @@ std::string GridObjectConstructor::Call(
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string GridObject::Initialize(
+	const ObjectRegistry & objreg,
 	const std::vector<std::string> & vecFuncArguments,
 	const std::vector<ObjectType> & vecFuncArgumentsType
 ) {
 	// Check arguments
 	if (vecFuncArguments.size() == 0) {
-		return std::string("ERROR: grid filename argument missing");
-	}
-	if (vecFuncArguments.size() > 2) {
-		return std::string("ERROR: Too many arguments to grid()");
-	}
-	if (vecFuncArgumentsType[0] != ObjectType_String) {
-		return std::string("ERROR: First argument to grid() must be of type string");
-	}
-	if ((vecFuncArguments.size() == 2) && 
-	    (vecFuncArgumentsType[1] != ObjectType_String)
-	) {
-		return std::string("ERROR: Second argument to grid() must be of type string");
+		return std::string("ERROR: Missing grid() arguments");
 	}
 
-	// First argument specifies the grid filename
-	m_mesh.Read(vecFuncArguments[0]);
+	// Initialize from file name
+	if (vecFuncArgumentsType[0] == ObjectType_String) {
+		if (vecFuncArguments.size() > 2) {
+			return std::string("ERROR: Too many arguments to grid()");
+		}
+		if ((vecFuncArguments.size() == 2) && 
+		    (vecFuncArgumentsType[1] != ObjectType_String)
+		) {
+			return std::string("ERROR: Second argument to grid([filename]) "
+				"must specify grid type");
+		}
 
-	// Second argument specifies finite element type
-	if (vecFuncArguments.size() == 2) {
-		if (vecFuncArguments[1].substr(0,6) == "sem_np") {
-			int nP = atoi(vecFuncArguments[1].substr(6).c_str());
-			if (nP < 2) {
-				return std::string("ERROR: sem_np# must be at least 2");
+		// First argument specifies the grid filename
+		m_mesh.Read(vecFuncArguments[0]);
+
+		// Second argument specifies finite element type
+		if (vecFuncArguments.size() == 2) {
+			if (vecFuncArguments[1].substr(0,6) == "sem_np") {
+				int nP = atoi(vecFuncArguments[1].substr(6).c_str());
+				if (nP < 2) {
+					return std::string("ERROR: sem_np# must be at least 2");
+				}
+				m_mesh.InitializeAsFiniteElement(
+					Mesh::DataLayout_SpectralElementGLL,
+					nP);
+
+			} else if (vecFuncArguments[1].substr(0,8) == "dggll_np") {
+				int nP = atoi(vecFuncArguments[1].substr(8).c_str());
+				if (nP < 1) {
+					return std::string("ERROR: dggll_np# must be at least 1");
+				}
+				m_mesh.InitializeAsFiniteElement(
+					Mesh::DataLayout_DiscontinuousGLL,
+					nP);
+
+			} else {
+				return std::string("ERROR: Second argument to grid() must be "
+					"\"sem_np#\" or \"dggll_np#\"");
 			}
-			m_mesh.InitializeAsFiniteElement(
-				Mesh::DataLayout_SpectralElementGLL,
-				nP);
+		}
 
-		} else if (vecFuncArguments[1].substr(0,8) == "dggll_np") {
-			int nP = atoi(vecFuncArguments[1].substr(8).c_str());
-			if (nP < 1) {
-				return std::string("ERROR: dggll_np# must be at least 1");
-			}
-			m_mesh.InitializeAsFiniteElement(
-				Mesh::DataLayout_DiscontinuousGLL,
-				nP);
+	// Initialize from parameter list
+	} else if (vecFuncArgumentsType[0] == ObjectType_Token) {
 
-		} else {
-			return std::string("ERROR: Second argument to grid() must be "
-				"\"sem_np#\" or \"dggll_np#\"");
+		// Check for GridType
+		Object * pobjParam =
+			dynamic_cast<Object *>(
+				objreg.GetObject(vecFuncArguments[0]));
+		if (pobjParam == NULL) {
+			return std::string("ERROR: Invalid first argument to grid(): "
+				"Expected Token or String");
+		}
+
+		StringObject * pobjGridType =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(pobjParam->ChildName("gridtype")));
+		if (pobjParam == NULL) {
+			return std::string("ERROR: parameter_list argument must specify gridtype");
+		}
+
+		if (pobjGridType->Value() == "rll") {
+			return InitializeRLLGrid(objreg, pobjParam);
+		}
+
+	// Invalid arguments
+	} else {
+		return std::string("ERROR: Invalid arguments to grid()");
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string GridObject::InitializeRLLGrid(
+	const ObjectRegistry & objreg,
+	const Object * pobjParameters
+) {
+	double dLatBegin = -90.0;
+	double dLatEnd = 90.0;
+	double dLonBegin = 0.0;
+	double dLonEnd = 360.0;
+
+	int nLatitudes = 0;
+	int nLongitudes = 0;
+
+	// Minimum latitude
+	StringObject * pobjMinimumLatitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParameters->ChildName("minlat")));
+	if (pobjMinimumLatitude != NULL) {
+		bool fSuccessMag =
+			pobjMinimumLatitude->ToUnit(
+				"deg", &(dLatBegin));
+		if (!fSuccessMag) {
+			return std::string("Cannot convert ")
+				+ pobjParameters->ChildName("minlat")
+				+ std::string(" to \"deg\"");
 		}
 	}
+
+	// Maximum latitude
+	StringObject * pobjMaximumLatitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParameters->ChildName("maxlat")));
+	if (pobjMaximumLatitude != NULL) {
+		bool fSuccess =
+			pobjMaximumLatitude->ToUnit(
+				"deg", &(dLatEnd));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParameters->ChildName("maxlat")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Minimum longitude
+	StringObject * pobjMinimumLongitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParameters->ChildName("minlon")));
+	if (pobjMinimumLongitude != NULL) {
+		bool fSuccess =
+			pobjMinimumLongitude->ToUnit(
+				"deg", &(dLonBegin));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParameters->ChildName("minlon")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Maximum longitude
+	StringObject * pobjMaximumLongitude =
+		dynamic_cast<StringObject *>(
+			objreg.GetObject(pobjParameters->ChildName("maxlon")));
+	if (pobjMaximumLongitude != NULL) {
+		bool fSuccess =
+			pobjMaximumLongitude->ToUnit(
+				"deg", &(dLonEnd));
+		if (!fSuccess) {
+			return std::string("Cannot convert ")
+				+ pobjParameters->ChildName("maxlon")
+				+ std::string(" to \"deg\"");
+		}
+	}
+
+	// Number of latitudes
+	IntegerObject * pobjLatitudeCount =
+		dynamic_cast<IntegerObject *>(
+			objreg.GetObject(pobjParameters->ChildName("nlat")));
+	if (pobjLatitudeCount == NULL) {
+		return std::string("ERROR: Missing mandatory parameter \"nlat\""
+			" or invalid type in ")
+				+ pobjParameters->Name();
+	}
+	nLatitudes = pobjLatitudeCount->Value();
+
+	// Number of longitudes
+	IntegerObject * pobjLongitudeCount =
+		dynamic_cast<IntegerObject *>(
+			objreg.GetObject(pobjParameters->ChildName("nlon")));
+	if (pobjLongitudeCount == NULL) {
+		return std::string("ERROR: Missing mandatory parameter \"nlon\""
+			" or invalid type in ")
+				+ pobjParameters->Name();
+	}
+	nLongitudes = pobjLongitudeCount->Value();
+
+	// Initialize the Mesh
+	m_mesh.InitializeAsRLL(
+		dLatBegin,
+		dLatEnd,
+		dLonBegin,
+		dLonEnd,
+		nLatitudes,
+		nLongitudes);
+
 	return std::string("");
 }
 

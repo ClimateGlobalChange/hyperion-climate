@@ -23,6 +23,7 @@
 #include "VariableLookupObject.h"
 #include "RecapConfigObject.h"
 
+#include "regrid/Regrid.h"
 #include "pointwise/Pointwise.h"
 
 #include <iostream>
@@ -93,6 +94,9 @@ try {
 	funcreg.Assign(
 		std::string("variable_lookup"),
 		new VariableLookupObjectConstructor(std::string("variable_lookup")));
+
+	// Register functions from regrid/
+	HRegrid::RegisterGlobalFunctions(funcreg);
 
 	// Register functions from pointwise/
 	HPointwise::RegisterGlobalFunctions(funcreg);

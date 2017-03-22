@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    GridObject.h
+///	\file    TempestRegridObject.h
 ///	\author  Paul Ullrich
 ///	\version March 10, 2017
 ///
 ///	<remarks>
-///		Copyright 2000- Paul Ullrich
+///		Copyright 2016- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -14,30 +14,25 @@
 ///		or implied warranty.
 ///	</remarks>
 
-#ifndef _GRIDOBJECT_H_
-#define _GRIDOBJECT_H_
+#ifndef _TEMPESTREGRIDOBJECT_H_
+#define _TEMPESTREGRIDOBJECT_H_
 
 #include "Announce.h"
 #include "Object.h"
-#include "DataArray1D.h"
 #include "GridElements.h"
-#include "GlobalFunction.h"
-
-#include <vector>
-#include <cstdlib>
 
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A GlobalFunction that builds a new GridObject.
+///		A GlobalFunction that builds a new TempestRegridObject.
 ///	</summary>
-class GridObjectConstructor : public GlobalFunction {
+class TempestRegridObjectConstructor : public GlobalFunction {
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	GridObjectConstructor(const std::string & strName) :
+	TempestRegridObjectConstructor(const std::string & strName) :
 		GlobalFunction(strName)
 	{ }
 
@@ -56,30 +51,19 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A data structure describing the grid, including coordinates of
-///		each data point and graph connectivity of elements.
+///		A data structure describing a list of files.
 ///	</summary>
-class GridObject : public Object {
+class TempestRegridObject : public Object {
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	GridObject(
+	TempestRegridObject(
 		const std::string & strName
 	) :
-		Object(strName)
-	{ }
-
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	GridObject(
-		const std::string & strName,
-		const std::string & strMeshFile
-	) :
 		Object(strName),
-		m_mesh(strMeshFile)
+		m_pMeshOverlap(NULL)
 	{ }
 
 	///	<summary>
@@ -89,8 +73,36 @@ public:
 		const std::string & strDuplicateName,
 		ObjectRegistry & objreg
 	) const {
-		Announce("ERROR: Grid objects cannot be duplicated");
-		return (NULL);
+		return _Duplicate(
+			new TempestRegridObject(strDuplicateName),
+			objreg);
+	}
+
+	///	<summary>
+	///		Call a member function of this Object.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::string & strFunctionName,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	) {
+		if (strFunctionName == "regrid") {
+			if ((vecCommandLineType.size() != 1) ||
+			    (vecCommandLineType[0] != ObjectType_String)
+			) {
+				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
+			}
+			return std::string("Not implemented");
+		}
+		return
+			Object::Call(
+				objreg,
+				strFunctionName,
+				vecCommandLine,
+				vecCommandLineType,
+				ppReturn);
 	}
 
 public:
@@ -105,39 +117,14 @@ public:
 
 protected:
 	///	<summary>
-	///		Initialize a RLL Grid.
+	///		The overlap Mesh used for building the offline map.
 	///	</summary>
-	std::string InitializeRLLGrid(
-		const ObjectRegistry & objreg,
-		const Object * pobjParameters
-	);
-
-public:
-	///	<summary>
-	///		Get a reference to the Mesh.
-	///	</summary>
-	const Mesh & GetMesh() const {
-		return m_mesh;
-	}
+	Mesh * m_pMeshOverlap;
 
 	///	<summary>
-	///		Get a reference to the Mesh.
+	///		The offline map.
 	///	</summary>
-	Mesh & GetMesh() {
-		return m_mesh;
-	}
-
-protected:
-	///	<summary>
-	///		Mesh associated with this Grid.
-	///	</summary>
-	Mesh m_mesh;
-
-public:
-	///	<summary>
-	///		Grid dimensions.
-	///	</summary>
-	std::vector<size_t> m_nGridDim;
+	//OfflineMap
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -17,16 +17,18 @@ ifeq ($(NETCDF), TRUE)
   HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/netcdf-cxx-4.2
 endif
 
-BUILD_TARGETS+= base pointwise
+BUILD_TARGETS+= base regrid pointwise
 CLEAN_TARGETS= $(addsuffix .clean,$(BUILD_TARGETS))
 
 HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/base/libhyperionbase.a
+HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/regrid/libhyperionregrid.a
 HYPERIONCLIMATELIBS+= $(HYPERIONCLIMATEDIR)/src/pointwise/libhyperionpointwise.a
 
 HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/base
+HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/regrid
 HYPERIONCLIMATELDFLAGS+= -L$(HYPERIONCLIMATEDIR)/src/pointwise
 
-LIBRARIES+= -lhyperionpointwise -lhyperionbase
+LIBRARIES+= -lhyperionpointwise -lhyperionregrid -lhyperionbase
 ifeq ($(NETCDF), TRUE)
   LIBRARIES+= -lnetcdf_c++
 endif

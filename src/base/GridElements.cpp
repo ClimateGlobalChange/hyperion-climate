@@ -65,10 +65,150 @@ void Face::RemoveZeroEdges() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::Clear() {
+	eDataLayout = DataLayout_Volumetric;
 	nodes.clear();
 	faces.clear();
+	vecSourceFaceIx.clear();
+	vecTargetFaceIx.clear();
+	sDOFCount = 0;
+	dLat.Deallocate();
+	dLon.Deallocate();
+	vecFaceArea.Deallocate();
 	edgemap.clear();
+	adjlist.clear();
 	revnodearray.clear();
+	vecMultiFaceMap.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Mesh::InitializeAsRLL(
+	double dLatBegin,
+	double dLatEnd,
+	double dLonBegin,
+	double dLonEnd,
+	int nLatitudes,
+	int nLongitudes
+) {
+	// Clear the existing Mesh
+	Clear();
+
+	// Change in longitude
+	double dDeltaLon = dLonEnd - dLonBegin;
+	double dDeltaLat = dLatEnd - dLatBegin;
+
+	// Check if longitudes wrap
+	bool fWrapLongitudes = false;
+	if (fmod(dDeltaLon, 2.0 * M_PI) < 1.0e-12) {
+		fWrapLongitudes = true;
+	}
+	bool fIncludeSouthPole = (fabs(dLatBegin + 0.5 * M_PI) < ReferenceTolerance);
+	bool fIncludeNorthPole = (fabs(dLatEnd   - 0.5 * M_PI) < ReferenceTolerance);
+
+	int iSouthPoleOffset = (fIncludeSouthPole)?(1):(0);
+
+	// Increase number of latitudes if south pole is not included
+	int iInteriorLatBegin = (fIncludeSouthPole)?(1):(0);
+	int iInteriorLatEnd   = (fIncludeNorthPole)?(nLatitudes-1):(nLatitudes);
+
+	// Number of longitude nodes
+	int nLongitudeNodes = nLongitudes;
+	if (!fWrapLongitudes) {
+		nLongitudeNodes++;
+	}
+
+	// Generate nodes
+	if (fIncludeSouthPole) {
+		nodes.push_back(Node(0.0, 0.0, -1.0));
+	}
+	for (int j = iInteriorLatBegin; j < iInteriorLatEnd+1; j++) {
+		for (int i = 0; i < nLongitudeNodes; i++) {
+			double dPhiFrac =
+				  static_cast<double>(j)
+				/ static_cast<double>(nLatitudes);
+
+			double dLambdaFrac =
+				  static_cast<double>(i)
+				/ static_cast<double>(nLongitudes);
+
+			double dPhi = dDeltaLat * dPhiFrac + dLatBegin;
+			double dLambda = dDeltaLon * dLambdaFrac + dLonBegin;
+
+			double dX = cos(dPhi) * cos(dLambda);
+			double dY = cos(dPhi) * sin(dLambda);
+			double dZ = sin(dPhi);
+
+			nodes.push_back(Node(dX, dY, dZ));
+		}
+	}
+	if (fIncludeNorthPole) {
+		nodes.push_back(Node(0.0, 0.0, +1.0));
+	}
+
+	// Generate south polar faces
+	if (fIncludeSouthPole) {
+		for (int i = 0; i < nLongitudes; i++) {
+			Face face(4);
+			face.SetNode(0, 0);
+			face.SetNode(1, (i+1) % nLongitudeNodes + 1);
+			face.SetNode(2, i + 1);
+			face.SetNode(3, 0);
+
+#ifndef ONLY_GREAT_CIRCLES
+			face.edges[1].type = Edge::Type_ConstantLatitude;
+			face.edges[3].type = Edge::Type_ConstantLatitude;
+#endif
+
+			faces.push_back(face);
+		}
+	}
+
+	// Generate interior faces
+	for (int j = iInteriorLatBegin; j < iInteriorLatEnd; j++) {
+		int jx = j - iInteriorLatBegin;
+
+		int iThisLatNodeIx =  jx    * nLongitudeNodes + iSouthPoleOffset;
+		int iNextLatNodeIx = (jx+1) * nLongitudeNodes + iSouthPoleOffset;
+
+		for (int i = 0; i < nLongitudes; i++) {
+			Face face(4);
+			face.SetNode(0, iThisLatNodeIx + (i + 1) % nLongitudeNodes);
+			face.SetNode(1, iNextLatNodeIx + (i + 1) % nLongitudeNodes);
+			face.SetNode(2, iNextLatNodeIx + i);
+			face.SetNode(3, iThisLatNodeIx + i);
+
+#ifndef ONLY_GREAT_CIRCLES
+			face.edges[1].type = Edge::Type_ConstantLatitude;
+			face.edges[3].type = Edge::Type_ConstantLatitude;
+#endif
+
+			faces.push_back(face);
+		}
+	}
+
+	// Generate north polar faces
+	if (fIncludeNorthPole) {
+		int jx = nLatitudes - iInteriorLatBegin - 1;
+
+		int iThisLatNodeIx =  jx    * nLongitudeNodes + iSouthPoleOffset;
+		int iNextLatNodeIx = (jx+1) * nLongitudeNodes + iSouthPoleOffset;
+
+		int iNorthPolarNodeIx = static_cast<int>(nodes.size()-1);
+		for (int i = 0; i < nLongitudes; i++) {
+			Face face(4);
+			face.SetNode(0, iNorthPolarNodeIx);
+			face.SetNode(1, iThisLatNodeIx + i);
+			face.SetNode(2, iThisLatNodeIx + (i + 1) % nLongitudeNodes);
+			face.SetNode(3, iNorthPolarNodeIx);
+
+#ifndef ONLY_GREAT_CIRCLES
+			face.edges[1].type = Edge::Type_ConstantLatitude;
+			face.edges[3].type = Edge::Type_ConstantLatitude;
+#endif
+
+			faces.push_back(face);
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

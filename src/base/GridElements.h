@@ -711,7 +711,21 @@ public:
 
 public:
 	///	<summary>
-	///		Initialize as a spectral element mesh.
+	///		Initialize as a new Regular Latitude Longitude mesh.
+	///	</summary>
+	void InitializeAsRLL(
+		double dLatBegin,
+		double dLatEnd,
+		double dLonBegin,
+		double dLonEnd,
+		int nLatitudes,
+		int nLongitudes
+	);
+
+public:
+	///	<summary>
+	///		Initialize as a finite element mesh using the existing
+	///		quadrilateral grid elements.
 	///	</summary>
 	void InitializeAsFiniteElement(
 		DataLayout a_eDataLayout,
