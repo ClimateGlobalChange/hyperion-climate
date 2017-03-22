@@ -29,6 +29,49 @@
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
+// FileListObjectConstructor
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObjectConstructor::Call(
+	const ObjectRegistry & objreg,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	FileListObject * pobjFileList = new FileListObject("");
+	if (pobjFileList == NULL) {
+		_EXCEPTIONT("Unable to initialize FileListObject");
+	}
+
+	// Set the return value
+	if (vecCommandLine.size() < 1) {
+		return std::string("ERROR: First argument [filename] missing from "
+			"file_list() call");
+	}
+	if (vecCommandLine.size() > 1) {
+		return std::string("ERROR: Invalid arguments to file_list()");
+	}
+	if (vecCommandLineType[0] != ObjectType_String) {
+		return std::string("ERROR: Invalid first argument [filename] "
+			"in file_list() call");
+	}
+
+	// Initialize the grid with given parameters
+	std::string strError =
+		pobjFileList->PopulateFromSearchString(
+			vecCommandLine[0]);
+
+	// Set the return value
+	if (ppReturn != NULL) {
+		(*ppReturn) = pobjFileList;
+	} else {
+		delete pobjFileList;
+	}
+
+	return strError;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // FileListObject
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -37,8 +80,7 @@ const size_t FileListObject::InvalidTimeIx = (-1);
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string FileListObject::PopulateFromSearchString(
-	const std::string & strSearchString,
-	ObjectRegistry & objreg
+	const std::string & strSearchString
 ) {
 	// File the directory in the search string
 	std::string strDir;

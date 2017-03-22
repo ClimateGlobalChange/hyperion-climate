@@ -21,9 +21,13 @@
 #include "Object.h"
 #include "TimeObj.h"
 #include "DataArray1D.h"
+#include "GlobalFunction.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		A class that describes primitive variable information from a FileList.
+///	</summary>
 class VariableInfo {
 
 public:
@@ -79,6 +83,33 @@ public:
 	///		Map from Times to filename index and time index.
 	///	</summary>
 	VariableTimeFileMap m_mapTimeFile;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A GlobalFunction that builds a new FileListObject.
+///	</summary>
+class FileListObjectConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	FileListObjectConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -161,12 +192,8 @@ public:
 	///	<summary>
 	///		Populate from a search string.
 	///	</summary>
-	///	<returns>
-	///		An error message if an error occurred.  A blank string otherwise.
-	///	</returns>
 	std::string PopulateFromSearchString(
-		const std::string & strSearchString,
-		ObjectRegistry & objreg
+		const std::string & strSearchString
 	);
 
 public:

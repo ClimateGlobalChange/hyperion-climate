@@ -19,6 +19,34 @@
 
 #include "Announce.h"
 #include "Object.h"
+#include "GlobalFunction.h"
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A GlobalFunction that builds a new VariableLookupObject.
+///	</summary>
+class VariableLookupObjectConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableLookupObjectConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 

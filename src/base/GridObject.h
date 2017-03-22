@@ -21,9 +21,37 @@
 #include "Object.h"
 #include "DataArray1D.h"
 #include "GridElements.h"
+#include "GlobalFunction.h"
 
 #include <vector>
 #include <cstdlib>
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A GlobalFunction that builds a new GridObject.
+///	</summary>
+class GridObjectConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	GridObjectConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -19,6 +19,7 @@ FILES= Announce.cpp \
 	   MultiTypeDataArray2D.cpp \
 	   MultiTypeDataHeaders.cpp \
 	   Object.cpp \
+	   RecapConfigObject.cpp \
 	   GridObject.cpp \
 	   FileListObject.cpp \
 	   VariableLookupObject.cpp \

@@ -18,6 +18,40 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string GridObjectConstructor::Call(
+	const ObjectRegistry & objreg,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	GridObject * pobjGrid = new GridObject("");
+	if (pobjGrid == NULL) {
+		_EXCEPTIONT("Unable to initialize GridObject");
+	}
+
+	// Set the return value
+	if (ppReturn != NULL) {
+		(*ppReturn) = pobjGrid;
+	}
+
+	// Initialize the grid with given parameters
+	std::string strError =
+		pobjGrid->Initialize(
+			vecCommandLine,
+			vecCommandLineType);
+
+	// Set the return value
+	if (ppReturn != NULL) {
+		(*ppReturn) = pobjGrid;
+	} else {
+		delete pobjGrid;
+	}
+
+	return strError;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string GridObject::Initialize(
 	const std::vector<std::string> & vecFuncArguments,
 	const std::vector<ObjectType> & vecFuncArgumentsType

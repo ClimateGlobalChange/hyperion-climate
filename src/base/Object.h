@@ -18,6 +18,8 @@
 #define _OBJECT_H_
 
 #include "Exception.h"
+#include "GlobalFunction.h"
+#include "ObjectType.h"
 
 #include <string>
 #include <set>
@@ -35,20 +37,6 @@ typedef std::vector<Object *> ObjectChildrenVector;
 typedef std::map<std::string, Object *> ObjectMap;
 
 typedef int ObjectIndex;
-
-///////////////////////////////////////////////////////////////////////////////
-
-typedef int ObjectType;
-
-static const ObjectType ObjectType_Op = 0;
-
-static const ObjectType ObjectType_Token = 1;
-
-static const ObjectType ObjectType_String = 2;
-
-static const ObjectType ObjectType_Integer = 3;
-
-static const ObjectType ObjectType_FloatingPoint = 4;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -104,6 +92,33 @@ private:
 	///		Map from Object name to Object instance.
 	///	</summary>
 	ObjectMap m_mapObjects;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A GlobalFunction that builds a new Object.
+///	</summary>
+class ObjectConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ObjectConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
 };
 
 ///////////////////////////////////////////////////////////////////////////////

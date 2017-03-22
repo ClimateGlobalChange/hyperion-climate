@@ -27,6 +27,33 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A GlobalFunction that builds a new RecapConfigObject.
+///	</summary>
+class RecapConfigObjectConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	RecapConfigObjectConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		A data structure describing a list of files.
 ///	</summary>
 class RecapConfigObject : public Object {

@@ -20,6 +20,52 @@
 #include <iostream>
 
 ///////////////////////////////////////////////////////////////////////////////
+// VariableLookupObjectConstructor
+///////////////////////////////////////////////////////////////////////////////
+
+std::string VariableLookupObjectConstructor::Call(
+	const ObjectRegistry & objreg,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	VariableLookupObject * pobjVariableLookup = new VariableLookupObject("");
+	if (pobjVariableLookup == NULL) {
+		_EXCEPTIONT("Unable to initialize VariableLookupObject");
+	}
+
+	// Check arguments
+	if (vecCommandLine.size() < 1) {
+		return std::string("ERROR: First argument [filename] missing from "
+			"variable_lookup() call");
+	}
+	if (vecCommandLine.size() > 1) {
+		return std::string("ERROR: Invalid arguments to variable_lookup()");
+	}
+	if (vecCommandLineType[0] != ObjectType_String) {
+		return std::string("ERROR: Invalid first argument [filename] "
+			"in variable_lookup() call");
+	}
+
+	// Initialize the grid with given parameters
+	std::string strError =
+		pobjVariableLookup->PopulateFromFile(
+			vecCommandLine[0]);
+
+	// Set the return value
+	if (ppReturn != NULL) {
+		(*ppReturn) = pobjVariableLookup;
+	} else {
+		delete pobjVariableLookup;
+	}
+
+	return strError;
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// VariableLookupObject
+///////////////////////////////////////////////////////////////////////////////
 
 std::string VariableLookupObject::PopulateFromFile(
 	const std::string & strFilename

@@ -170,6 +170,29 @@ bool ObjectRegistry::Assign(
 // Object
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string ObjectConstructor::Call(
+	const ObjectRegistry & objreg,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	if (ppReturn != NULL) {
+		Object * pobj = new Object("");
+		if (pobj == NULL) {
+			_EXCEPTIONT("Unable to initialize GridObject");
+		}
+
+		// Set the return value
+		(*ppReturn) = pobj;
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Object
+///////////////////////////////////////////////////////////////////////////////
+
 Object * Object::_Duplicate(
 	Object * pobjDuplicate,
 	ObjectRegistry & objreg

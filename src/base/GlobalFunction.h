@@ -18,7 +18,7 @@
 #define _GLOBALFUNCTION_H_
 
 #include "Exception.h"
-#include "Object.h"
+#include "ObjectType.h"
 
 #include <string>
 #include <set>
@@ -26,6 +26,10 @@
 #include <map>
 
 ///////////////////////////////////////////////////////////////////////////////
+
+class ObjectRegistry;
+
+class Object;
 
 class GlobalFunction;
 

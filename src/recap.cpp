@@ -73,6 +73,27 @@ try {
 	// Create GlobalFunction registry
 	GlobalFunctionRegistry funcreg;
 
+	// Register constructors
+	funcreg.Assign(
+		std::string("parameter_list"),
+		new ObjectConstructor(std::string("parameter_list")));
+
+	funcreg.Assign(
+		std::string("recap_configuration"),
+		new RecapConfigObjectConstructor(std::string("recap_configuration")));
+
+	funcreg.Assign(
+		std::string("grid"),
+		new GridObjectConstructor(std::string("grid")));
+
+	funcreg.Assign(
+		std::string("file_list"),
+		new FileListObjectConstructor(std::string("file_list")));
+
+	funcreg.Assign(
+		std::string("variable_lookup"),
+		new VariableLookupObjectConstructor(std::string("variable_lookup")));
+
 	// Register functions from pointwise/
 	HPointwise::RegisterGlobalFunctions(funcreg);
 
@@ -561,205 +582,41 @@ try {
 			// Assignment of function to LHS
 			if ((iAssignmentOp != (-1)) && (iEvaluateOp != (-1))) {
 
-				// parameter_list() type
-				if (vecCommandLine[2] == "parameter_list") {
-					if (vecFuncArguments.size() != 0) {
-						Announce("ERROR: Invalid arguments to parameter_list on line %i", iLine);
-						return (-1);
-					}
+				// Check the GlobalFunctionRegistry for this function
+				std::string strFunctionName = vecCommandLine[2];
 
-					bool fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new Object(vecCommandLine[0]));
+				GlobalFunction * pFunc =
+					funcreg.GetGlobalFunction(strFunctionName);
 
-					if (!fSuccess) {
-						return (-1);
-					}
-
-				// variable(STRING) type
-				} else if (vecCommandLine[2] == "variable") {
-					if (vecCommandLine.size() != 6) {
-						Announce("ERROR: Variable op declaration missing"
-							" operation on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLine[3] != "(") {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid variable op declaration on line %i", iLine);
-						return (-1);
-					}
-					//printf("VAR: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					bool fSuccess =
-						objreg.Assign(
-							vecCommandLine[0],
-							new VariableObject(
-								vecCommandLine[0], vecCommandLine[4]));
-
-					if (!fSuccess) {
-						return (-1);
-					}
-
-				// recap_configuration() type
-				} else if (vecCommandLine[2] == "recap_configuration") {
-					if (vecFuncArguments.size() != 0) {
-						Announce("ERROR: Invalid arguments to recap_configuration on line %i", iLine);
-						return (-1);
-					}
-
-					printf("CONFIG: %s\n", vecCommandLine[0].c_str());
-					RecapConfigObject * pObj =
-						new RecapConfigObject(
-							vecCommandLine[0]);
-
-					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
-					if (!fSuccess) {
-						return (-1);
-					}
-
-				// grid(STRING) type
-				} else if (vecCommandLine[2] == "grid") {
-					printf("GRID: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					GridObject * pobjGrid = new GridObject(vecCommandLine[0]);
-					if (pobjGrid == NULL) {
-						_EXCEPTIONT("Unable to initial GridObject");
-					}
-
-					bool fSuccess = objreg.Assign(vecCommandLine[0], pobjGrid);
-					if (!fSuccess) {
-						return (-1);
-					}
-
-					std::string strError =
-						pobjGrid->Initialize(
-							vecFuncArguments,
-							vecFuncArgumentsType);
-
-					if (strError != "") {
-						strError += std::string(" (line ")
-							+ std::to_string(static_cast<long long>(iLine))
-							+ std::string(")");
-
-						Announce(strError.c_str());
-						return (-1);
-					}
-
-				// file_list(STRING) type
-				} else if (vecCommandLine[2] == "file_list") {
-					if (vecFuncArguments.size() != 1) {
-						Announce("ERROR: file_list search string argument missing"
-							" on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLine[3] != "(") {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid file_list declaration on line %i", iLine);
-						return (-1);
-					}
-
-					printf("FILELIST: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					FileListObject * pObj =
-						new FileListObject(
-							vecCommandLine[0]);
-
-					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
-					if (!fSuccess) {
-						return (-1);
-					}
-
-					std::string strError =
-						pObj->PopulateFromSearchString(
-							vecCommandLine[4],
-							objreg);
-
-					if (strError != "") {
-						Announce("%s", strError.c_str());
-						return (-1);
-					}
-
-				// variable_lookup_table(STRING) type
-				} else if (vecCommandLine[2] == "variable_lookup") {
-					if (vecFuncArguments.size() != 1) {
-						Announce("ERROR: variable_lookup filename argument missing"
-							" on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLine[3] != "(") {
-						Announce("ERROR: Syntax error on line %i", iLine);
-						return (-1);
-					}
-					if (vecCommandLineType[4] != ObjectType_String) {
-						Announce("ERROR: Invalid variable_lookup filename on line %i", iLine);
-						return (-1);
-					}
-
-					printf("LOOKUP: %s %s\n", vecCommandLine[0].c_str(), vecCommandLine[4].c_str());
-					VariableLookupObject * pObj =
-						new VariableLookupObject(
-							vecCommandLine[0]);
-
-					bool fSuccess = objreg.Assign(vecCommandLine[0], pObj);
-					if (!fSuccess) {
-						return (-1);
-					}
-
-					std::string strError =
-						pObj->PopulateFromFile(
-							vecCommandLine[4]);
-
-					if (strError != "") {
-						Announce("%s", strError.c_str());
-						return (-1);
-					}
-
-					Announce("variable_lookup_table %s contains %i entries",
-						vecCommandLine[0].c_str(),
-						pObj->LookupEntryCount());
+				if (pFunc == NULL) {
+					Announce("WARNING: Unknown function \"%s\" on line %i",
+						vecCommandLine[2].c_str(), iLine);
 
 				} else {
+					Object * pObjReturn = NULL;
 
-					// Check the GlobalFunctionRegistry for this function
-					std::string strFunctionName = vecCommandLine[2];
+					std::cout << "EVAL " << strFunctionName << std::endl;
+					std::string strError =
+						pFunc->Call(
+							objreg,
+							vecFuncArguments,
+							vecFuncArgumentsType,
+							&pObjReturn);
 
-					GlobalFunction * pFunc =
-						funcreg.GetGlobalFunction(strFunctionName);
+					if (strError != "") {
+						Announce("%s", strError.c_str());
+						return (-1);
+					}
 
-					if (pFunc == NULL) {
-						Announce("WARNING: Unknown function \"%s\" on line %i",
-							vecCommandLine[2].c_str(), iLine);
+					if (pObjReturn == NULL) {
+						Announce("ERROR: Function \"%s\" does not return a value on line %i",
+							strFunctionName.c_str(), iLine);
+						return (-1);
+					}
 
-					} else {
-						Object * pObjReturn = NULL;
-
-						std::cout << "EVAL " << strFunctionName << std::endl;
-						std::string strError =
-							pFunc->Call(
-								objreg,
-								vecFuncArguments,
-								vecFuncArgumentsType,
-								&pObjReturn);
-
-						if (strError != "") {
-							Announce("%s", strError.c_str());
-							return (-1);
-						}
-
-						if (pObjReturn == NULL) {
-							Announce("ERROR: Function \"%s\" does not return a value on line %i",
-								strFunctionName.c_str(), iLine);
-							return (-1);
-						}
-
-						bool fSuccess = objreg.Assign(vecCommandLine[0], pObjReturn);
-						if (!fSuccess) {
-							return (-1);
-						}
+					bool fSuccess = objreg.Assign(vecCommandLine[0], pObjReturn);
+					if (!fSuccess) {
+						return (-1);
 					}
 				}
 			}
