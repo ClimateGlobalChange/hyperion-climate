@@ -12,7 +12,10 @@ include $(HYPERIONCLIMATEDIR)/mk/framework.make
 
 FILES= Regrid.cpp \
 	   OverlapMesh.cpp \
-	   TempestRegridObject.cpp
+	   OfflineMap.cpp \
+	   TempestRegridObject.cpp \
+	   LinearRemapFV.cpp \
+	   LinearRemapSE0.cpp
 
 LIB_TARGET= libhyperionregrid.a
 

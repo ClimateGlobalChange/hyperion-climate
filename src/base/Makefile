@@ -29,6 +29,9 @@ FILES= Announce.cpp \
 	   LegendrePolynomial.cpp \
 	   GaussQuadrature.cpp \
 	   GaussLobattoQuadrature.cpp \
+	   TriangularQuadrature.cpp \
+	   PolynomialInterp.cpp \
+	   FiniteElementTools.cpp \
 	   MeshUtilities.cpp \
 	   MeshUtilitiesFuzzy.cpp \
 	   GridElements.cpp

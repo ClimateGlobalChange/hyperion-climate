@@ -20,6 +20,9 @@
 #include "Announce.h"
 #include "Object.h"
 #include "GridElements.h"
+#include "OfflineMap.h"
+
+namespace HRegrid {
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -124,10 +127,12 @@ protected:
 	///	<summary>
 	///		The offline map.
 	///	</summary>
-	//OfflineMap
+	OfflineMap m_mapRemap;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+
+};
 
 #endif
 

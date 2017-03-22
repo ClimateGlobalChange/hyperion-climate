@@ -16,8 +16,13 @@
 
 #include "TempestRegridObject.h"
 #include "GridObject.h"
+#include "FiniteElementTools.h"
+#include "DataArray3D.h"
 
 #include "OverlapMesh.h"
+#include "LinearRemapSE0.h"
+
+namespace HRegrid {
 
 ///////////////////////////////////////////////////////////////////////////////
 // TempestRegridObjectConstructor
@@ -100,22 +105,87 @@ std::string TempestRegridObject::Initialize(
 			" of type parameter_list");
 	}
 
+	// Monotone type
+	int nMonotoneType = 0;
+
+	// No conservation
+	bool fNoConservation = false;
+
+	// Always bubble
+	bool fBubble = true;
+
+	// Concave faces in mesh
+	bool fSourceConcave = false;
+
+	// Concave faces in mesh
+	bool fTargetConcave = false;
+
 	// Generate EdgeMap on source mesh if not available
 	Mesh & meshSource = pobjSourceGrid->GetMesh();
 	meshSource.ConstructEdgeMap();
+	if (meshSource.vecFaceArea.GetRows() != meshSource.dLat.GetRows()) {
+		meshSource.CalculateFaceAreas(fSourceConcave);
+	}
 
 	// Generate EdgeMap on target mesh if not available
 	Mesh & meshTarget = pobjTargetGrid->GetMesh();
 	meshTarget.ConstructEdgeMap();
+	if (meshTarget.vecFaceArea.GetRows() != meshTarget.dLat.GetRows()) {
+		meshTarget.CalculateFaceAreas(fTargetConcave);
+	}
 
 	// Generate the overlap mesh
 	Mesh * pMeshOverlap = new Mesh();
 
+	AnnounceStartBlock("Generate overlap mesh");
 	GenerateOverlapMesh_v2(
 		pobjSourceGrid->GetMesh(),
 		pobjTargetGrid->GetMesh(),
 		*pMeshOverlap,
 		HRegrid::OverlapMeshMethod_Fuzzy);
+	AnnounceEndBlock("Done");
+
+	// Generate offline map
+	AnnounceStartBlock("Generate offline map");
+
+	if ((meshSource.eDataLayout == Mesh::DataLayout_SpectralElementGLL) ||
+		(meshSource.eDataLayout == Mesh::DataLayout_DiscontinuousGLL)
+	) {
+		bool fContinuousIn =
+			(meshSource.eDataLayout == Mesh::DataLayout_SpectralElementGLL);
+
+		if (meshTarget.eDataLayout == Mesh::DataLayout_Volumetric) {
+			DataArray3D<int> dataGLLNodes;
+			DataArray3D<double> dataGLLJacobian;
+
+			double dNumericalArea =
+				GenerateMetaData(
+					meshSource,
+					meshSource.nP,
+					fBubble,
+					dataGLLNodes,
+					dataGLLJacobian);
+
+			LinearRemapSE4(
+				meshSource,
+				meshTarget,
+				*pMeshOverlap,
+				dataGLLNodes,
+				dataGLLJacobian,
+				nMonotoneType,
+				fContinuousIn,
+				fNoConservation,
+				m_mapRemap);
+
+		} else {
+			_EXCEPTIONT("Not implemented");
+		}
+
+	} else {
+		_EXCEPTIONT("Not implemented");
+	}
+
+	AnnounceEndBlock("Done");
 
 	delete pMeshOverlap;
 
@@ -123,4 +193,6 @@ std::string TempestRegridObject::Initialize(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+};
 

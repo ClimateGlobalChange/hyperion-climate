@@ -626,6 +626,11 @@ public:
 	DataLayout eDataLayout;
 
 	///	<summary>
+	///		Polynomial order of mesh (for finite element DataLayouts)
+	///	</summary>
+	int nP;
+
+	///	<summary>
 	///		Vector of Nodes for this mesh.
 	///	</summary>
 	NodeVector nodes;

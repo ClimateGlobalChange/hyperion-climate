@@ -215,13 +215,17 @@ void Mesh::InitializeAsRLL(
 
 void Mesh::InitializeAsFiniteElement(
 	DataLayout a_eDataLayout,
-	int nP
+	int a_nP
 ) {
 	if ((a_eDataLayout != DataLayout_SpectralElementGLL) &&
 	    (a_eDataLayout != DataLayout_DiscontinuousGLL)
 	) {
 		_EXCEPTIONT("Invalid DataLayout");
 	}
+
+	// Store eDataLayout and nP
+	eDataLayout = a_eDataLayout;
+	nP = a_nP;
 
 	// Clear existing adjacency list
 	if (edgemap.size() != 0) {
@@ -429,10 +433,6 @@ void Mesh::ConstructEdgeMap(
 		if (!fForceReconstruct) {
 			return;
 		}
-	}
-
-	if (eDataLayout != DataLayout_Volumetric) {
-		_EXCEPTIONT("Only volumetric data layout supported");
 	}
 
 	// Construct the edge map
