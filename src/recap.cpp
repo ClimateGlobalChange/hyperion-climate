@@ -519,7 +519,7 @@ try {
 						}
 
 						std::string strChildName =
-							vecCommandLine[0] + "._" + std::to_string(iListEntry);
+							vecCommandLine[0] + "._" + std::to_string(static_cast<long long>(iListEntry));
 /*
 						printf("%i %i %i %s %s\n",
 							i, iListEntry,
@@ -640,7 +640,7 @@ try {
 
 					if (strError != "") {
 						strError += std::string(" (line ")
-							+ std::to_string(iLine)
+							+ std::to_string(static_cast<long long>(iLine))
 							+ std::string(")");
 
 						Announce(strError.c_str());

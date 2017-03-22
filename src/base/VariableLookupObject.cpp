@@ -136,7 +136,7 @@ std::string VariableLookupObject::PopulateFromFile(
 			// Done
 			} else if (mode == ParseMode_Done) {
 				return std::string("Too many entries in lookup table on line ")
-					+ std::to_string(iLine);
+					+ std::to_string(static_cast<long long>(iLine));
 			}
 		}
 
@@ -147,7 +147,7 @@ std::string VariableLookupObject::PopulateFromFile(
 
 			if (iter != m_mapLookupTable.end()) {
 				return std::string("Repeated lookup table entry on line ")
-					+ std::to_string(iLine);
+					+ std::to_string(static_cast<long long>(iLine));
 			}
 
 			m_mapLookupTable.insert(

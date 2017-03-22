@@ -173,9 +173,9 @@ public:
 			strDescription += " is not equal to ";
 		}
 
-		strDescription += std::to_string(m_dValue)
+		strDescription += std::to_string(static_cast<long double>(m_dValue))
 			+ std::string(" within ")
-			+ std::to_string(m_dDistance)
+			+ std::to_string(static_cast<long double>(m_dDistance))
 			+ std::string(" degrees");
 
 		return strDescription;
@@ -331,12 +331,12 @@ public:
 		if (m_dDeltaAmount < 0.0) {
 			std::string strDescription =
 				m_pvar->Name() + std::string(" decreases by ")
-				+ std::to_string(-m_dDeltaAmount)
+				+ std::to_string(static_cast<long double>(-m_dDeltaAmount))
 				+ m_pvar->Units()
 				+ std::string(" over ")
-				+ std::to_string(m_dDistance)
+				+ std::to_string(static_cast<long double>(m_dDistance))
 				+ std::string("deg (max search ")
-				+ std::to_string(m_dMinMaxDist)
+				+ std::to_string(static_cast<long double>(m_dMinMaxDist))
 				+ std::string("deg)");
 
 			return strDescription;
@@ -344,12 +344,12 @@ public:
 		} else {
 			std::string strDescription =
 				m_pvar->Name() + std::string(" increases by ")
-				+ std::to_string(m_dDeltaAmount)
+				+ std::to_string(static_cast<long double>(m_dDeltaAmount))
 				+ m_pvar->Units()
 				+ std::string(" over ")
-				+ std::to_string(m_dDistance)
+				+ std::to_string(static_cast<long double>(m_dDistance))
 				+ std::string("deg (min search ")
-				+ std::to_string(m_dMinMaxDist)
+				+ std::to_string(static_cast<long double>(m_dMinMaxDist))
 				+ std::string("deg)");
 
 			return strDescription;
@@ -510,7 +510,7 @@ public:
 		strDescription +=
 			m_pvar->Name()
 			+ std::string(" within ")
-			+ std::to_string(m_dDistance)
+			+ std::to_string(static_cast<long double>(m_dDistance))
 			+ " degrees";
 
 		return strDescription;
