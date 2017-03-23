@@ -37,6 +37,28 @@ class OfflineMap {
 
 public:
 	///	<summary>
+	///		Initialize the array of input dimensions from arrays.
+	///	</summary>
+	void InitializeSourceDimensions(
+		const std::vector<int> & vecSourceDimSizes,
+		const std::vector<std::string> & vecSourceDimNames
+	) {
+		m_vecSourceDimSizes = vecSourceDimSizes;
+		m_vecSourceDimNames = vecSourceDimNames;
+	}
+
+	///	<summary>
+	///		Initialize the array of output dimensions from arrays.
+	///	</summary>
+	void InitializeTargetDimensions(
+		const std::vector<int> & vecTargetDimSizes,
+		const std::vector<std::string> & vecTargetDimNames
+	) {
+		m_vecTargetDimSizes = vecTargetDimSizes;
+		m_vecTargetDimNames = vecTargetDimNames;
+	}
+
+	///	<summary>
 	///		Initialize the array of input dimensions from a file.
 	///	</summary>
 	void InitializeSourceDimensionsFromFile(

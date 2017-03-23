@@ -157,6 +157,7 @@ public:
 		const std::vector<ObjectType> & vecCommandLineType,
 		Object ** ppReturn
 	) {
+		// Output information about the FileList to a CSV file
 		if (strFunctionName == "output_csv") {
 			if ((vecCommandLineType.size() != 1) ||
 			    (vecCommandLineType[0] != ObjectType_String)
@@ -165,6 +166,44 @@ public:
 			}
 			return OutputTimeVariableIndexCSV(vecCommandLine[0]);
 		}
+
+		// Create a copy of the FileList with modified filenames
+		if (strFunctionName == "append") {
+			if ((vecCommandLineType.size() != 1) ||
+			    (vecCommandLineType[0] != ObjectType_String)
+			) {
+				return std::string("ERROR: Invalid parameters to function \"append\"");
+			}
+
+			FileListObject * pobjNewFileList = new FileListObject("");
+			if (pobjNewFileList == NULL) {
+				return std::string("ERROR: Unable to allocate new FileListObject");
+			}
+
+			pobjNewFileList->m_vecFilenames = m_vecFilenames;
+
+			for (size_t f = 0; f < pobjNewFileList->m_vecFilenames.size(); f++) {
+				int nLength = pobjNewFileList->m_vecFilenames[f].length();
+				int iExt = nLength-1;
+				for (; iExt >= 0; iExt--) {
+					if (pobjNewFileList->m_vecFilenames[f][iExt] == '.') {
+						break;
+					}
+					pobjNewFileList->m_vecFilenames[f] =
+						pobjNewFileList->m_vecFilenames[f].substr(0,iExt)
+						+ vecCommandLine[0]
+						+ pobjNewFileList->m_vecFilenames[f].substr(iExt);
+				}
+			}
+
+			if (ppReturn != NULL) {
+				(*ppReturn) = pobjNewFileList;
+			} else {
+				delete pobjNewFileList;
+			}
+			return std::string("");
+		}
+
 		return
 			Object::Call(
 				objreg,

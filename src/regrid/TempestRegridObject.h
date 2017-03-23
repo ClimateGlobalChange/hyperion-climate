@@ -90,23 +90,7 @@ public:
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
 		Object ** ppReturn
-	) {
-		if (strFunctionName == "regrid") {
-			if ((vecCommandLineType.size() != 1) ||
-			    (vecCommandLineType[0] != ObjectType_String)
-			) {
-				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
-			}
-			return std::string("Not implemented");
-		}
-		return
-			Object::Call(
-				objreg,
-				strFunctionName,
-				vecCommandLine,
-				vecCommandLineType,
-				ppReturn);
-	}
+	);
 
 public:
 	///	<summary>

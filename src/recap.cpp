@@ -584,109 +584,100 @@ try {
 			}
 
 			// Assignment of function to LHS
-			if ((iAssignmentOp != (-1)) && (iEvaluateOp != (-1))) {
+			if (iEvaluateOp != (-1)) {
 
-				// Check the GlobalFunctionRegistry for this function
-				std::string strFunctionName = vecCommandLine[2];
-
-				GlobalFunction * pFunc =
-					funcreg.GetGlobalFunction(strFunctionName);
-
-				if (pFunc == NULL) {
-					Announce("WARNING: Unknown function \"%s\" on line %i",
-						vecCommandLine[2].c_str(), iLine);
-
+				std::string strLHS;
+				std::string strRHS;
+				if (iAssignmentOp == (-1)) {
+					strRHS = vecCommandLine[0];
 				} else {
-					Object * pObjReturn = NULL;
-
-					std::cout << "EVAL " << strFunctionName << std::endl;
-					std::string strError =
-						pFunc->Call(
-							objreg,
-							vecFuncArguments,
-							vecFuncArgumentsType,
-							&pObjReturn);
-
-					if (strError != "") {
-						Announce("%s", strError.c_str());
-						return (-1);
-					}
-
-					if (pObjReturn == NULL) {
-						Announce("ERROR: Function \"%s\" does not return a value on line %i",
-							strFunctionName.c_str(), iLine);
-						return (-1);
-					}
-
-					bool fSuccess = objreg.Assign(vecCommandLine[0], pObjReturn);
-					if (!fSuccess) {
-						return (-1);
-					}
+					strLHS = vecCommandLine[0];
+					strRHS = vecCommandLine[2];
 				}
-			}
 
-			// Evaluation of function
-			if ((iAssignmentOp == (-1)) && (iEvaluateOp != (-1))) {
-
+				// Check for member function
 				std::string strObject;
 				std::string strFunctionName;
 
-				// Check for member function
-				for (int i = vecCommandLine[0].length()-1; i >= 0; i--) {
-					if (vecCommandLine[0][i] == '.') {
-						strObject = vecCommandLine[0].substr(0, i);
-						strFunctionName = vecCommandLine[0].substr(i+1);
+				for (int i = strRHS.length()-1; i >= 0; i--) {
+					if (strRHS[i] == '.') {
+						strObject = strRHS.substr(0, i);
+						strFunctionName = strRHS.substr(i+1);
 						break;
 					}
 				}
 
+				// Return value
+				Object * pobjReturn = NULL;
+
 				// Call member function
 				if (strObject != "") {
-					Object * pObj = objreg.GetObject(strObject);
-					if (pObj == NULL) {
+					Object * pobj = objreg.GetObject(strObject);
+					if (pobj == NULL) {
 						Announce("ERROR: Invalid object \"%s\"",
 							strObject.c_str());
 						return (-1);
 					}
 
-					Object * pObjReturn = NULL;
-
-					std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
+					std::cout << "EVAL " << strObject << "::" << strFunctionName << std::endl;
 					std::string strError =
-						pObj->Call(
+						pobj->Call(
 							objreg,
 							strFunctionName,
 							vecFuncArguments,
 							vecFuncArgumentsType,
-							&pObjReturn);
+							&pobjReturn);
 
 					if (strError != "") {
 						Announce("%s (Line %i)\n", strError.c_str(), iLine);
 						return (-1);
 					}
 
-				// Call generic function
+				// Call a GlobalFunction
 				} else {
-					strFunctionName = vecCommandLine[0];
-
-					std::cout << strFunctionName << std::endl;
+					strFunctionName = strRHS;
 
 					GlobalFunction * pFunc =
 						funcreg.GetGlobalFunction(strFunctionName);
 
 					if (pFunc == NULL) {
 						Announce("WARNING: Unknown function \"%s\" on line %i",
-							vecCommandLine[0].c_str(), iLine);
+							strFunctionName.c_str(), iLine);
 
 					} else {
-
-						std::cout << "CALL " << strObject << "::" << strFunctionName << std::endl;
+						std::cout << "EVAL " << strFunctionName << std::endl;
 						std::string strError =
 							pFunc->Call(
 								objreg,
 								vecFuncArguments,
 								vecFuncArgumentsType,
-								NULL);
+								&pobjReturn);
+
+						if (strError != "") {
+							Announce("%s", strError.c_str());
+							return (-1);
+						}
+					}
+				}
+
+				// Assign return value to Object
+				if (strLHS != "") {
+					if (pobjReturn == NULL) {
+						Announce("ERROR: Function \"%s\" does not return a value on line %i",
+							strFunctionName.c_str(), iLine);
+						return (-1);
+					}
+
+					bool fSuccess = objreg.Assign(strLHS, pobjReturn);
+					if (!fSuccess) {
+						Announce("ERROR: Invalid assignment on line %i", iLine);
+						return (-1);
+					}
+
+				// Delete return value
+				} else {
+					if (pobjReturn != NULL) {
+						delete pobjReturn;
 					}
 				}
 			}

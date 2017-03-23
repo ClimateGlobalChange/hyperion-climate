@@ -642,11 +642,11 @@ void FindLocalMinMax(
 	}
 
 	// Check index argument
-	if (ix0 >= mesh.dLat.GetRows()) {
-		_EXCEPTIONT("ix0 out of range of mesh.dLat");
+	if (ix0 >= mesh.dCenterLat.GetRows()) {
+		_EXCEPTIONT("ix0 out of range of mesh.dCenterLat");
 	}
-	if (ix0 >= mesh.dLon.GetRows()) {
-		_EXCEPTIONT("ix0 out of range of mesh.dLon");
+	if (ix0 >= mesh.dCenterLon.GetRows()) {
+		_EXCEPTIONT("ix0 out of range of mesh.dCenterLon");
 	}
 
 	// Initialize the maximum to the central location
@@ -662,8 +662,8 @@ void FindLocalMinMax(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin (in radians)
-	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
-	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
+	double dLat0 = mesh.dCenterLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dCenterLon[ix0] * M_PI / 180.0;
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -676,8 +676,8 @@ void FindLocalMinMax(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
-		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
+		double dLatThis = mesh.dCenterLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dCenterLon[ix] * M_PI / 180.0;
 
 		// Great circle distance to this element
 		double dR =
@@ -779,8 +779,8 @@ bool HasClosedContour(
 	real dRefValue = dataState[ixOrigin];
 
 	// Latitude and longitude at origin (in radians)
-	const double dLat0 = mesh.dLat[ixOrigin] * M_PI / 180.0;
-	const double dLon0 = mesh.dLon[ixOrigin] * M_PI / 180.0;
+	const double dLat0 = mesh.dCenterLat[ixOrigin] * M_PI / 180.0;
+	const double dLon0 = mesh.dCenterLon[ixOrigin] * M_PI / 180.0;
 
 	Announce(2, "Checking (%lu) : (%1.5f %1.5f)",
 		ixOrigin, dLat0, dLon0);
@@ -797,8 +797,8 @@ bool HasClosedContour(
 		setNodesVisited.insert(ix);
 
 		// Great circle distance to this element
-		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
-		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
+		double dLatThis = mesh.dCenterLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dCenterLon[ix] * M_PI / 180.0;
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -879,8 +879,8 @@ bool SatisfiesThreshold(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
-	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
+	double dLat0 = mesh.dCenterLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dCenterLon[ix0] * M_PI / 180.0;
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -894,8 +894,8 @@ bool SatisfiesThreshold(
 		setNodesVisited.insert(ix);
 
 		// Great circle distance to this element (in degrees)
-		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
-		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
+		double dLatThis = mesh.dCenterLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dCenterLon[ix] * M_PI / 180.0;
 
 		double dR =
 			sin(dLat0) * sin(dLatThis)
@@ -997,8 +997,8 @@ void FindLocalAverage(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin (in radians)
-	double dLat0 = mesh.dLat[ix0] * M_PI / 180.0;
-	double dLon0 = mesh.dLon[ix0] * M_PI / 180.0;
+	double dLat0 = mesh.dCenterLat[ix0] * M_PI / 180.0;
+	double dLon0 = mesh.dCenterLon[ix0] * M_PI / 180.0;
 
 	// Number of points
 	float dSum = 0.0;
@@ -1015,8 +1015,8 @@ void FindLocalAverage(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = mesh.dLat[ix] * M_PI / 180.0;
-		double dLonThis = mesh.dLon[ix] * M_PI / 180.0;
+		double dLatThis = mesh.dCenterLat[ix] * M_PI / 180.0;
+		double dLonThis = mesh.dCenterLon[ix] * M_PI / 180.0;
 
 		// Great circle distance to this element (in degrees)
 		double dR =
@@ -1238,8 +1238,8 @@ std::string PointSearch(
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 			// Get latitude and longitude in degrees
-			double dLat = mesh.dLat[*iterCandidate];
-			double dLon = mesh.dLon[*iterCandidate];
+			double dLat = mesh.dCenterLat[*iterCandidate];
+			double dLon = mesh.dCenterLon[*iterCandidate];
 
 			if (param.dMinLatitude != param.dMaxLatitude) {
 				if (dLat < param.dMinLatitude) {
@@ -1305,8 +1305,8 @@ std::string PointSearch(
 		std::set<int>::const_iterator iterCandidate
 			= setCandidates.begin();
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-			double dLat = mesh.dLat[*iterCandidate] * M_PI / 180.0;
-			double dLon = mesh.dLon[*iterCandidate] * M_PI / 180.0;
+			double dLat = mesh.dCenterLat[*iterCandidate] * M_PI / 180.0;
+			double dLon = mesh.dCenterLon[*iterCandidate] * M_PI / 180.0;
 
 			double dX = cos(dLon) * cos(dLat);
 			double dY = sin(dLon) * cos(dLat);
@@ -1318,8 +1318,8 @@ std::string PointSearch(
 		// Loop through all candidates find set of nearest neighbors
 		iterCandidate = setCandidates.begin();
 		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-			double dLat = mesh.dLat[*iterCandidate] * M_PI / 180.0;
-			double dLon = mesh.dLon[*iterCandidate] * M_PI / 180.0;
+			double dLat = mesh.dCenterLat[*iterCandidate] * M_PI / 180.0;
+			double dLon = mesh.dCenterLon[*iterCandidate] * M_PI / 180.0;
 
 			double dX = cos(dLon) * cos(dLat);
 			double dY = sin(dLon) * cos(dLat);
@@ -1645,8 +1645,8 @@ std::string PointSearch(
 			}
 
 			fprintf(fpOutput, "\t%3.6f\t%3.6f",
-				mesh.dLon[*iterCandidate] * 180.0 / M_PI,
-				mesh.dLat[*iterCandidate] * 180.0 / M_PI);
+				mesh.dCenterLon[*iterCandidate] * 180.0 / M_PI,
+				mesh.dCenterLat[*iterCandidate] * 180.0 / M_PI);
 
 			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 				fprintf(fpOutput, "\t%3.6e",

@@ -872,7 +872,7 @@ void LinearRemapSE4(
 						nodeQuadrature,
 						dAlpha,
 						dBeta);
-
+/*
 					// Check inverse map value
 					if ((dAlpha < -1.0e-13) || (dAlpha > 1.0 + 1.0e-13) ||
 						(dBeta  < -1.0e-13) || (dBeta  > 1.0 + 1.0e-13)
@@ -880,7 +880,7 @@ void LinearRemapSE4(
 						_EXCEPTION2("Inverse Map out of range (%1.5e %1.5e)",
 							dAlpha, dBeta);
 					}
-
+*/
 					// Sample the finite element at this point
 					SampleGLLFiniteElement(
 						nMonotoneType,

@@ -659,12 +659,12 @@ public:
 	///	<summary>
 	///		Vector of the latitude of the Face centerpoint (in degrees).
 	///	</summary>
-	DataArray1D<double> dLat;
+	DataArray1D<double> dCenterLat;
 
 	///	<summary>
 	///		Vector of the longitude of the Face centerpoint (in degrees).
 	///	</summary>
-	DataArray1D<double> dLon;
+	DataArray1D<double> dCenterLon;
 
 	///	<summary>
 	///		Vector of Face areas.
@@ -695,13 +695,29 @@ public:
 	///	</summary>
 	std::vector<int> vecMultiFaceMap;
 
+	///	<summary>
+	///		Flag indicating this mesh is rectilinear.
+	///	</summary>
+	bool fRectilinear;
+
+	///	<summary>
+	///		Vector of dimension sizes for source.
+	///	</summary>
+	std::vector<int> vecDimSizes;
+
+	///	<summary>
+	///		Vector of dimension names for source.
+	///	</summary>
+	std::vector<std::string> vecDimNames;
+
 public:
 	///	<summary>
 	///		Default constructor.
 	///	</summary>
 	Mesh() :
 		eDataLayout(DataLayout_Volumetric),
-		sDOFCount(0)
+		sDOFCount(0),
+		fRectilinear(false)
 	{ }
 
 	///	<summary>
@@ -709,7 +725,8 @@ public:
 	///	</summary>
 	Mesh(const std::string & strFile) :
 		eDataLayout(DataLayout_Volumetric),
-		sDOFCount(0)
+		sDOFCount(0),
+		fRectilinear(false)
 	{
 		Read(strFile);
 	}

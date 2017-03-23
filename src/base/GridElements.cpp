@@ -71,22 +71,25 @@ void Mesh::Clear() {
 	vecSourceFaceIx.clear();
 	vecTargetFaceIx.clear();
 	sDOFCount = 0;
-	dLat.Deallocate();
-	dLon.Deallocate();
+	dCenterLat.Deallocate();
+	dCenterLon.Deallocate();
 	vecFaceArea.Deallocate();
 	edgemap.clear();
 	adjlist.clear();
 	revnodearray.clear();
 	vecMultiFaceMap.clear();
+	fRectilinear = false;
+	vecDimSizes.clear();
+	vecDimNames.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::InitializeAsRLL(
-	double dLatBegin,
-	double dLatEnd,
-	double dLonBegin,
-	double dLonEnd,
+	double dLatBeginDeg,
+	double dLatEndDeg,
+	double dLonBeginDeg,
+	double dLonEndDeg,
 	int nLatitudes,
 	int nLongitudes
 ) {
@@ -94,8 +97,18 @@ void Mesh::InitializeAsRLL(
 	Clear();
 
 	// Change in longitude
-	double dDeltaLon = dLonEnd - dLonBegin;
-	double dDeltaLat = dLatEnd - dLatBegin;
+	const double dDeltaLonDeg = dLonEndDeg - dLonBeginDeg;
+	const double dDeltaLatDeg = dLatEndDeg - dLatBeginDeg;
+
+	// Convert all units to radians
+	const double dLatBegin = dLatBeginDeg * M_PI / 180.0;
+	const double dLatEnd   = dLatEndDeg   * M_PI / 180.0;
+	const double dLonBegin = dLonBeginDeg * M_PI / 180.0;
+	const double dLonEnd   = dLonEndDeg   * M_PI / 180.0;
+
+	// Change in longitude
+	const double dDeltaLon = dLonEnd - dLonBegin;
+	const double dDeltaLat = dLatEnd - dLatBegin;
 
 	// Check if longitudes wrap
 	bool fWrapLongitudes = false;
@@ -148,16 +161,10 @@ void Mesh::InitializeAsRLL(
 	// Generate south polar faces
 	if (fIncludeSouthPole) {
 		for (int i = 0; i < nLongitudes; i++) {
-			Face face(4);
+			Face face(3);
 			face.SetNode(0, 0);
 			face.SetNode(1, (i+1) % nLongitudeNodes + 1);
 			face.SetNode(2, i + 1);
-			face.SetNode(3, 0);
-
-#ifndef ONLY_GREAT_CIRCLES
-			face.edges[1].type = Edge::Type_ConstantLatitude;
-			face.edges[3].type = Edge::Type_ConstantLatitude;
-#endif
 
 			faces.push_back(face);
 		}
@@ -177,11 +184,6 @@ void Mesh::InitializeAsRLL(
 			face.SetNode(2, iNextLatNodeIx + i);
 			face.SetNode(3, iThisLatNodeIx + i);
 
-#ifndef ONLY_GREAT_CIRCLES
-			face.edges[1].type = Edge::Type_ConstantLatitude;
-			face.edges[3].type = Edge::Type_ConstantLatitude;
-#endif
-
 			faces.push_back(face);
 		}
 	}
@@ -195,20 +197,45 @@ void Mesh::InitializeAsRLL(
 
 		int iNorthPolarNodeIx = static_cast<int>(nodes.size()-1);
 		for (int i = 0; i < nLongitudes; i++) {
-			Face face(4);
+			Face face(3);
 			face.SetNode(0, iNorthPolarNodeIx);
 			face.SetNode(1, iThisLatNodeIx + i);
 			face.SetNode(2, iThisLatNodeIx + (i + 1) % nLongitudeNodes);
-			face.SetNode(3, iNorthPolarNodeIx);
-
-#ifndef ONLY_GREAT_CIRCLES
-			face.edges[1].type = Edge::Type_ConstantLatitude;
-			face.edges[3].type = Edge::Type_ConstantLatitude;
-#endif
 
 			faces.push_back(face);
 		}
 	}
+
+	// Set latitude and longitude of grid centerpoints
+	dCenterLat.Allocate(nLatitudes * nLongitudes);
+	dCenterLon.Allocate(nLatitudes * nLongitudes);
+	int ix = 0;
+	for (int j = 0; j < nLatitudes; j++) {
+		double dLat = dLatBeginDeg
+			+ (static_cast<double>(j) + 0.5) * dDeltaLatDeg;
+
+		for (int i = 0; i < nLongitudes; i++) {
+			double dLon = dLonBegin
+				+ (static_cast<double>(j) + 0.5) * dDeltaLonDeg;
+
+			dCenterLat[ix] = dLat;
+			dCenterLon[ix] = dLon;
+
+			ix++;
+		}
+	}
+
+	// Set rectilinear flag
+	fRectilinear = true;
+
+	// Push rectilinear attributes into array
+	vecDimSizes.resize(2);
+	vecDimSizes[0] = nLatitudes;
+	vecDimSizes[1] = nLongitudes;
+
+	vecDimNames.resize(2);
+	vecDimNames[0] = "lat";
+	vecDimNames[1] = "lon";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -234,11 +261,11 @@ void Mesh::InitializeAsFiniteElement(
 	if (adjlist.size() != 0) {
 		adjlist.clear();
 	}
-	if (dLat.GetRows() != 0) {
-		dLat.Deallocate();
+	if (dCenterLat.GetRows() != 0) {
+		dCenterLat.Deallocate();
 	}
-	if (dLon.GetRows() != 0) {
-		dLon.Deallocate();
+	if (dCenterLon.GetRows() != 0) {
+		dCenterLon.Deallocate();
 	}
 
 	// Gauss-Lobatto quadrature nodes and weights
@@ -361,19 +388,19 @@ void Mesh::InitializeAsFiniteElement(
 	sDOFCount = vecGLLNodes.size();
 
 	// Calculate latitude and longitude of nodes
-	dLat.Allocate(sDOFCount);
-	dLon.Allocate(sDOFCount);
+	dCenterLat.Allocate(sDOFCount);
+	dCenterLon.Allocate(sDOFCount);
 	for (size_t i = 0; i < sDOFCount; i++) {
 		double dR = sqrt(
 			  vecGLLNodes[i].x * vecGLLNodes[i].x
 			+ vecGLLNodes[i].y * vecGLLNodes[i].y
 			+ vecGLLNodes[i].z * vecGLLNodes[i].z);
 
-		dLat[i] = asin(vecGLLNodes[i].z / dR);
-		dLat[i] *= 180.0 / M_PI;
+		dCenterLat[i] = asin(vecGLLNodes[i].z / dR);
+		dCenterLat[i] *= 180.0 / M_PI;
 
-		dLon[i] = atan2(vecGLLNodes[i].y, vecGLLNodes[i].x);
-		dLon[i] *= 180.0 / M_PI;
+		dCenterLon[i] = atan2(vecGLLNodes[i].y, vecGLLNodes[i].x);
+		dCenterLon[i] *= 180.0 / M_PI;
 	}
 
 	// Build adjacency list set
@@ -1262,9 +1289,9 @@ void Mesh::Read(const std::string & strFile) {
 				_EXCEPTIONT("Grid defines \"grid_center_lat\" "
 					"but not \"grid_center_lon\"");
 			}
-			dLat.Allocate(nGridSize);
+			dCenterLat.Allocate(nGridSize);
 			varGridCenterLat->set_cur((long)0);
-			varGridCenterLat->get(&(dLat[0]), nGridSize);
+			varGridCenterLat->get(&(dCenterLat[0]), nGridSize);
 
 			NcAtt * attGridCenterLatUnits =
 				varGridCenterLat->get_att("units");
@@ -1281,9 +1308,9 @@ void Mesh::Read(const std::string & strFile) {
 				_EXCEPTIONT("Grid defines \"grid_center_lon\" "
 					"but not \"grid_center_lat\"");
 			}
-			dLon.Allocate(nGridSize);
+			dCenterLon.Allocate(nGridSize);
 			varGridCenterLon->set_cur((long)0);
-			varGridCenterLon->get(&(dLon[0]), nGridSize);
+			varGridCenterLon->get(&(dCenterLon[0]), nGridSize);
 
 			NcAtt * attGridCenterLonUnits =
 				varGridCenterLon->get_att("units");
@@ -1293,7 +1320,7 @@ void Mesh::Read(const std::string & strFile) {
 			}
 		}
 
-		if (dLon.GetRows() != dLat.GetRows()) {
+		if (dCenterLon.GetRows() != dCenterLat.GetRows()) {
 			_EXCEPTIONT("lat/lon size mismatch in grid file");
 		}
 		if (strLatUnits != strLonUnits) {
@@ -1301,11 +1328,16 @@ void Mesh::Read(const std::string & strFile) {
 		} else {
 			if (strLatUnits == "") {
 			} else if ((strLatUnits == "rad") || (strLatUnits == "radians")) {
-				for (int i = 0; i < dLat.GetRows(); i++) {
-					dLat[i] *= 180.0 / M_PI;
-					dLon[i] *= 180.0 / M_PI;
+				for (int i = 0; i < dCenterLat.GetRows(); i++) {
+					dCenterLat[i] *= 180.0 / M_PI;
+					dCenterLon[i] *= 180.0 / M_PI;
 				}
-			} else if ((strLatUnits == "deg") || (strLatUnits == "degrees")) {
+			} else if (
+				(strLatUnits == "deg") ||
+				(strLatUnits == "degrees") ||
+				(strLatUnits == "degrees_north")
+			) {
+				// Do nothing
 			} else {
 				_EXCEPTION1("Unknown units for lat/lon: %s", strLatUnits.c_str());
 			}
@@ -1388,6 +1420,34 @@ void Mesh::Read(const std::string & strFile) {
 		// SCRIP does not reference a node table, so we must remove
 		// coincident nodes.
 		RemoveCoincidentNodes();
+
+		// SCRIP also contains grid dimension information
+		NcVar * varGridDims = ncFile.get_var("grid_dims");
+		if (varGridDims == NULL) {
+			_EXCEPTIONT("SCRIP grid file missing \"grid_dims\" variable");
+		}
+
+		vecDimSizes.resize(dimGridRank->size());
+		varGridDims->get(&(vecDimSizes[0]), dimGridRank->size());
+
+		if (dimGridRank->size() == 1) {
+			vecDimNames.push_back("num_elem");
+			fRectilinear = false;
+
+		} else if (dimGridRank->size() == 2) {
+			vecDimNames.push_back("lat");
+			vecDimNames.push_back("lon");
+
+			int iTemp = vecDimSizes[0];
+			vecDimSizes[0] = vecDimSizes[1];
+			vecDimSizes[1] = iTemp;
+
+			fRectilinear = true;
+
+		} else {
+			_EXCEPTION1("\"grid_rank\" size out or ange: Expected < 3 (found %i)",
+				dimGridRank->size());
+		}
 
 		// Output size
 		Announce("Mesh size: Nodes [%i] Elements [%i]",
@@ -1635,10 +1695,68 @@ void Mesh::Read(const std::string & strFile) {
 
 			dNodeCoords.Deallocate();
 		}
+
+		// Check for rectilinear attribute
+		NcAtt * attRectilinear = ncFile.get_att("rectilinear");
+
+		// No rectilinear attribute
+		if (attRectilinear == NULL) {
+			int nElements = ncFile.get_dim("num_elem")->size();
+			fRectilinear = false;
+			vecDimSizes.push_back(nElements);
+			vecDimNames.push_back("num_elem");
+
+		// Rectilinear attribute present
+		} else {
+			NcAtt * attRectilinearDim0Size =
+				ncFile.get_att("rectilinear_dim0_size");
+			NcAtt * attRectilinearDim1Size =
+				ncFile.get_att("rectilinear_dim1_size");
+
+			if (attRectilinearDim0Size == NULL) {
+				_EXCEPTIONT("Missing attribute \"rectilinear_dim0_size\"");
+			}
+			if (attRectilinearDim1Size == NULL) {
+				_EXCEPTIONT("Missing attribute \"rectilinear_dim1_size\"");
+			}
+
+			int nDim0Size = attRectilinearDim0Size->as_int(0);
+			int nDim1Size = attRectilinearDim1Size->as_int(0);
+
+			// Obtain rectilinear attributes (dimension names)
+			NcAtt * attRectilinearDim0Name =
+				ncFile.get_att("rectilinear_dim0_name");
+			NcAtt * attRectilinearDim1Name =
+				ncFile.get_att("rectilinear_dim1_name");
+
+			if (attRectilinearDim0Name == NULL) {
+				_EXCEPTIONT("Missing attribute \"rectilinear_dim0_name\"");
+			}
+			if (attRectilinearDim1Name == NULL) {
+				_EXCEPTIONT("Missing attribute \"rectilinear_dim1_name\"");
+			}
+
+			std::string strDim0Name = attRectilinearDim0Name->as_string(0);
+			std::string strDim1Name = attRectilinearDim1Name->as_string(0);
+
+			// Push rectilinear attributes into array
+			fRectilinear = true;
+
+			vecDimSizes.resize(2);
+			vecDimSizes[0] = nDim0Size;
+			vecDimSizes[1] = nDim1Size;
+
+			vecDimNames.resize(2);
+			vecDimNames[0] = strDim0Name;
+			vecDimNames[1] = strDim1Name;
+		}
 	}
 
 	// Set number of degrees of freedom
 	sDOFCount = faces.size();
+
+	// Remove zero edges
+	RemoveZeroEdges();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

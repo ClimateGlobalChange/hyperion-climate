@@ -65,6 +65,48 @@ std::string TempestRegridObjectConstructor::Call(
 // TempestRegridObject
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string TempestRegridObject::Call(
+	const ObjectRegistry & objreg,
+	const std::string & strFunctionName,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	if (strFunctionName == "regrid") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"regrid\"");
+		}
+		return std::string("Not implemented");
+	}
+
+	// Output the map as a netcdf file
+	if (strFunctionName == "outputnetcdf") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"outputnetcdf\"");
+		}
+
+		m_mapRemap.Write(vecCommandLine[0]);
+
+		return std::string("");
+
+	} else if (strFunctionName == "regrid") {
+	}
+
+	return
+		Object::Call(
+			objreg,
+			strFunctionName,
+			vecCommandLine,
+			vecCommandLineType,
+			ppReturn);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string TempestRegridObject::Initialize(
 	const ObjectRegistry & objreg,
 	const std::vector<std::string> & vecFuncArguments,
@@ -122,28 +164,127 @@ std::string TempestRegridObject::Initialize(
 
 	// Generate EdgeMap on source mesh if not available
 	Mesh & meshSource = pobjSourceGrid->GetMesh();
+	meshSource.ConstructReverseNodeArray();
 	meshSource.ConstructEdgeMap();
-	if (meshSource.vecFaceArea.GetRows() != meshSource.dLat.GetRows()) {
-		meshSource.CalculateFaceAreas(fSourceConcave);
+	double dSourceArea = meshSource.CalculateFaceAreas(fSourceConcave);
+
+	if ((meshSource.vecDimSizes.size() == 0) ||
+	    (meshSource.vecDimNames.size() == 0)
+	) {
+		_EXCEPTIONT("Source mesh missing vecDimSizes and vecDimNames");
+	}
+
+	m_mapRemap.InitializeSourceDimensions(
+		meshSource.vecDimSizes,
+		meshSource.vecDimNames);
+
+	DataArray3D<int> dataSourceGLLNodes;
+	DataArray3D<double> dataSourceGLLJacobian;
+
+	if (meshSource.eDataLayout == Mesh::DataLayout_Volumetric) {
+		m_mapRemap.SetSourceAreas(meshSource.vecFaceArea);
+		m_mapRemap.InitializeSourceCoordinatesFromMeshFV(meshSource);
+
+	} else {
+		double dSourceNumericalArea =
+			GenerateMetaData(
+				meshSource,
+				meshSource.nP,
+				fBubble,
+				dataSourceGLLNodes,
+				dataSourceGLLJacobian);
+
+		m_mapRemap.InitializeSourceCoordinatesFromMeshFE(
+			meshSource, meshSource.nP, dataSourceGLLNodes);
+
+		if (meshSource.eDataLayout == Mesh::DataLayout_SpectralElementGLL) {
+			GenerateUniqueJacobian(
+				dataSourceGLLNodes,
+				dataSourceGLLJacobian,
+				m_mapRemap.GetSourceAreas());
+
+		} else {
+			GenerateDiscontinuousJacobian(
+				dataSourceGLLJacobian,
+				m_mapRemap.GetSourceAreas());
+		}
+
 	}
 
 	// Generate EdgeMap on target mesh if not available
 	Mesh & meshTarget = pobjTargetGrid->GetMesh();
+	meshTarget.ConstructReverseNodeArray();
 	meshTarget.ConstructEdgeMap();
-	if (meshTarget.vecFaceArea.GetRows() != meshTarget.dLat.GetRows()) {
-		meshTarget.CalculateFaceAreas(fTargetConcave);
+	double dTargetArea = meshTarget.CalculateFaceAreas(fTargetConcave);
+
+	if ((meshTarget.vecDimSizes.size() == 0) ||
+	    (meshTarget.vecDimNames.size() == 0)
+	) {
+		_EXCEPTIONT("Target mesh missing vecDimSizes and vecDimNames");
 	}
+
+	m_mapRemap.InitializeTargetDimensions(
+		meshTarget.vecDimSizes,
+		meshTarget.vecDimNames);
+
+	DataArray3D<int> dataTargetGLLNodes;
+	DataArray3D<double> dataTargetGLLJacobian;
+
+ 	if (meshTarget.eDataLayout == Mesh::DataLayout_Volumetric) {
+		m_mapRemap.SetTargetAreas(meshTarget.vecFaceArea);
+		m_mapRemap.InitializeTargetCoordinatesFromMeshFV(meshTarget);
+	} else {
+		double dTargetNumericalArea =
+			GenerateMetaData(
+				meshTarget,
+				meshTarget.nP,
+				fBubble,
+				dataTargetGLLNodes,
+				dataTargetGLLJacobian);
+
+		m_mapRemap.InitializeTargetCoordinatesFromMeshFE(
+			meshTarget, meshTarget.nP, dataTargetGLLNodes);
+
+		if (meshTarget.eDataLayout == Mesh::DataLayout_SpectralElementGLL) {
+			GenerateUniqueJacobian(
+				dataTargetGLLNodes,
+				dataTargetGLLJacobian,
+				m_mapRemap.GetTargetAreas());
+
+		} else {
+			GenerateDiscontinuousJacobian(
+				dataTargetGLLJacobian,
+				m_mapRemap.GetTargetAreas());
+		}
+	}
+
+	// Output mesh areas
+	Announce("Source mesh area: %1.15e", dSourceArea);
+	Announce("Target mesh area: %1.15e", dTargetArea);
 
 	// Generate the overlap mesh
 	Mesh * pMeshOverlap = new Mesh();
 
+	// This can be parallelized over the faces of meshSource
 	AnnounceStartBlock("Generate overlap mesh");
-	GenerateOverlapMesh_v2(
-		pobjSourceGrid->GetMesh(),
-		pobjTargetGrid->GetMesh(),
-		*pMeshOverlap,
-		HRegrid::OverlapMeshMethod_Fuzzy);
+	if (dSourceArea < dTargetArea) {
+		GenerateOverlapMesh_v2(
+			meshSource,
+			meshTarget,
+			*pMeshOverlap,
+			HRegrid::OverlapMeshMethod_Fuzzy);
+	} else {
+		GenerateOverlapMesh_v2(
+			meshTarget,
+			meshSource,
+			*pMeshOverlap,
+			HRegrid::OverlapMeshMethod_Fuzzy);
+	}
 	AnnounceEndBlock("Done");
+
+	// Switch overlap mesh correspondence
+
+	//pMeshOverlap->Write("ov_test.g");
 
 	// Generate offline map
 	AnnounceStartBlock("Generate offline map");
@@ -155,23 +296,13 @@ std::string TempestRegridObject::Initialize(
 			(meshSource.eDataLayout == Mesh::DataLayout_SpectralElementGLL);
 
 		if (meshTarget.eDataLayout == Mesh::DataLayout_Volumetric) {
-			DataArray3D<int> dataGLLNodes;
-			DataArray3D<double> dataGLLJacobian;
-
-			double dNumericalArea =
-				GenerateMetaData(
-					meshSource,
-					meshSource.nP,
-					fBubble,
-					dataGLLNodes,
-					dataGLLJacobian);
 
 			LinearRemapSE4(
 				meshSource,
 				meshTarget,
 				*pMeshOverlap,
-				dataGLLNodes,
-				dataGLLJacobian,
+				dataSourceGLLNodes,
+				dataSourceGLLJacobian,
 				nMonotoneType,
 				fContinuousIn,
 				fNoConservation,
