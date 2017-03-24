@@ -189,10 +189,16 @@ public:
 					if (pobjNewFileList->m_vecFilenames[f][iExt] == '.') {
 						break;
 					}
+				}
+				if (iExt == (-1)) {
 					pobjNewFileList->m_vecFilenames[f] =
-						pobjNewFileList->m_vecFilenames[f].substr(0,iExt)
+						m_vecFilenames[f]
+						+ vecCommandLine[0];
+				} else {
+					pobjNewFileList->m_vecFilenames[f] =
+						m_vecFilenames[f].substr(0,iExt)
 						+ vecCommandLine[0]
-						+ pobjNewFileList->m_vecFilenames[f].substr(iExt);
+						+ m_vecFilenames[f].substr(iExt);
 				}
 			}
 
@@ -214,6 +220,23 @@ public:
 	}
 
 public:
+	///	<summary>
+	///		Get the count of filenames.
+	///	</summary>
+	size_t GetFilenameCount() const {
+		return m_vecFilenames.size();
+	}
+
+	///	<summary>
+	///		Get the vector of filenames.
+	///	</summary>
+	const std::string & GetFilename(size_t f) const {
+		if (f >= m_vecFilenames.size()) {
+			_EXCEPTIONT("Index out of range");
+		}
+		return m_vecFilenames[f];
+	}
+
 	///	<summary>
 	///		Get the VariableInfo associated with a given variable name.
 	///	</summary>

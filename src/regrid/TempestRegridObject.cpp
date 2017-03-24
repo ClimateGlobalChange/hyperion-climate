@@ -16,6 +16,7 @@
 
 #include "TempestRegridObject.h"
 #include "GridObject.h"
+#include "FileListObject.h"
 #include "FiniteElementTools.h"
 #include "DataArray3D.h"
 
@@ -72,15 +73,6 @@ std::string TempestRegridObject::Call(
 	const std::vector<ObjectType> & vecCommandLineType,
 	Object ** ppReturn
 ) {
-	if (strFunctionName == "regrid") {
-		if ((vecCommandLineType.size() != 1) ||
-		    (vecCommandLineType[0] != ObjectType_String)
-		) {
-			return std::string("ERROR: Invalid parameters to function \"regrid\"");
-		}
-		return std::string("Not implemented");
-	}
-
 	// Output the map as a netcdf file
 	if (strFunctionName == "outputnetcdf") {
 		if ((vecCommandLineType.size() != 1) ||
@@ -93,7 +85,86 @@ std::string TempestRegridObject::Call(
 
 		return std::string("");
 
-	} else if (strFunctionName == "regrid") {
+	}
+
+	// Regrid data
+	if (strFunctionName == "regrid") {
+		if (vecCommandLineType.size() != 3) {
+			return std::string("ERROR: Invalid parameters to function \"regrid\"");
+		}
+
+		// Source files
+		FileListObject * pobjSourceFileListObject =
+			dynamic_cast<FileListObject *>(
+				objreg.GetObject(vecCommandLine[0]));
+		if (pobjSourceFileListObject == NULL) {
+			return std::string("ERROR: First argument of regrid() must be"
+				" of type file_list");
+		}
+
+		// Target files
+		FileListObject * pobjTargetFileListObject =
+			dynamic_cast<FileListObject *>(
+				objreg.GetObject(vecCommandLine[1]));
+		if (pobjTargetFileListObject == NULL) {
+			return std::string("ERROR: Second argument of regrid() must be"
+				" of type file_list");
+		}
+
+		// Variables
+		std::vector<std::string> vecVariables;
+
+		ListObject * pobjVariableList =
+			dynamic_cast<ListObject *>(
+				objreg.GetObject(vecCommandLine[2]));
+
+		if (pobjVariableList == NULL) {
+			StringObject * pobjVariableString =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(vecCommandLine[2]));
+			if (pobjVariableString == NULL) {
+				return std::string("ERROR: Third argument of regrid() must be"
+					" of type list or string");
+			}
+
+			vecVariables.push_back(pobjVariableString->Value());
+
+		} else {
+			for (size_t i = 0; i < pobjVariableList->Count(); i++) {
+				StringObject * pobjVariableString =
+					dynamic_cast<StringObject *>(
+						objreg.GetObject(pobjVariableList->ChildName(i)));
+
+				if (pobjVariableString == NULL) {
+					return std::string("ERROR: Third argument of regrid() must be"
+						" a list of string objects");
+				}
+
+				vecVariables.push_back(pobjVariableString->Value());
+			}
+		}
+
+		size_t sSourceFilenameCount =
+			pobjSourceFileListObject->GetFilenameCount();
+
+		size_t sTargetFilenameCount =
+			pobjTargetFileListObject->GetFilenameCount();
+
+		if (sSourceFilenameCount != sTargetFilenameCount) {
+			return std::string("ERROR: Number of files in regrid() "
+				"file_list arguments must match");
+		}
+
+		for (size_t f = 0; f < sSourceFilenameCount; f++) {
+			Announce("Input File:  %s", pobjSourceFileListObject->GetFilename(f).c_str());
+			Announce("Output File: %s", pobjTargetFileListObject->GetFilename(f).c_str());
+			m_mapRemap.Apply(
+				pobjSourceFileListObject->GetFilename(f),
+				pobjTargetFileListObject->GetFilename(f),
+				vecVariables,
+				std::string("ncol"));
+		}
+		return std::string("");
 	}
 
 	return
@@ -279,6 +350,9 @@ std::string TempestRegridObject::Initialize(
 			meshSource,
 			*pMeshOverlap,
 			HRegrid::OverlapMeshMethod_Fuzzy);
+
+		pMeshOverlap->ExchangeFirstAndSecondMesh();
+
 	}
 	AnnounceEndBlock("Done");
 

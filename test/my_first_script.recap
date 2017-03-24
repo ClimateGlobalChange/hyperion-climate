@@ -1,8 +1,7 @@
 # The list of data files and grid can be specified on the command line
 # i.e. recap my_first_script.recap "datafiles=/mydata/*.nc" "grid=/mydata/mygrid.g" "varlookup=/mydata/mylookup.txt"
 config = recap_configuration()
-#config.data = file_list("*.nc")
-config.data = file_list("nhemi_30_x4_fixedSST.cam.h4.1201-09-01-00000.nc")
+config.data = file_list("*.nc")
 config.grid = grid("nhemi_30_x4.g", "sem_np4")
 config.lookup = variable_lookup("nhemi_lookup.txt")
 

@@ -872,8 +872,21 @@ void LinearRemapSE4(
 						nodeQuadrature,
 						dAlpha,
 						dBeta);
-/*
+
 					// Check inverse map value
+					if (dAlpha < 0.0) {
+						dAlpha = 0.0;
+					}
+					if (dBeta < 0.0) {
+						dBeta = 0.0;
+					}
+					if (dAlpha > 1.0) {
+						dAlpha = 1.0;
+					}
+					if (dBeta > 1.0) {
+						dBeta = 1.0;
+					}
+/*
 					if ((dAlpha < -1.0e-13) || (dAlpha > 1.0 + 1.0e-13) ||
 						(dBeta  < -1.0e-13) || (dBeta  > 1.0 + 1.0e-13)
 					) {

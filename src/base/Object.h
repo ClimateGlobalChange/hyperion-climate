@@ -517,6 +517,20 @@ public:
 		m_vecObjectNames.push_back(strObject);
 	}
 
+	///	<summary>
+	///		Number of items in the ListObject.
+	///	</summary>
+	size_t Count() const {
+		return m_vecObjectNames.size();
+	}
+
+	///	<summary>
+	///		Get the name of the nth item in the ListObject.
+	///	</summary>
+	std::string ChildName(size_t n) const {
+		return Object::ChildName(std::string("_") + std::to_string(n));
+	}
+
 protected:
 	///	<summary>
 	///		Vector of Object names in this ListObject.
