@@ -22,6 +22,12 @@
 #include "GridElements.h"
 #include "OfflineMap.h"
 
+///////////////////////////////////////////////////////////////////////////////
+
+class RecapConfigObject;
+
+///////////////////////////////////////////////////////////////////////////////
+
 namespace HRegrid {
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -66,8 +72,15 @@ public:
 		const std::string & strName
 	) :
 		Object(strName),
+		m_pobjSourceConfig(NULL),
+		m_pobjTargetConfig(NULL),
 		m_pMeshOverlap(NULL)
 	{ }
+
+	///	<summary>
+	///		Virtual destructor.
+	///	</summary>
+	virtual ~TempestRegridObject();
 
 	///	<summary>
 	///		Self-duplicator.
@@ -103,6 +116,16 @@ public:
 	);
 
 protected:
+	///	<summary>
+	///		Pointer to source configuration.
+	///	</summary>
+	RecapConfigObject * m_pobjSourceConfig;
+
+	///	<summary>
+	///		Pointer to target configuration.
+	///	</summary>
+	RecapConfigObject * m_pobjTargetConfig;
+
 	///	<summary>
 	///		The overlap Mesh used for building the offline map.
 	///	</summary>

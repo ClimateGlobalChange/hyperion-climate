@@ -69,77 +69,15 @@ std::string VariableRegistry::FindOrRegister(
 
 	// Check if Variable is an operator combination
 	if (strVariableName[0] == '_') {
-		Variable varNew(this, strVariableName, true);
 
-		// Parse arguments
-		int iArgBegin = 0;
-		int iArgEnd = strVariableName.length()-1;
+		// Register the operator combination
+		Variable varNew(this, strVariableName, NULL);
 
-		for (; iArgBegin < strVariableName.length(); iArgBegin++) {
-			if (strVariableName[iArgBegin] == '(') {
-				break;
-			}
-		}
-		if (iArgBegin == strVariableName.length()) {
-			return
-				std::string("ERROR: Variable operator")
-				+ strVariableName + std::string(" missing open parenthesis");
-		}
+		std::string strError =
+			varNew.Initialize();
 
-		for (; iArgEnd >= 0; iArgEnd--) {
-			if (strVariableName[iArgEnd] == ')') {
-				break;
-			}
-		}
-		if (iArgEnd < 0) {
-			return
-				std::string("ERROR: Variable operator")
-				+ strVariableName + std::string(" missing close parenthesis");
-		}
-
-		// Operator name
-		varNew.m_strOpName = strVariableName.substr(0, iArgBegin);
-
-		// Parse argument list
-		int iPos = iArgBegin+1;
-		int iParenthesisNest = 0;
-		for (int i = iArgBegin+1; i <= iArgEnd; i++) {
-			if (strVariableName[i] == '(') {
-				iParenthesisNest++;
-			}
-			if (((strVariableName[i] == ',') && (iParenthesisNest == 0)) ||
-			    ((strVariableName[i] == ')') && (i == iArgEnd) && (iParenthesisNest == 0))
-			) {
-				// Add argument to Variable's argument list
-				std::string strArg = strVariableName.substr(iPos, i-iPos);
-				varNew.m_vecArg.push_back(strArg);
-
-				// Recursively register Variables
-				Variable * ppVariableArgument = NULL;
-				std::string strError =
-					pobjConfig->GetVariable(
-						strArg,
-						&ppVariableArgument);
-
-				if (strError != "") {
-					return strError;
-				}
-				iPos = i+1;
-
-				if (i == iArgEnd) {
-					break;
-				}
-			}
-
-			if (strVariableName[i] == ')') {
-				if (iParenthesisNest > 0) {
-					iParenthesisNest--;
-				} else {
-					return
-						std::string("ERROR: Variable operator")
-						+ strVariableName + std::string(" has unbalanced parentheses");
-				}
-			}
+		if (strError != "") {
+			return strError;
 		}
 
 		iterVar =
@@ -148,6 +86,15 @@ std::string VariableRegistry::FindOrRegister(
 					strVariableName, varNew)).first;
 
 		(*ppVariable) = &(iterVar->second);
+
+		// Recursively register arguments to operator combination
+		for (int a = 0; a < varNew.m_vecArg.size(); a++) {
+			Variable * ppVariableArgument = NULL;
+			std::string strError =
+				pobjConfig->GetVariable(
+					varNew.m_vecArg[a],
+					&ppVariableArgument);
+		}
 
 		return std::string("");
 	}
@@ -214,10 +161,17 @@ Variable::Variable(
 	m_strName(strName),
 	m_pvarinfo(pvarinfo),
 	m_fOp(false),
+	m_fReductionOp(false),
 	m_strUnits(),
 	m_nSpecifiedDim(0),
 	m_sTime(InvalidTimeIndex)
 {
+	if (strName.length() == 0) {
+		_EXCEPTIONT("Variable name must be given");
+	}
+	if (pvarreg == NULL) {
+		_EXCEPTIONT("pvarreg must be specified in Variable() constuctor");
+	}
 	if (pvarinfo != NULL) {
 		m_strUnits = pvarinfo->m_strUnits;
 	}
@@ -226,16 +180,99 @@ Variable::Variable(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string Variable::Initialize() {
+
+	// Operator
+	if (m_strName[0] == '_') {
+
+		// Set operator flag
+		m_fOp = true;
+
+		// Parse arguments
+		int iArgBegin = 0;
+		int iArgEnd = m_strName.length()-1;
+
+		for (; iArgBegin < m_strName.length(); iArgBegin++) {
+			if (m_strName[iArgBegin] == '(') {
+				break;
+			}
+		}
+		if (iArgBegin == m_strName.length()) {
+			return
+				std::string("ERROR: Variable operator")
+				+ m_strName + std::string(" missing open parenthesis");
+		}
+	
+		for (; iArgEnd >= 0; iArgEnd--) {
+			if (m_strName[iArgEnd] == ')') {
+				break;
+			}
+		}
+		if (iArgEnd < 0) {
+			return
+				std::string("ERROR: Variable operator")
+				+ m_strName + std::string(" missing close parenthesis");
+		}
+	
+		// Operator name
+		m_strOpName = m_strName.substr(0, iArgBegin);
+	
+		// Parse argument list
+		int iPos = iArgBegin+1;
+		int iParenthesisNest = 0;
+		for (int i = iArgBegin+1; i <= iArgEnd; i++) {
+			if (m_strName[i] == '(') {
+				iParenthesisNest++;
+			}
+			if (((m_strName[i] == ',') && (iParenthesisNest == 0)) ||
+			    ((m_strName[i] == ')') && (i == iArgEnd) && (iParenthesisNest == 0))
+			) {
+				// Add argument to Variable's argument list
+				std::string strArg = m_strName.substr(iPos, i-iPos);
+				m_vecArg.push_back(strArg);
+	
+				iPos = i+1;
+	
+				if (i == iArgEnd) {
+					break;
+				}
+			}
+	
+			if (m_strName[i] == ')') {
+				if (iParenthesisNest > 0) {
+					iParenthesisNest--;
+				} else {
+					return
+						std::string("ERROR: Variable operator")
+						+ m_strName + std::string(" has unbalanced parentheses");
+				}
+			}
+		}
+
+		// Check operator properties
+		if (m_strOpName == "_CLIMMEAN") {
+			m_fReductionOp = true;
+		}
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 bool Variable::operator==(
 	const Variable & var
 ) {
-	if (m_fOp != var.m_fOp) {
-		return false;
-	}
 	if (m_strName != var.m_strName) {
 		return false;
 	}
 	if (m_strUnits != var.m_strUnits) {
+		return false;
+	}
+	if (m_fOp != var.m_fOp) {
+		return false;
+	}
+	if (m_fReductionOp != var.m_fReductionOp) {
 		return false;
 	}
 	if (m_nSpecifiedDim != var.m_nSpecifiedDim) {
@@ -247,120 +284,6 @@ bool Variable::operator==(
 		}
 	}
 	return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-int Variable::ParseFromString(
-	const std::string & strIn
-) {
-	_EXCEPTIONT("Deprecated -- don't call this routine");
-/*
-	// Verify initialization
-	if (m_pvarreg == NULL) {
-		_EXCEPTIONT("Invalid VariableRegistry");
-	}
-
-	m_fOp = false;
-	m_strName = "";
-	m_nSpecifiedDim = 0;
-	m_varArg.clear();
-
-	bool fDimMode = false;
-	std::string strDim;
-
-	if (strIn.length() >= 1) {
-		if (strIn[0] == '_') {
-			m_fOp = true;
-		}
-	}
-
-	for (int n = 0; n <= strIn.length(); n++) {
-		// Reading the variable name
-		if (!fDimMode) {
-			if (n == strIn.length()) {
-				m_strName = strIn;
-				return n;
-			}
-			if (strIn[n] == ',') {
-				m_strName = strIn.substr(0, n);
-				return n;
-			}
-			if (strIn[n] == '(') {
-				m_strName = strIn.substr(0, n);
-				fDimMode = true;
-				continue;
-			}
-			if (strIn[n] == ')') {
-				m_strName = strIn.substr(0, n);
-				return n;
-			}
-
-		// Reading in dimensions
-		} else if (!m_fOp) {
-			if (m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
-			}
-			if (n == strIn.length()) {
-				_EXCEPTION1("Variable dimension list must be terminated"
-					" with ): %s", strIn.c_str());
-			}
-			if (strIn[n] == ',') {
-				if (strDim.length() == 0) {
-					_EXCEPTIONT("Invalid dimension index in variable");
-				}
-				m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
-				m_nSpecifiedDim++;
-				strDim = "";
-
-			} else if (strIn[n] == ')') {
-				if (strDim.length() == 0) {
-					_EXCEPTIONT("Invalid dimension index in variable");
-				}
-				m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
-				m_nSpecifiedDim++;
-				return (n+1);
-
-			} else {
-				strDim += strIn[n];
-			}
-
-		// Reading in arguments
-		} else {
-			if (m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
-			}
-			if (n == strIn.length()) {
-				_EXCEPTION1("Op argument list must be terminated"
-					" with ): %s", strIn.c_str());
-			}
-
-			// No arguments
-			if (strIn[n] == ')') {
-				return (n+1);
-			}
-
-			// Parse arguments
-			m_varArg.resize(m_nSpecifiedDim+1);
-
-			Variable var(m_pvarreg);
-			n += var.ParseFromString(strIn.substr(n));
-
-			m_pvarreg->FindOrRegister(var.m_strName);
-			m_vecArg.push_back(var.m_strName);
-
-			m_nSpecifiedDim++;
-
-			if (strIn[n] == ')') {
-				return (n+1);
-			}
-		}
-	}
-
-	_EXCEPTION1("Malformed variable string \"%s\"", strIn.c_str());
-*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -457,8 +380,46 @@ void Variable::LoadGridData(
 		return;
 	}
 
+	// Evaluate the climate mean operator
+	if (m_strOpName == "_CLIMMEAN") {
+
+		// Climate mean data has already been calculated
+		if (m_sTime == SingleTimeIndex) {
+			return;
+		}
+
+		if (m_vecArg.size() != 1) {
+			_EXCEPTION1("_CLIMMEAN expects one argument: %i given",
+				m_vecArg.size());
+		}
+
+		Variable * pvar = NULL;
+		std::string strError =
+			pobjConfig->GetVariable(m_vecArg[0], &pvar);
+		if (strError != "") {
+			_EXCEPTION1("%s", strError.c_str());
+		}
+
+		// Calculate climate mean
+		size_t sTimeCount = pobjFileList->GetTimeCount();
+		for (size_t t = 0; t < sTimeCount; t++) {
+			pvar->LoadGridData(pobjConfig, t);
+
+			const DataArray1D<float> & dataVar = pvar->m_data;
+
+			for (int i = 0; i < m_data.GetRows(); i++) {
+				m_data[i] += dataVar[i];
+			}
+		}
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] /= static_cast<double>(sTimeCount);
+		}
+
+		// Set this data as loaded
+		m_sTime = SingleTimeIndex;
+
 	// Evaluate the vector magnitude operator
-	if (m_strOpName == "_VECMAG") {
+	} else if (m_strOpName == "_VECMAG") {
 		if (m_vecArg.size() != 2) {
 			_EXCEPTION1("_VECMAG expects two arguments: %i given",
 				m_vecArg.size());
@@ -469,13 +430,13 @@ void Variable::LoadGridData(
 		std::string strErrorLeft =
 			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
 		if (strErrorLeft != "") {
-			_EXCEPTION();
+			_EXCEPTION1("%s", strErrorLeft.c_str());
 		}
 
 		std::string strErrorRight =
 			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
 		if (strErrorRight != "") {
-			_EXCEPTION();
+			_EXCEPTION1("%s", strErrorRight.c_str());
 		}
 
 		pvarLeft->LoadGridData(pobjConfig, sTime);
@@ -660,6 +621,49 @@ void Variable::LoadGridData(
 
 	} else {
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Variable::AllocateGridData(
+	RecapConfigObject * pobjConfig,
+	size_t sTime
+) {
+	// Verify initialization
+	if (m_pvarreg == NULL) {
+		_EXCEPTIONT("Invalid VariableRegistry");
+	}
+
+	// Verify argument
+	if (pobjConfig == NULL) {
+		_EXCEPTIONT("Invalid pobjConfig argument");
+	}
+
+	// Get Mesh
+	GridObject * pobjGrid = pobjConfig->GetGrid();
+	if (pobjGrid == NULL) {
+		_EXCEPTIONT("Invalid configuration: Missing grid");
+	}
+
+	const Mesh & mesh = pobjGrid->GetMesh();
+
+	// Allocate data
+	m_data.Allocate(mesh.sDOFCount);
+
+	// Set time flag to invalid
+	m_sTime = sTime;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Variable::WriteGridData(
+	RecapConfigObject * pobjConfig,
+	size_t sTime
+) {
+	// Verify initialization
+	if (m_pvarreg == NULL) {
+		_EXCEPTIONT("Invalid VariableRegistry");
 	}
 }
 

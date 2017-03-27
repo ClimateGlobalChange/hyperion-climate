@@ -1,4 +1,3 @@
-# The list of data files and grid can be specified on the command line
 config = recap_configuration()
 config.data = file_list("nhemi_*00000.nc")
 config.grid = grid("nhemi_30_x4.g", "sem_np4")

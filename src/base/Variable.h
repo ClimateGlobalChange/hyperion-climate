@@ -112,25 +112,6 @@ public:
 
 public:
 	///	<summary>
-	///		Default constructor.
-	///	</summary>
-	Variable(
-		VariableRegistry * pvarreg,
-		const std::string & strName,
-		bool fOp
-	) :
-		m_pvarreg(pvarreg),
-		m_strName(strName),
-		m_pvarinfo(NULL),
-		m_fOp(fOp),
-		m_strUnits(),
-		m_nSpecifiedDim(0),
-		m_sTime(InvalidTimeIndex)
-	{
-		memset(m_iDim, 0, MaxArguments * sizeof(int));
-	}
-
-	///	<summary>
 	///		Primitive Variable constructor.
 	///	</summary>
 	Variable(
@@ -138,6 +119,13 @@ public:
 		const std::string & strName,
 		const VariableInfo * pvarinfo
 	);
+
+
+private:
+	///	<summary>
+	///		Initialize the Variable.
+	///	</summary>
+	std::string Initialize();
 
 public:
 	///	<summary>
@@ -154,22 +142,30 @@ public:
 
 public:
 	///	<summary>
-	///		Parse the variable information from a string.  Return the index
-	///		of the first character after the variable information.
-	///	</summary>
-	int ParseFromString(
-		const std::string & strIn
-	);
-
-	///	<summary>
 	///		Get a string representation of this variable.
 	///	</summary>
 	std::string ToString() const;
 
 	///	<summary>
-	///		Load a data block from the NcFileVector.
+	///		Load a data block from disk.
 	///	</summary>
 	void LoadGridData(
+		RecapConfigObject * pobjConfig,
+		size_t sTime
+	);
+
+	///	<summary>
+	///		Allocate an empty data block for the specified variable.
+	///	</summary>
+	void AllocateGridData(
+		RecapConfigObject * pobjConfig,
+		size_t sTime
+	);
+
+	///	<summary>
+	///		Write a data block to disk.
+	///	</summary>
+	void WriteGridData(
 		RecapConfigObject * pobjConfig,
 		size_t sTime
 	);
@@ -195,9 +191,30 @@ public:
 	}
 
 	///	<summary>
+	///		Check if this is an operator.
+	///	</summary>
+	bool IsOp() const {
+		return m_fOp;
+	}
+
+	///	<summary>
+	///		Check if this is a reduction operator.
+	///	</summary>
+	bool IsReductionOp() const {
+		return m_fReductionOp;
+	}
+
+	///	<summary>
 	///		Get the data associated with this variable.
 	///	</summary>
 	const DataArray1D<float> & GetData() const {
+		return m_data;
+	}
+
+	///	<summary>
+	///		Get the data associated with this variable.
+	///	</summary>
+	DataArray1D<float> & GetData() {
 		return m_data;
 	}
 
@@ -227,6 +244,11 @@ protected:
 	///		Flag indicating this is an operator.
 	///	</summary>
 	bool m_fOp;
+
+	///	<summary>
+	///		Flag indicating this is a reduction operator.
+	///	</summary>
+	bool m_fReductionOp;
 
 	///	<summary>
 	///		Number of dimensions specified.

@@ -161,6 +161,24 @@ public:
 		}
 	}
 
+	///	<summary>
+	///		Apply the sparse matrix to a DataArray1D of given type.
+	///	</summary>
+	template <typename TargetType>
+	void ApplyTyped(
+		const DataArray1D<TargetType> & dataVectorIn,
+		DataArray1D<TargetType> & dataVectorOut
+	) const {
+		dataVectorOut.Zero();
+
+		SparseMapConstIterator iter = m_mapEntries.begin();
+		for (; iter != m_mapEntries.end(); iter++) {
+			dataVectorOut[iter->first.first] +=
+				static_cast<TargetType>(iter->second)
+				* dataVectorIn[iter->first.second];
+		}
+	}
+
 protected:
 	///	<summary>
 	///		Number of rows in the sparse matrix.

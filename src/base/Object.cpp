@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "Object.h"
+#include "Announce.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -96,7 +97,7 @@ bool ObjectRegistry::Create(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ObjectRegistry::Remove(
+std::string ObjectRegistry::Remove(
 	const std::string & strName
 ) {
 	// Check if this Object already exists
@@ -105,16 +106,28 @@ void ObjectRegistry::Remove(
 		_EXCEPTION1("Object \"%s\" not found in registry", strName.c_str());
 	}
 
-	printf("REMOVE %s\n", strName.c_str());
+	if (iter->second->m_nLocks != 0) {
+		return std::string("ERROR: Cannot delete locked object \"")
+			+ strName + std::string("\"");
+	}
+
+	Announce("REMOVE %s\n", strName.c_str());
 
 	// Remove all children of this Object
 	for (size_t i = 0; i < iter->second->m_vecChildren.size(); i++) {
-		Remove(iter->second->m_vecChildren[i]->m_strName);
+		std::string strError =
+			Remove(iter->second->m_vecChildren[i]->m_strName);
+
+		if (strError != "") {
+			return strError;
+		}
 	}
 
 	// Remove this Object
 	delete (iter->second);
 	m_mapObjects.erase(iter);
+
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -128,7 +141,11 @@ bool ObjectRegistry::Assign(
 	// Check if this Object already exists
 	ObjectMap::const_iterator iter = m_mapObjects.find(strName);
 	if (iter != m_mapObjects.end()) {
-		Remove(strName);
+		std::string strError = Remove(strName);
+		if (strError != "") {
+			Announce(strError.c_str());
+			return false;
+		}
 	}
 
 	// Assign the Object its name

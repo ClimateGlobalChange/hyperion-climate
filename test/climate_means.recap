@@ -1,0 +1,34 @@
+# Input data
+config = recap_configuration()
+config.data = file_list("nhemi_*00000.nc")
+config.grid = grid("nhemi_30_x4.g", "sem_np4")
+config.lookup = variable_lookup("nhemi_lookup.txt")
+
+# Generate a new RLL grid
+rllparam = parameter_list()
+rllparam.gridtype = "rll"
+rllparam.minlon = "95.0deg"
+rllparam.maxlon = "355.0deg"
+rllparam.minlat = "0.0deg"
+rllparam.maxlat = "60.0deg"
+#rllparam.nlon = 1040
+#rllparam.nlat = 240
+rllparam.nlon = 104
+rllparam.nlat = 24
+
+# Output data
+config_out = recap_configuration()
+config_out.data = file_list()
+config_out.grid = grid(rllparam)
+config_out.lookup = variable_lookup("nhemi_lookup.txt")
+config_out.set_reduce_target("nhemi_climate_means.nc")
+
+# Create a new regridder
+remapparam = parameter_list()
+my_regrid = tempestregrid(config, config_out, remapparam)
+my_regrid.outputnetcdf("map_nhemi_rll.nc")
+
+# Regrid
+variables = ["_CLIMMEAN(PSL)", "_CLIMMEAN(U850)", "_CLIMMEAN(V850)", "_CLIMMEAN(T400)"]
+my_regrid.regrid(variables)
+

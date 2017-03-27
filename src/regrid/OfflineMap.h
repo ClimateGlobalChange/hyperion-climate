@@ -169,6 +169,14 @@ public:
 
 public:
 	///	<summary>
+	///		Apply the offline map to the given floating point data.
+	///	</summary>
+	void ApplyFloat(
+		const DataArray1D<float> & dataSource,
+		DataArray1D<float> & dataTarget
+	);
+
+	///	<summary>
 	///		Apply the offline map to a data file.
 	///	</summary>
 	void Apply(

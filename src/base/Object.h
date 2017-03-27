@@ -71,7 +71,7 @@ public:
 	///	<summary>
 	///		Remove the Object with the specified name.
 	///	</summary>
-	void Remove(
+	std::string Remove(
 		const std::string & strName
 	);
 
@@ -135,7 +135,8 @@ public:
 	///		Constructor.
 	///	</summary>
 	Object(const std::string & strName) :
-		m_strName(strName)
+		m_strName(strName),
+		m_nLocks(0)
 	{ }
 
 	///	<summary>
@@ -232,6 +233,24 @@ protected:
 		ObjectRegistry & objreg
 	) const;
 
+public:
+	///	<summary>
+	///		Add a lock to this Object.
+	///	</summary>
+	void AddLock() {
+		m_nLocks++;
+	}
+
+	///	<summary>
+	///		Release a lock from this Object.
+	///	</summary>
+	void ReleaseLock() {
+		if (m_nLocks == 0) {
+			_EXCEPTIONT("No locks on object");
+		}
+		m_nLocks--;
+	}
+	
 protected:
 	///	<summary>
 	///		Name of the Object.
@@ -242,6 +261,12 @@ protected:
 	///		List of child Objects.
 	///	</summary>
 	ObjectChildrenVector m_vecChildren;
+
+	///	<summary>
+	///		Number of locks placed on this Object.  An object with a 
+	///		non-zero lock count cannot be deleted.
+	///	</summary>
+	int m_nLocks;
 };
 
 ///	<summary>

@@ -16,6 +16,8 @@
 
 #include "FileListObject.h"
 #include "STLStringHelper.h"
+#include "GridElements.h"
+#include "GridObject.h"
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 #include "netcdfcpp.h"
@@ -43,23 +45,21 @@ std::string FileListObjectConstructor::Call(
 		_EXCEPTIONT("Unable to initialize FileListObject");
 	}
 
-	// Set the return value
-	if (vecCommandLine.size() < 1) {
-		return std::string("ERROR: First argument [filename] missing from "
-			"file_list() call");
-	}
+	// Constructor accepts 0 or 1 arguments
 	if (vecCommandLine.size() > 1) {
 		return std::string("ERROR: Invalid arguments to file_list()");
 	}
-	if (vecCommandLineType[0] != ObjectType_String) {
-		return std::string("ERROR: Invalid first argument [filename] "
-			"in file_list() call");
-	}
+	if (vecCommandLine.size() == 1) {
+		if (vecCommandLineType[0] != ObjectType_String) {
+			return std::string("ERROR: Invalid first argument [filename] "
+				"in file_list() call");
+		}
 
-	// Initialize the grid with given parameters
-	std::string strError =
-		pobjFileList->PopulateFromSearchString(
-			vecCommandLine[0]);
+		// Initialize the FileList with the given search string
+		std::string strError =
+			pobjFileList->PopulateFromSearchString(
+				vecCommandLine[0]);
+	}
 
 	// Set the return value
 	if (ppReturn != NULL) {
@@ -68,14 +68,89 @@ std::string FileListObjectConstructor::Call(
 		delete pobjFileList;
 	}
 
-	return strError;
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // FileListObject
 ///////////////////////////////////////////////////////////////////////////////
 
+const size_t FileListObject::InvalidFileIx = (-1);
+
+///////////////////////////////////////////////////////////////////////////////
+
 const size_t FileListObject::InvalidTimeIx = (-1);
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::Call(
+	const ObjectRegistry & objreg,
+	const std::string & strFunctionName,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	// Output information about the FileList to a CSV file
+	if (strFunctionName == "output_csv") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"output_csv\"");
+		}
+		return OutputTimeVariableIndexCSV(vecCommandLine[0]);
+	}
+
+	// Create a copy of the FileList with modified filenames
+	if (strFunctionName == "append") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"append\"");
+		}
+
+		FileListObject * pobjNewFileList = new FileListObject("");
+		if (pobjNewFileList == NULL) {
+			return std::string("ERROR: Unable to allocate new FileListObject");
+		}
+
+		pobjNewFileList->m_vecFilenames = m_vecFilenames;
+
+		for (size_t f = 0; f < pobjNewFileList->m_vecFilenames.size(); f++) {
+			int nLength = pobjNewFileList->m_vecFilenames[f].length();
+			int iExt = nLength-1;
+			for (; iExt >= 0; iExt--) {
+				if (pobjNewFileList->m_vecFilenames[f][iExt] == '.') {
+					break;
+				}
+			}
+			if (iExt == (-1)) {
+				pobjNewFileList->m_vecFilenames[f] =
+					m_vecFilenames[f]
+					+ vecCommandLine[0];
+			} else {
+				pobjNewFileList->m_vecFilenames[f] =
+					m_vecFilenames[f].substr(0,iExt)
+					+ vecCommandLine[0]
+					+ m_vecFilenames[f].substr(iExt);
+			}
+		}
+
+		if (ppReturn != NULL) {
+			(*ppReturn) = pobjNewFileList;
+		} else {
+			delete pobjNewFileList;
+		}
+		return std::string("");
+	}
+
+	return
+		Object::Call(
+			objreg,
+			strFunctionName,
+			vecCommandLine,
+			vecCommandLineType,
+			ppReturn);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -114,30 +189,87 @@ std::string FileListObject::PopulateFromSearchString(
 				strFileSearchString.c_str(),
 				strFilename.c_str())
 		) {
-			//std::string strChild = m_strName + "._" + std::to_string(iFile);
-			std::string strFullFilename = strDir + strFilename;
-			//printf("%s %s\n", strChild.c_str(), strFilename.c_str());
-
 			// File found, insert into list of filenames
+			std::string strFullFilename = strDir + strFilename;
 			m_vecFilenames.push_back(strFullFilename);
-			//bool fSuccess =
-			//	objreg.Assign(
-			//		strChild,
-			//		new StringObject(
-			//			strChild,
-			//			strFullFilename));
-
-			//if (!fSuccess) {
-			//	_EXCEPTIONT("Failed to register Object");
-			//}
-
-			//iFile++;
-			//printf ("[%s]\n", pDirent->d_name);
 		}
 	}
 	closedir(pDir);
 
-	return IndexVariableData();;
+	return IndexVariableData();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::CreateFileNoTime(
+	const std::string & strFilename,
+	const GridObject * pobjGrid
+) {
+	if (pobjGrid == NULL) {
+		_EXCEPTION();
+	}
+
+	// Check if file already exists
+	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
+		if (m_vecFilenames[f] == strFilename) {
+			return std::string("ERROR: File \"") + strFilename
+				+ std::string("\" already exists in file_list");
+		}
+	}
+
+	// Add the file to the registry
+	size_t sNewFileIx = m_vecFilenames.size();
+	m_vecFilenames.push_back(strFilename);
+
+	NcFile ncFile(strFilename.c_str(), NcFile::Replace);
+	if (!ncFile.is_valid()) {
+		return std::string("ERROR: Unable to open \"")
+			+ strFilename + std::string("\" for writing");
+	}
+
+	// Add grid dimensions to file
+	const Mesh & mesh = pobjGrid->GetMesh();
+	for (int i = 0; i < mesh.vecDimNames.size(); i++) {
+		NcDim * dim =
+			ncFile.add_dim(
+				mesh.vecDimNames[i].c_str(),
+				mesh.vecDimSizes[i]);
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::SetReduceTarget(
+	const std::string & strTargetFilename
+) {
+
+	// Check if file exists exists
+	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
+		if (m_vecFilenames[f] == strTargetFilename) {
+			m_sReduceTargetIx = f;
+			return std::string("");
+		}
+	}
+
+	return std::string("ERROR: Reduce target not in file_list");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool FileListObject::IsCompatible(
+	const FileListObject * pobjFileList
+) {
+	if (m_vecTimes.size() != pobjFileList->m_vecTimes.size()) {
+		return false;
+	}
+	for (size_t t = 0; t < m_vecTimes.size(); t++) {
+		if (m_vecTimes[t] != pobjFileList->m_vecTimes[t]) {
+			return false;
+		}
+	}
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -236,6 +236,9 @@ void Mesh::InitializeAsRLL(
 	vecDimNames.resize(2);
 	vecDimNames[0] = "lat";
 	vecDimNames[1] = "lon";
+
+	// Total number of degrees of freedom
+	sDOFCount = nLatitudes * nLongitudes;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -25,6 +25,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class GridObject;
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A class that describes primitive variable information from a FileList.
 ///	</summary>
@@ -121,6 +125,11 @@ class FileListObject : public Object {
 
 public:
 	///	<summary>
+	///		Invalid File index.
+	///	</summary>
+	static const size_t InvalidFileIx;
+
+	///	<summary>
 	///		Invalid Time index.
 	///	</summary>
 	static const size_t InvalidTimeIx;
@@ -132,7 +141,8 @@ public:
 	FileListObject(
 		const std::string & strName
 	) :
-		Object(strName)
+		Object(strName),
+		m_sReduceTargetIx(InvalidFileIx)
 	{ }
 
 	///	<summary>
@@ -142,9 +152,17 @@ public:
 		const std::string & strDuplicateName,
 		ObjectRegistry & objreg
 	) const {
-		return _Duplicate(
-			new FileListObject(strDuplicateName),
-			objreg);
+		FileListObject * pobjDuplicate =
+			new FileListObject(strDuplicateName);
+		if (pobjDuplicate == NULL) {
+			_EXCEPTIONT("Out of memory");
+		}
+
+		pobjDuplicate->m_vecFilenames = m_vecFilenames;
+		pobjDuplicate->m_vecTimes = m_vecTimes;
+		pobjDuplicate->m_vecVariableInfo = m_vecVariableInfo;
+
+		return _Duplicate(pobjDuplicate, objreg);
 	}
 
 	///	<summary>
@@ -156,68 +174,7 @@ public:
 		const std::vector<std::string> & vecCommandLine,
 		const std::vector<ObjectType> & vecCommandLineType,
 		Object ** ppReturn
-	) {
-		// Output information about the FileList to a CSV file
-		if (strFunctionName == "output_csv") {
-			if ((vecCommandLineType.size() != 1) ||
-			    (vecCommandLineType[0] != ObjectType_String)
-			) {
-				return std::string("ERROR: Invalid parameters to function \"output_csv\"");
-			}
-			return OutputTimeVariableIndexCSV(vecCommandLine[0]);
-		}
-
-		// Create a copy of the FileList with modified filenames
-		if (strFunctionName == "append") {
-			if ((vecCommandLineType.size() != 1) ||
-			    (vecCommandLineType[0] != ObjectType_String)
-			) {
-				return std::string("ERROR: Invalid parameters to function \"append\"");
-			}
-
-			FileListObject * pobjNewFileList = new FileListObject("");
-			if (pobjNewFileList == NULL) {
-				return std::string("ERROR: Unable to allocate new FileListObject");
-			}
-
-			pobjNewFileList->m_vecFilenames = m_vecFilenames;
-
-			for (size_t f = 0; f < pobjNewFileList->m_vecFilenames.size(); f++) {
-				int nLength = pobjNewFileList->m_vecFilenames[f].length();
-				int iExt = nLength-1;
-				for (; iExt >= 0; iExt--) {
-					if (pobjNewFileList->m_vecFilenames[f][iExt] == '.') {
-						break;
-					}
-				}
-				if (iExt == (-1)) {
-					pobjNewFileList->m_vecFilenames[f] =
-						m_vecFilenames[f]
-						+ vecCommandLine[0];
-				} else {
-					pobjNewFileList->m_vecFilenames[f] =
-						m_vecFilenames[f].substr(0,iExt)
-						+ vecCommandLine[0]
-						+ m_vecFilenames[f].substr(iExt);
-				}
-			}
-
-			if (ppReturn != NULL) {
-				(*ppReturn) = pobjNewFileList;
-			} else {
-				delete pobjNewFileList;
-			}
-			return std::string("");
-		}
-
-		return
-			Object::Call(
-				objreg,
-				strFunctionName,
-				vecCommandLine,
-				vecCommandLineType,
-				ppReturn);
-	}
+	);
 
 public:
 	///	<summary>
@@ -258,6 +215,31 @@ public:
 		const std::string & strSearchString
 	);
 
+	///	<summary>
+	///		Add a single timeslice file with the given filename.
+	///	</summary>
+	std::string CreateFileNoTime(
+		const std::string & strFilename,
+		const GridObject * pobjGrid
+	);
+
+	///	<summary>
+	///		Set the reduce target by filename.
+	///	</summary>
+	std::string SetReduceTarget(
+		const std::string & strTargetFilename
+	);
+
+	///	<summary>
+	///		Check if the FileList has a reduce target.
+	///	</summary>
+	bool HasReduceTarget() const {
+		if (m_sReduceTargetIx != InvalidFileIx) {
+			return true;
+		}
+		return false;
+	}
+
 public:
 	///	<summary>
 	///		Get the number of time indices in the file list.
@@ -265,6 +247,14 @@ public:
 	size_t GetTimeCount() const {
 		return m_vecTimes.size();
 	}
+
+	///	<summary>
+	///		Check if another FileListObject has a compatible set of
+	///		Times indices.
+	///	</summary>
+	bool IsCompatible(
+		const FileListObject * pobjFileList
+	);
 
 	///	<summary>
 	///		Distribute available time indices across MPI ranks.
@@ -318,6 +308,10 @@ protected:
 	///	</summary>
 	std::vector<VariableInfo> m_vecVariableInfo;
 
+	///	<summary>
+	///		Filename index that is the target of reductions.
+	///	</summary>
+	size_t m_sReduceTargetIx;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

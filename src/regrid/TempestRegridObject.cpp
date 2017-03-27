@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "TempestRegridObject.h"
+#include "RecapConfigObject.h"
 #include "GridObject.h"
 #include "FileListObject.h"
 #include "FiniteElementTools.h"
@@ -66,6 +67,17 @@ std::string TempestRegridObjectConstructor::Call(
 // TempestRegridObject
 ///////////////////////////////////////////////////////////////////////////////
 
+TempestRegridObject::~TempestRegridObject() {
+	if (m_pobjSourceConfig != NULL) {
+		m_pobjSourceConfig->ReleaseLock();
+	}
+	if (m_pobjTargetConfig != NULL) {
+		m_pobjTargetConfig->ReleaseLock();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string TempestRegridObject::Call(
 	const ObjectRegistry & objreg,
 	const std::string & strFunctionName,
@@ -89,10 +101,10 @@ std::string TempestRegridObject::Call(
 
 	// Regrid data
 	if (strFunctionName == "regrid") {
-		if (vecCommandLineType.size() != 3) {
+		if (vecCommandLineType.size() != 1) {
 			return std::string("ERROR: Invalid parameters to function \"regrid\"");
 		}
-
+/*
 		// Source files
 		FileListObject * pobjSourceFileListObject =
 			dynamic_cast<FileListObject *>(
@@ -102,7 +114,7 @@ std::string TempestRegridObject::Call(
 				" of type file_list");
 		}
 
-		// Target files
+		// Target file(s)
 		FileListObject * pobjTargetFileListObject =
 			dynamic_cast<FileListObject *>(
 				objreg.GetObject(vecCommandLine[1]));
@@ -110,20 +122,20 @@ std::string TempestRegridObject::Call(
 			return std::string("ERROR: Second argument of regrid() must be"
 				" of type file_list");
 		}
-
+*/
 		// Variables
 		std::vector<std::string> vecVariables;
 
 		ListObject * pobjVariableList =
 			dynamic_cast<ListObject *>(
-				objreg.GetObject(vecCommandLine[2]));
+				objreg.GetObject(vecCommandLine[0]));
 
 		if (pobjVariableList == NULL) {
 			StringObject * pobjVariableString =
 				dynamic_cast<StringObject *>(
-					objreg.GetObject(vecCommandLine[2]));
+					objreg.GetObject(vecCommandLine[0]));
 			if (pobjVariableString == NULL) {
-				return std::string("ERROR: Third argument of regrid() must be"
+				return std::string("ERROR: First argument of regrid() must be"
 					" of type list or string");
 			}
 
@@ -136,7 +148,7 @@ std::string TempestRegridObject::Call(
 						objreg.GetObject(pobjVariableList->ChildName(i)));
 
 				if (pobjVariableString == NULL) {
-					return std::string("ERROR: Third argument of regrid() must be"
+					return std::string("ERROR: First argument of regrid() must be"
 						" a list of string objects");
 				}
 
@@ -144,26 +156,114 @@ std::string TempestRegridObject::Call(
 			}
 		}
 
-		size_t sSourceFilenameCount =
-			pobjSourceFileListObject->GetFilenameCount();
+		// Get FileListObjects
+		FileListObject * pobjSourceFileList =
+			m_pobjSourceConfig->GetFileList();
+		FileListObject * pobjTargetFileList =
+			m_pobjTargetConfig->GetFileList();
 
-		size_t sTargetFilenameCount =
-			pobjTargetFileListObject->GetFilenameCount();
+		// Check if a reduce target is available
+		bool fReduceTargetAvailable =
+			pobjTargetFileList->HasReduceTarget();
 
-		if (sSourceFilenameCount != sTargetFilenameCount) {
-			return std::string("ERROR: Number of files in regrid() "
-				"file_list arguments must match");
+		// Check if times are compatible across FileLists
+		bool fFileListCompatible =
+			pobjSourceFileList->IsCompatible(pobjTargetFileList);
+
+		// Check the size of all variables
+		for (int v = 0; v < vecVariables.size(); v++) {
+			Variable * pvarSource;
+			std::string strError =
+				m_pobjSourceConfig->GetVariable(
+					vecVariables[v],
+					&pvarSource);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			if ((pvarSource->IsReductionOp()) && (!fReduceTargetAvailable)) {
+				return std::string("ERROR: No reduction target available "
+					"for output of variable reduction \"")
+					+ pvarSource->Name() + std::string("\"");
+			}
+			if ((!pvarSource->IsReductionOp()) && (!fFileListCompatible)) {
+				return std::string("ERROR: Source and target configurations "
+					"are not compatible for regrid operation");
+			}
+
+			Variable * pvarTarget;
+			strError =
+				m_pobjTargetConfig->GetVariable(
+					vecVariables[v],
+					&pvarTarget);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			// Apply the regridding operation to a reduction
+			if (pvarSource->IsReductionOp()) {
+				pvarSource->LoadGridData(
+					m_pobjSourceConfig,
+					Variable::SingleTimeIndex);
+
+				pvarTarget->AllocateGridData(
+					m_pobjTargetConfig,
+					Variable::SingleTimeIndex);
+
+				const DataArray1D<float> & dataSource =
+					pvarSource->GetData();
+
+				DataArray1D<float> & dataTarget =
+					pvarTarget->GetData();
+
+				m_mapRemap.ApplyFloat(
+					dataSource,
+					dataTarget);
+
+				pvarTarget->WriteGridData(
+					m_pobjTargetConfig,
+					Variable::SingleTimeIndex);
+
+			// Apply the regridding operation to all times
+			} else {
+				for (size_t t = 0; t < pobjSourceFileList->GetTimeCount(); t++) {
+					pvarSource->LoadGridData(
+						m_pobjSourceConfig,
+						t);
+
+					pvarTarget->AllocateGridData(
+						m_pobjTargetConfig,
+						t);
+
+					const DataArray1D<float> & dataSource =
+						pvarSource->GetData();
+
+					DataArray1D<float> & dataTarget =
+						pvarTarget->GetData();
+
+					m_mapRemap.ApplyFloat(
+						dataSource,
+						dataTarget);
+
+					pvarTarget->WriteGridData(
+						m_pobjTargetConfig,
+						t);
+				}
+			}
 		}
-
+/*
 		for (size_t f = 0; f < sSourceFilenameCount; f++) {
-			Announce("Input File:  %s", pobjSourceFileListObject->GetFilename(f).c_str());
-			Announce("Output File: %s", pobjTargetFileListObject->GetFilename(f).c_str());
+			Announce("Input File:  %s", pobjSourceFileList->GetFilename(f).c_str());
+			Announce("Output File: %s", pobjTargetFileList->GetFilename(f).c_str());
 			m_mapRemap.Apply(
-				pobjSourceFileListObject->GetFilename(f),
-				pobjTargetFileListObject->GetFilename(f),
+				pobjSourceFileList->GetFilename(f),
+				pobjTargetFileList->GetFilename(f),
 				vecVariables,
 				std::string("ncol"));
 		}
+*/
 		return std::string("");
 	}
 
@@ -191,32 +291,52 @@ std::string TempestRegridObject::Initialize(
 				"[target grid], [parameters])");
 	}
 
-	// Source grid
-	GridObject * pobjSourceGrid =
-		dynamic_cast<GridObject *>(
+	// Source configuration
+	RecapConfigObject * pobjSourceConfig =
+		dynamic_cast<RecapConfigObject *>(
 			objreg.GetObject(vecFuncArguments[0]));
-	if (pobjSourceGrid == NULL) {
+	if (pobjSourceConfig == NULL) {
 		return std::string("ERROR: First argument of tempestregrid() must be"
-			" of type grid");
+			" of type recap_configuration");
+	}
+	if (!pobjSourceConfig->IsValid()) {
+		return std::string("ERROR: recap_configuration must have both "
+			" \"data\" and \"grid\" attributes before being used");
 	}
 
 	// Target grid
-	GridObject * pobjTargetGrid =
-		dynamic_cast<GridObject *>(
+	RecapConfigObject * pobjTargetConfig =
+		dynamic_cast<RecapConfigObject *>(
 			objreg.GetObject(vecFuncArguments[1]));
-	if (pobjTargetGrid == NULL) {
+	if (pobjTargetConfig == NULL) {
 		return std::string("ERROR: Second argument of tempestregrid() must be"
-			" of type grid");
+			" of type recap_configuration");
+	}
+	if (!pobjTargetConfig->IsValid()) {
+		return std::string("ERROR: recap_configuration must have both "
+			" \"data\" and \"grid\" attributes before being used");
 	}
 
 	// Parameters
 	Object * pobjParameters =
 		dynamic_cast<Object *>(
 			objreg.GetObject(vecFuncArguments[2]));
-	if (pobjTargetGrid == NULL) {
+	if (pobjParameters == NULL) {
 		return std::string("ERROR: Third argument to tempestregrid() must be"
 			" of type parameter_list");
 	}
+
+	// Store pointer
+	m_pobjSourceConfig = pobjSourceConfig;
+	m_pobjTargetConfig = pobjTargetConfig;
+
+	// Add locks to RecapConfigs
+	pobjSourceConfig->AddLock();
+	pobjTargetConfig->AddLock();
+
+	// Get the grid
+	GridObject * pobjSourceGrid = pobjSourceConfig->GetGrid();
+	GridObject * pobjTargetGrid = pobjTargetConfig->GetGrid();
 
 	// Monotone type
 	int nMonotoneType = 0;
@@ -355,10 +475,6 @@ std::string TempestRegridObject::Initialize(
 
 	}
 	AnnounceEndBlock("Done");
-
-	// Switch overlap mesh correspondence
-
-	//pMeshOverlap->Write("ov_test.g");
 
 	// Generate offline map
 	AnnounceStartBlock("Generate offline map");

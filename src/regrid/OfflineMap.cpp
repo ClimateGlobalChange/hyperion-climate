@@ -1048,6 +1048,56 @@ void OfflineMap::PreserveAllVariables(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void OfflineMap::ApplyFloat(
+	const DataArray1D<float> & dataSource,
+	DataArray1D<float> & dataTarget
+) {
+	if (dataSource.GetRows() != m_dSourceAreas.GetRows()) {
+		_EXCEPTIONT("Source data size mismatch");
+	}
+	if (dataTarget.GetRows() != m_dTargetAreas.GetRows()) {
+		_EXCEPTIONT("Target data size mismatch");
+	}
+
+	// Announce input mass
+	float dSourceMass = 0.0;
+	float dSourceMin  = dataSource[0];
+	float dSourceMax  = dataSource[0];
+	for (int i = 0; i < dataSource.GetRows(); i++) {
+		dSourceMass += dataSource[i] * m_dSourceAreas[i];
+		if (dataSource[i] < dSourceMin) {
+			dSourceMin = dataSource[i];
+		}
+		if (dataSource[i] > dSourceMax) {
+			dSourceMax = dataSource[i];
+		}
+	}
+
+	Announce("Source Mass: %1.15e Min %1.10e Max %1.10e",
+		dSourceMass, dSourceMin, dSourceMax);
+
+	// Apply the offline map to the data
+	m_mapRemap.ApplyTyped<float>(dataSource, dataTarget);
+
+	// Announce output mass
+	float dTargetMass = 0.0;
+	float dTargetMin  = dataTarget[0];
+	float dTargetMax  = dataTarget[0];
+	for (int i = 0; i < dataTarget.GetRows(); i++) {
+		dTargetMass += dataTarget[i] * m_dTargetAreas[i];
+		if (dataTarget[i] < dTargetMin) {
+			dTargetMin = dataTarget[i];
+		}
+		if (dataTarget[i] > dTargetMax) {
+			dTargetMax = dataTarget[i];
+		}
+	}
+	Announce("Target Mass: %1.15e Min %1.10e Max %1.10e",
+		dTargetMass, dTargetMin, dTargetMax);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void OfflineMap::Apply(
 	const std::string & strSourceDataFile,
 	const std::string & strTargetDataFile,
@@ -1531,16 +1581,7 @@ void OfflineMap::Apply(
 					dSourceMax = dataInDouble[i];
 				}
 			}
-/*
-			for (int d = 0; d < nCountsIn.GetRows(); d++) {
-				printf("%li ", nCountsIn[d]);
-			}
-			printf(" : ");
-			for (int d = 0; d < nCountsOut.GetRows(); d++) {
-				printf("%li ", nCountsOut[d]);
-			}
-			printf("\n");
-*/
+
 			Announce("Source Mass: %1.15e Min %1.10e Max %1.10e",
 				dSourceMass, dSourceMin, dSourceMax);
 

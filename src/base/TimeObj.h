@@ -163,6 +163,13 @@ public:
 	bool operator==(const Time & time) const;
 
 	///	<summary>
+	///		Inequality between Times.
+	///	</summary>
+	bool operator!=(const Time & time) const {
+		return !((*this) == time);
+	}
+
+	///	<summary>
 	///		Less-than between Times.
 	///	</summary>
 	bool operator<(const Time & time) const;
