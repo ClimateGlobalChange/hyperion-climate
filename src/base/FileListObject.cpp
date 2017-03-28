@@ -1071,6 +1071,14 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 		ofOutput << std::endl;
 	}
 
+	// Output file names
+	ofOutput << std::endl << std::endl;
+
+	ofOutput << "file_ix,filename" << std::endl;
+	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
+		ofOutput << f << ",\"" << m_vecFilenames[f] << "\"" << std::endl;
+	}
+
 	return ("");
 }
 
