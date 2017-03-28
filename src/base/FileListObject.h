@@ -25,6 +25,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class RecapConfigObject;
+
 class GridObject;
 
 class Variable;
@@ -151,6 +153,7 @@ public:
 		const std::string & strName
 	) :
 		Object(strName),
+		m_pobjRecapConfig(NULL),
 		m_strRecordDimName("time"),
 		m_sReduceTargetIx(InvalidFileIx)
 	{ }
@@ -189,6 +192,15 @@ public:
 		const std::vector<ObjectType> & vecCommandLineType,
 		Object ** ppReturn
 	);
+
+	///	<summary>
+	///		Set the RecapConfigObject pointer for this FileListObject.
+	///	</summary>
+	void SetRecapConfigObject(
+		RecapConfigObject * pobjRecapConfig
+	) {
+		m_pobjRecapConfig = pobjRecapConfig;
+	}
 
 public:
 	///	<summary>
@@ -359,6 +371,11 @@ protected:
 	);
 
 protected:
+	///	<summary>
+	///		Pointer to the associated RecapConfigObject.
+	///	</summary>
+	RecapConfigObject * m_pobjRecapConfig;
+
 	///	<summary>
 	///		The name of the record dimension (default "time")
 	///	</summary>

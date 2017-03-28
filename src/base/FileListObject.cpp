@@ -234,11 +234,36 @@ std::string FileListObject::CreateFileNoTime(
 
 	// Add grid dimensions to file
 	const Mesh & mesh = pobjGrid->GetMesh();
-	for (int i = 0; i < mesh.vecDimNames.size(); i++) {
+	for (size_t i = 0; i < mesh.vecDimNames.size(); i++) {
 		NcDim * dim =
 			ncFile.add_dim(
 				mesh.vecDimNames[i].c_str(),
 				mesh.vecDimSizes[i]);
+
+		if (dim == NULL) {
+			_EXCEPTION1("Unable to create dimension \"%s\" in file",
+				mesh.vecDimNames[i].c_str());
+		}
+
+		if (mesh.vecDimValues.size() > i) {
+			if (mesh.vecDimValues[i].size() != mesh.vecDimSizes[i]) {
+				_EXCEPTIONT("Mesh DimValues / DimSizes mismatch");
+			}
+
+			NcVar * var =
+				ncFile.add_var(
+					mesh.vecDimNames[i].c_str(),
+					ncDouble,
+					dim);
+
+			if (var == NULL) {
+				_EXCEPTION1("Unable to create variable \"%s\" in file",
+					mesh.vecDimNames[i].c_str());
+			}
+
+			var->set_cur((long)0);
+			var->put(&(mesh.vecDimValues[i][0]), mesh.vecDimSizes[i]);
+		}
 	}
 
 	return std::string("");
@@ -250,7 +275,7 @@ std::string FileListObject::SetReduceTarget(
 	const std::string & strTargetFilename
 ) {
 
-	// Check if file exists exists
+	// Check if file exists
 	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
 		if (m_vecFilenames[f] == strTargetFilename) {
 			m_sReduceTargetIx = f;
@@ -336,7 +361,9 @@ std::string FileListObject::LoadData_float(
 	VariableInfo & varinfo = m_vecVariableInfo[iVarInfo];
 
 	// Get the time index
-	if (varinfo.m_iTimeDimIx >= vecAuxIndices.size()) {
+	if ((varinfo.m_iTimeDimIx != (-1)) &&
+		(varinfo.m_iTimeDimIx >= vecAuxIndices.size())
+	) {
 		_EXCEPTIONT("time index exceeds auxiliary index size");
 	}
 
@@ -345,7 +372,7 @@ std::string FileListObject::LoadData_float(
 		varinfo.m_mapTimeFile.find(sTime);
 
 	if (iter == varinfo.m_mapTimeFile.end()) {
-		_EXCEPTION1("sTime (%lu) not found", sTime);
+		_EXCEPTION2("sTime (%s) (%lu) not found", strVariableName.c_str(), sTime);
 	}
 
 	size_t sFile = iter->second.first;

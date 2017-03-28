@@ -701,14 +701,19 @@ public:
 	bool fRectilinear;
 
 	///	<summary>
-	///		Vector of dimension sizes for source.
+	///		Vector of grid dimension sizes for source.
 	///	</summary>
 	std::vector<int> vecDimSizes;
 
 	///	<summary>
-	///		Vector of dimension names for source.
+	///		Vector of grid dimension names for source.
 	///	</summary>
 	std::vector<std::string> vecDimNames;
+
+	///	<summary>
+	///		Vector of grid dimension values.
+	///	</summary>
+	std::vector< std::vector<double> > vecDimValues;
 
 public:
 	///	<summary>

@@ -294,7 +294,7 @@ std::string Variable::InitializeAuxiliary(
 	// Reduction operator
 	if (m_strOpName == "_CLIMMEAN") {
 		if (vecVarArguments.size() != 1) {
-			_EXCEPTION();
+			return std::string("_CLIMMEAN expectes one argument");
 		}
 
 		// Inherit units from argument
@@ -313,9 +313,26 @@ std::string Variable::InitializeAuxiliary(
 			m_vecAuxIndices.push_back(vecVarArguments[0]->m_vecAuxIndices[d]);
 			m_vecDimNames.push_back(vecVarArguments[0]->m_vecDimNames[d]);
 		}
+
+		return std::string("");
 	}
 
-	return std::string("");
+	// Vector magnitude
+	if (m_strOpName == "_VECMAG") {
+		if (vecVarArguments.size() != 2) {
+			return std::string("_VECMAG expectes two arguments");
+		}
+
+		// Inherit attributes from argument
+		m_strUnits = vecVarArguments[0]->m_strUnits;
+		m_vecDimNames = vecVarArguments[0]->m_vecDimNames;
+		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
+		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
+
+		return std::string("");
+	}
+
+	_EXCEPTIONT("Missing auxiliary specification for op");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -397,6 +414,9 @@ std::string Variable::LoadGridData(
 	// Single time index (variable already loaded)
 	std::vector<long> vecAuxIndices = m_vecAuxIndices;
 
+	if (m_iTimeDimIx == SingleTimeIndex) {
+		sTime = SingleTimeIndex;
+	}
 	if (m_sTime == SingleTimeIndex) {
 		return std::string("");
 	}

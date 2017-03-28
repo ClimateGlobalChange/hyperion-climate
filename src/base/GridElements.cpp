@@ -81,6 +81,7 @@ void Mesh::Clear() {
 	fRectilinear = false;
 	vecDimSizes.clear();
 	vecDimNames.clear();
+	vecDimValues.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -97,8 +98,13 @@ void Mesh::InitializeAsRLL(
 	Clear();
 
 	// Change in longitude
-	const double dDeltaLonDeg = dLonEndDeg - dLonBeginDeg;
-	const double dDeltaLatDeg = dLatEndDeg - dLatBeginDeg;
+	const double dDeltaLonDeg =
+		(dLonEndDeg - dLonBeginDeg)
+		/ static_cast<double>(nLongitudes);
+
+	const double dDeltaLatDeg =
+		(dLatEndDeg - dLatBeginDeg)
+		/ static_cast<double>(nLatitudes);
 
 	// Convert all units to radians
 	const double dLatBegin = dLatBeginDeg * M_PI / 180.0;
@@ -215,7 +221,7 @@ void Mesh::InitializeAsRLL(
 			+ (static_cast<double>(j) + 0.5) * dDeltaLatDeg;
 
 		for (int i = 0; i < nLongitudes; i++) {
-			double dLon = dLonBegin
+			double dLon = dLonBeginDeg
 				+ (static_cast<double>(j) + 0.5) * dDeltaLonDeg;
 
 			dCenterLat[ix] = dLat;
@@ -236,6 +242,21 @@ void Mesh::InitializeAsRLL(
 	vecDimNames.resize(2);
 	vecDimNames[0] = "lat";
 	vecDimNames[1] = "lon";
+
+	// Set dimension values
+	vecDimValues.resize(2);
+
+	vecDimValues[0].resize(nLatitudes);
+	for (int j = 0; j < nLatitudes; j++) {
+		vecDimValues[0][j] = dLatBeginDeg
+			+ (static_cast<double>(j) + 0.5) * dDeltaLatDeg;
+	}
+
+	vecDimValues[1].resize(nLongitudes);
+	for (int j = 0; j < nLongitudes; j++) {
+		vecDimValues[1][j] = dLonBeginDeg
+			+ (static_cast<double>(j) + 0.5) * dDeltaLonDeg;
+	}
 
 	// Total number of degrees of freedom
 	sDOFCount = nLatitudes * nLongitudes;

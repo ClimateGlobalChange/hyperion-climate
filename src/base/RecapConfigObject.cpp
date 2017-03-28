@@ -225,6 +225,8 @@ bool RecapConfigObject::AddChild(
 			return false;
 		}
 
+		pobjFileList->SetRecapConfigObject(this);
+
 		GridObject * pobjGrid =
 			dynamic_cast<GridObject *>(GetChild("grid"));
 
