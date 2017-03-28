@@ -11,10 +11,8 @@ rllparam.minlon = "95.0deg"
 rllparam.maxlon = "355.0deg"
 rllparam.minlat = "0.0deg"
 rllparam.maxlat = "60.0deg"
-#rllparam.nlon = 1040
-#rllparam.nlat = 240
-rllparam.nlon = 104
-rllparam.nlat = 24
+rllparam.nlon = 1040
+rllparam.nlat = 240
 
 # Output data
 config_out = recap_configuration("create")

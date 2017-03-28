@@ -333,7 +333,8 @@ public:
 	///	</summary>
 	std::string AddDimension(
 		const std::string & strDimName,
-		long lDimSize
+		long lDimSize,
+		bool fGridDim = false
 	);
 
 	///	<summary>
@@ -382,6 +383,11 @@ protected:
 	///		A map between dimension name and size in the FileList.
 	///	</summary>
 	std::map<std::string, long> m_mapDimNameSize;
+
+	///	<summary>
+	///		Names of grid dimensions for this FileList.
+	///	</summary>
+	std::vector<std::string> m_vecGridDimNames;
 
 	///	<summary>
 	///		Filename index that is the target of reductions (output mode).

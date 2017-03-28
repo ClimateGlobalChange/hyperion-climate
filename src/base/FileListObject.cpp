@@ -536,16 +536,6 @@ std::string FileListObject::WriteData_float(
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
 	}
 
-/*
-	// Get data size of one timeslice
-	long nDataSize = 1;
-	for (int d = 0; d < varinfo.m_nTimeSliceDims; d++) {
-		nDataSize *= varinfo.m_vecDimSizes[varinfo.m_vecDimSizes.size()-d-1];
-	}
-	if (data.GetRows() != nDataSize) {
-		_EXCEPTIONT("Data size mismatch");
-	}
-
 	// Write data
 	NcFile ncout(m_vecFilenames[sFile].c_str(), NcFile::Write);
 	if (!ncout.is_valid()) {
@@ -556,9 +546,23 @@ std::string FileListObject::WriteData_float(
 	std::vector<NcDim *> vecDims;
 	vecDims.resize(varinfo.m_vecDimNames.size());
 	for (int d = 0; d < vecDims.size(); d++) {
+		long lDimSize = GetDimensionSize(varinfo.m_vecDimNames[d]);
 		vecDims[d] = ncout.get_dim(varinfo.m_vecDimNames[d].c_str());
-		if (vecDims[d] == NULL) {
-			_EXCEPTION1("Invalid dimension \"%s\"", vecDims[d]);
+		if (vecDims[d] != NULL) {
+			if (vecDims[d]->size() != lDimSize) {
+				_EXCEPTION1("Dimension %s mismatch",
+					varinfo.m_vecDimNames[d].c_str());
+			}
+		} else {
+			vecDims[d] =
+				ncout.add_dim(
+					varinfo.m_vecDimNames[d].c_str(),
+					lDimSize);
+
+			if (vecDims[d] == NULL) {
+				_EXCEPTION1("Cannot add dimension %s",
+					varinfo.m_vecDimNames[d].c_str());
+			}
 		}
 	}
 
@@ -578,23 +582,11 @@ std::string FileListObject::WriteData_float(
 	}
 
 	// Set current position
-	std::vector<long> vecDimPos = varinfo.m_vecDimSizes;
-	for (int d = 0; d < vecDimPos.size(); d++) {
-		if (d == varinfo.m_iTimeDimIx) {
-			vecDimPos[d] = iLocalTime;
-		}
-	}
-	var->set_cur(&(vecDimPos[0]));
-
-	// Set dimension sizes
-	std::vector<long> vecWriteSize = varinfo.m_vecDimSizes;
-	for (int d = 0; d < vecWriteSize.size() - varinfo.m_nTimeSliceDims; d++) {
-		vecWriteSize[d] = 1;
-	}
+	var->set_cur(&(vecPos[0]));
 
 	// Write data
-	var->put(&(data[0]), &(vecWriteSize[0]));
-*/
+	var->put(&(data[0]), &(vecSize[0]));
+
 	return std::string("");
 }
 
@@ -622,23 +614,42 @@ std::string FileListObject::AddVariableFromTemplate(
 		}
 	}
 
+	// VariableInfo
+	VariableInfo varinfo(pvar->Name());
+	varinfo.m_strUnits = pvar->Units();
+
 	// Add dimensions from variable to output FileList
 	const std::vector<std::string> & vecDimNames = pvar->DimNames();
 	for (int d = 0; d < vecDimNames.size(); d++) {
+		bool fGridDim = false;
+		for (int e = 0; e < pobjSourceFileList->m_vecGridDimNames.size(); e++) {
+			if (vecDimNames[d] == pobjSourceFileList->m_vecGridDimNames[e]) {
+				fGridDim = true;
+				break;
+			}
+		}
+		if (fGridDim) {
+			continue;
+		}
+
 		long lDimSize = pobjSourceFileList->GetDimensionSize(vecDimNames[d]);
 		if (lDimSize == (-1)) {
 			_EXCEPTIONT("Logic error");
 		}
+
+		varinfo.m_vecDimNames.push_back(vecDimNames[d]);
+
 		AddDimension(
 			vecDimNames[d], 
 			lDimSize);
 	}
 
-	// Create VariableInfo
-	VariableInfo varinfo(pvar->Name());
-	varinfo.m_strUnits = pvar->Units();
-	varinfo.m_vecDimNames = pvar->DimNames();
+	// Add grid dimensions
+	for (int d = 0; d < m_vecGridDimNames.size(); d++) {
+		varinfo.m_vecDimNames.push_back(m_vecGridDimNames[d]);
+	}
 
+	// Identify the time dimension
 	varinfo.m_iTimeDimIx = (-1);
 	for (int d = 0; d < varinfo.m_vecDimNames.size(); d++) {
 		if (varinfo.m_vecDimNames[d] == m_strRecordDimName) {
@@ -647,14 +658,12 @@ std::string FileListObject::AddVariableFromTemplate(
 		}
 	}
 /*
-	if (varinfo.m_iTimeDimIx == (-1)) {
-		if (m_sReduceTargetIx != (-1)) {
-			varinfo.m_mapTimeFile.insert(
-				VariableInfo::VariableTimeFileMap::value_type(
-					(-1), LocalFileTimePair(m_sReduceTargetIx, (-1))));
-		}
+	std::cout << "TEST " << m_vecGridDimNames.size() << std::endl;
+	for (int d = 0; d < varinfo.m_vecDimNames.size(); d++) {
+		std::cout << varinfo.m_vecDimNames[d] << std::endl;
 	}
 */
+	// Add this VariableInfo to the vector of VariableInfos
 	m_vecVariableInfo.push_back(varinfo);
 
 	(*ppvarinfo) = &(m_vecVariableInfo[m_vecVariableInfo.size()-1]);
@@ -666,7 +675,8 @@ std::string FileListObject::AddVariableFromTemplate(
 
 std::string FileListObject::AddDimension(
 	const std::string & strDimName,
-	long lDimSize
+	long lDimSize,
+	bool fGridDim
 ) {
 	std::map<std::string, long>::const_iterator iter =
 		m_mapDimNameSize.find(strDimName);
@@ -681,6 +691,10 @@ std::string FileListObject::AddDimension(
 		m_mapDimNameSize.insert(
 			std::pair<std::string, long>(
 				strDimName, lDimSize));
+	}
+
+	if (fGridDim) {
+		m_vecGridDimNames.push_back(strDimName);
 	}
 
 	return std::string("");

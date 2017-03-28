@@ -209,7 +209,8 @@ bool RecapConfigObject::AddChild(
 			for (int d = 0; d < mesh.vecDimNames.size(); d++) {
 				pobjFileList->AddDimension(
 					mesh.vecDimNames[d],
-					mesh.vecDimSizes[d]);
+					mesh.vecDimSizes[d],
+					true);
 			}
 		}
 		return Object::AddChild(pChild);
@@ -233,7 +234,8 @@ bool RecapConfigObject::AddChild(
 			for (int d = 0; d < mesh.vecDimNames.size(); d++) {
 				pobjFileList->AddDimension(
 					mesh.vecDimNames[d],
-					mesh.vecDimSizes[d]);
+					mesh.vecDimSizes[d],
+					true);
 			}
 		}
 		return Object::AddChild(pChild);

@@ -451,6 +451,12 @@ void Mesh::InitializeAsFiniteElement(
 	}
 
 	Announce("Mesh: SEM Nodes [%i]", sDOFCount);
+
+	// Adjust dimension names
+	if (vecDimNames[0] == "num_elem") {
+		vecDimNames[0] = "ncol";
+		vecDimSizes[0] = sDOFCount;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
