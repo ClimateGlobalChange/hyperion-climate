@@ -1,6 +1,6 @@
 config = recap_configuration()
-config.data = file_list("nhemi_*00000.nc")
 config.grid = grid("nhemi_30_x4.g", "sem_np4")
+config.data = file_list("nhemi_*00000.nc")
 config.lookup = variable_lookup("nhemi_lookup.txt")
 
 # Generate a new RLL grid

@@ -27,6 +27,20 @@
 
 class GridObject;
 
+class Variable;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A local (file,time) pair.
+///	</summary>
+typedef std::pair<size_t, int> LocalFileTimePair;
+
+///	<summary>
+///		A map from time indices to local (file,time) pairs.
+///	</summary>
+typedef std::map<size_t, LocalFileTimePair> VariableTimeFileMap;
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -36,25 +50,14 @@ class VariableInfo {
 
 public:
 	///	<summary>
-	///		A local (file,time) pair.
-	///	</summary>
-	typedef std::pair<size_t, int> LocalFileTimePair;
-
-	///	<summary>
-	///		A map from time indices to local (file,time) pairs.
-	///	</summary>
-	typedef std::map<size_t, LocalFileTimePair> VariableTimeFileMap;
-
-public:
-	///	<summary>
 	///		Constructor.
 	///	</summary>
 	VariableInfo(
 		const std::string & strVariableName
 	) :
 		m_strVariableName(strVariableName),
-		m_iTimeDimIx(-1),
-		m_nTimeSliceDims(1)
+		m_iTimeDimIx(-1)
+		//m_nTimeSliceDims(1)
 	{ } 
 
 public:
@@ -69,20 +72,20 @@ public:
 	std::string m_strUnits;
 
 	///	<summary>
-	///		Dimension of time variable.
+	///		Dimension names.
 	///	</summary>
-	std::vector<long> m_vecDimSizes;
+	std::vector<std::string> m_vecDimNames;
 
 	///	<summary>
 	///		Index of time dimension or (-1) if time dimension doesn't exist.
 	///	</summary>
 	int m_iTimeDimIx;
-
+/*
 	///	<summary>
 	///		Dimensionality of one time slice of data.
 	///	</summary>
 	int m_nTimeSliceDims;
-
+*/
 	///	<summary>
 	///		Map from Times to filename index and time index.
 	///	</summary>
@@ -134,6 +137,12 @@ public:
 	///	</summary>
 	static const size_t InvalidTimeIx;
 
+	///	<summary>
+	///		A value to denote that a dimension has inconsistent sizes
+	///		across files.
+	///	</summary>
+	static const long InconsistentDimensionSizes;
+
 public:
 	///	<summary>
 	///		Constructor.
@@ -142,6 +151,7 @@ public:
 		const std::string & strName
 	) :
 		Object(strName),
+		m_strRecordDimName("time"),
 		m_sReduceTargetIx(InvalidFileIx)
 	{ }
 
@@ -158,9 +168,13 @@ public:
 			_EXCEPTIONT("Out of memory");
 		}
 
+		pobjDuplicate->m_strRecordDimName = m_strRecordDimName;
 		pobjDuplicate->m_vecFilenames = m_vecFilenames;
 		pobjDuplicate->m_vecTimes = m_vecTimes;
 		pobjDuplicate->m_vecVariableInfo = m_vecVariableInfo;
+		pobjDuplicate->m_mapDimNameSize = m_mapDimNameSize;
+		pobjDuplicate->m_sReduceTargetIx = m_sReduceTargetIx;
+		pobjDuplicate->m_mapOutputTimeFile = m_mapOutputTimeFile;
 
 		return _Duplicate(pobjDuplicate, objreg);
 	}
@@ -242,10 +256,31 @@ public:
 
 public:
 	///	<summary>
+	///		Get the record dimension name.
+	///	</summary>
+	const std::string & GetRecordDimName() const {
+		return m_strRecordDimName;
+	}
+
+	///	<summary>
 	///		Get the number of time indices in the file list.
 	///	</summary>
 	size_t GetTimeCount() const {
 		return m_vecTimes.size();
+	}
+
+	///	<summary>
+	///		Get the size of the specified dimension.
+	///	</summary>
+	long GetDimSize(const std::string & strDimName) const {
+		std::map<std::string, long>::const_iterator iter =
+			m_mapDimNameSize.find(strDimName);
+
+		if (iter != m_mapDimNameSize.end()) {
+			return iter->second;
+		}
+
+		_EXCEPTIONT("Invalid dimension name");
 	}
 
 	///	<summary>
@@ -266,17 +301,47 @@ public:
 	///	<summary>
 	///		Load the data from a particular variable into the given array.
 	///	</summary>
-	///	<returns>
-	///		sTime if the load was successful
-	///		(-1) if the load was successful but the data does not
-	///            have a time dimension
-	///		(-2) if an error occurred
-	///	</returns>
-	size_t LoadData_float(
+	std::string LoadData_float(
 		const std::string & strVariableName,
+		const std::vector<long> & vecAuxIndices,
 		size_t sTime,
 		DataArray1D<float> & data
 	);
+
+	///	<summary>
+	///		Write the data from the given array to disk.
+	///	</summary>
+	std::string WriteData_float(
+		const std::string & strVariableName,
+		const std::vector<long> & vecAuxIndices,
+		size_t sTime,
+		const DataArray1D<float> & data
+	);
+
+	///	<summary>
+	///		Add a new variable from a template.
+	///	</summary>
+	std::string AddVariableFromTemplate(
+		const FileListObject * pobjSourceFileList,
+		const Variable * pvar,
+		VariableInfo ** ppvarinfo
+	);
+
+public:
+	///	<summary>
+	///		Add the given dimension to this FileListObject.
+	///	</summary>
+	std::string AddDimension(
+		const std::string & strDimName,
+		long lDimSize
+	);
+
+	///	<summary>
+	///		Get the size of the specified dimension.
+	///	</summary>
+	long GetDimensionSize(
+		const std::string & strDimName
+	) const;
 
 protected:
 	///	<summary>
@@ -294,6 +359,11 @@ protected:
 
 protected:
 	///	<summary>
+	///		The name of the record dimension (default "time")
+	///	</summary>
+	std::string m_strRecordDimName;
+
+	///	<summary>
 	///		The list of filenames.
 	///	</summary>
 	std::vector<std::string> m_vecFilenames;
@@ -309,9 +379,19 @@ protected:
 	std::vector<VariableInfo> m_vecVariableInfo;
 
 	///	<summary>
-	///		Filename index that is the target of reductions.
+	///		A map between dimension name and size in the FileList.
+	///	</summary>
+	std::map<std::string, long> m_mapDimNameSize;
+
+	///	<summary>
+	///		Filename index that is the target of reductions (output mode).
 	///	</summary>
 	size_t m_sReduceTargetIx;
+
+	///	<summary>
+	///		Filename index for each of the time indices (output mode).
+	///	</summary>
+	std::map<size_t, LocalFileTimePair> m_mapOutputTimeFile;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

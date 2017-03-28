@@ -18,6 +18,7 @@
 #define _RECAPCONFIGOBJECT_H_
 
 #include "Announce.h"
+#include "AccessMode.h"
 #include "Object.h"
 #include "FileListObject.h"
 #include "GridObject.h"
@@ -58,6 +59,8 @@ public:
 ///	</summary>
 class RecapConfigObject : public Object {
 
+friend class RecapConfigObjectConstructor;
+
 public:
 	///	<summary>
 	///		Constructor.
@@ -65,6 +68,8 @@ public:
 	RecapConfigObject(
 		const std::string & strName
 	) :
+		m_eAccessMode(AccessMode_ReadOnly),
+		m_varreg(this),
 		Object(strName)
 	{ }
 
@@ -140,7 +145,7 @@ public:
 	///		Get a reference to the VariableRegistry.
 	///	</summary>
 	VariableRegistry & GetVariableRegistry() {
-		return varreg;
+		return m_varreg;
 	}
 
 	///	<summary>
@@ -148,81 +153,35 @@ public:
 	///	</summary>
 	std::string GetVariable(
 		const std::string & strVariableName,
-		Variable ** ppVariable
-	) {
-		// Convert the name from native to standard
-		std::string strStandardName = strVariableName;
-		VariableLookupObject * pobjLookup = GetVariableLookup();
-		if (pobjLookup != NULL) {
-			strStandardName = pobjLookup->Convert(strStandardName);
-		}
+		Variable ** ppvar
+	);
 
-		// Find the Variable in the VariableRegistry
-		if (ppVariable == NULL) {
-			_EXCEPTIONT("Invalid argument");
-		}
-
-		std::string strError =
-			varreg.FindOrRegister(
-				this,
-				strStandardName,
-				ppVariable);
-
-		// Variable could not be found or registered
-		if (strError != "") {
-			return strError;
-		}
-		return std::string("");
-	}
+	///	<summary>
+	///		Add a new variable from a template.
+	///	</summary>
+	std::string AddVariableFromTemplate(
+		const RecapConfigObject * pobjRecapConfig,
+		const Variable * pvar,
+		Variable ** ppvarOut
+	);
 
 protected:
 	///	<summary>
-	///		RecapConfigObject only supports three child objects.
+	///		RecapConfigObject only supports three child objects:
+	///		grid, data and lookup, each of which are singletons.
 	///	</summary>
-	virtual bool AddChild(Object * pChild) {
-		if (pChild == NULL) {
-			_EXCEPTIONT("Invalid child pointer");
-		}
-		if (pChild->Name() == ChildName("data")) {
-			FileListObject * pobj = dynamic_cast<FileListObject *>(pChild);
-			if (pobj == NULL) {
-				Announce("ERROR: %s must be of type file_list",
-					pChild->Name().c_str());
-				return false;
-			}
-			return Object::AddChild(pChild);
-		}
-		if (pChild->Name() == ChildName("grid")) {
-			GridObject * pobj = dynamic_cast<GridObject *>(pChild);
-			if (pobj == NULL) {
-				Announce("ERROR: %s must be of type grid",
-					pChild->Name().c_str());
-				return false;
-			}
-			return Object::AddChild(pChild);
-		}
-		if (pChild->Name() == ChildName("lookup")) {
-			VariableLookupObject * pobj =
-				dynamic_cast<VariableLookupObject *>(pChild);
-			if (pobj == NULL) {
-				Announce("ERROR: %s must be of type variable_lookup",
-					pChild->Name().c_str());
-				return false;
-			}
-			return Object::AddChild(pChild);
-		}
-
-		Announce("ERROR: Only \"data\", \"grid\" and \"lookup\" allowed as "
-			"children of recap_configuration()");
-
-		return false;
-	}
+	virtual bool AddChild(Object * pChild);
 
 protected:
+	///	<summary>
+	///		Access mode to data in this configuration.
+	///	</summary>
+	AccessMode m_eAccessMode;
+
 	///	<summary>
 	///		Variable registry used in this configuration.
 	///	</summary>
-	VariableRegistry varreg;
+	VariableRegistry m_varreg;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

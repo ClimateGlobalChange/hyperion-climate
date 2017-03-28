@@ -18,21 +18,28 @@
 
 #include "RecapConfigObject.h"
 #include "FileListObject.h"
-
-#include <set>
+#include "GridObject.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // VariableRegistry
 ///////////////////////////////////////////////////////////////////////////////
 
+VariableRegistry::VariableRegistry(
+	RecapConfigObject * pobjConfig
+) :
+	m_pobjConfig(pobjConfig)
+{
+	if (pobjConfig == NULL) {
+		_EXCEPTIONT("Invalid RecapConfigObject pointer");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string VariableRegistry::FindOrRegister(
-	RecapConfigObject * pobjConfig,
 	const std::string & strVariableName,
 	Variable ** ppVariable
 ) {
-	if (!pobjConfig->IsValid()) {
-		_EXCEPTIONT("Invalid RecapConfigObject pointer");
-	}
 	if (strVariableName.length() == 0) {
 		_EXCEPTIONT("Attempting to find/register zero length Variable name");
 	}
@@ -51,8 +58,8 @@ std::string VariableRegistry::FindOrRegister(
 	}
 
 	// Check if Variable is in the FileList, and add to registry if present
-	const FileListObject * pobjFileList =
-		pobjConfig->GetFileList();
+	FileListObject * pobjFileList =
+		m_pobjConfig->GetFileList();
 	const VariableInfo * pvarinfo =
 		pobjFileList->GetVariableInfo(strVariableName);
 	if (pvarinfo != NULL) {
@@ -80,21 +87,35 @@ std::string VariableRegistry::FindOrRegister(
 			return strError;
 		}
 
+		// Recursively register arguments to operator combination
+		std::vector<Variable *> vecArguments;
+		vecArguments.resize(varNew.m_vecArg.size());
+
+		for (int a = 0; a < varNew.m_vecArg.size(); a++) {
+			strError =
+				m_pobjConfig->GetVariable(
+					varNew.m_vecArg[a],
+					&(vecArguments[a]));
+
+			if (strError != "") {
+				return strError;
+			}
+		}
+
+		// Verify compatibility and inherit auxiliary data from arguments
+		strError = varNew.InitializeAuxiliary(vecArguments);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		// Insert new variable into registry
 		iterVar =
 			m_mapVariables.insert(
 				std::pair<std::string, Variable>(
 					strVariableName, varNew)).first;
 
 		(*ppVariable) = &(iterVar->second);
-
-		// Recursively register arguments to operator combination
-		for (int a = 0; a < varNew.m_vecArg.size(); a++) {
-			Variable * ppVariableArgument = NULL;
-			std::string strError =
-				pobjConfig->GetVariable(
-					varNew.m_vecArg[a],
-					&ppVariableArgument);
-		}
 
 		return std::string("");
 	}
@@ -163,6 +184,7 @@ Variable::Variable(
 	m_fOp(false),
 	m_fReductionOp(false),
 	m_strUnits(),
+	m_iTimeDimIx(-1),
 	m_nSpecifiedDim(0),
 	m_sTime(InvalidTimeIndex)
 {
@@ -174,6 +196,9 @@ Variable::Variable(
 	}
 	if (pvarinfo != NULL) {
 		m_strUnits = pvarinfo->m_strUnits;
+		m_vecDimNames = pvarinfo->m_vecDimNames;
+		m_vecAuxIndices.resize(pvarinfo->m_vecDimNames.size(), (-1));
+		m_iTimeDimIx = pvarinfo->m_iTimeDimIx;
 	}
 	memset(m_iDim, 0, MaxArguments * sizeof(int));
 }
@@ -252,6 +277,41 @@ std::string Variable::Initialize() {
 		// Check operator properties
 		if (m_strOpName == "_CLIMMEAN") {
 			m_fReductionOp = true;
+			if (m_vecArg.size() != 1) {
+				return std::string("ERROR: _CLIMMEAN expects exactly one argument");
+			}
+		}
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string Variable::InitializeAuxiliary(
+	const std::vector<Variable *> vecVarArguments
+) {
+	// Reduction operator
+	if (m_strOpName == "_CLIMMEAN") {
+		if (vecVarArguments.size() != 1) {
+			_EXCEPTION();
+		}
+
+		// Inherit units from argument
+		m_strUnits = vecVarArguments[0]->m_strUnits;
+
+		// Remove time dimension
+		if (vecVarArguments[0]->m_vecAuxIndices.size() !=
+		    vecVarArguments[0]->m_vecDimNames.size()
+		) {
+			_EXCEPTIONT("Logic error");
+		}
+		for (int d = 0; d < vecVarArguments[0]->m_vecDimNames.size(); d++) {
+			if (d == vecVarArguments[0]->m_iTimeDimIx) {
+				continue;
+			}
+			m_vecAuxIndices.push_back(vecVarArguments[0]->m_vecAuxIndices[d]);
+			m_vecDimNames.push_back(vecVarArguments[0]->m_vecDimNames[d]);
 		}
 	}
 
@@ -267,6 +327,12 @@ bool Variable::operator==(
 		return false;
 	}
 	if (m_strUnits != var.m_strUnits) {
+		return false;
+	}
+	if (m_vecDimNames != var.m_vecDimNames) {
+		return false;
+	}
+	if (m_vecAuxIndices != var.m_vecAuxIndices) {
 		return false;
 	}
 	if (m_fOp != var.m_fOp) {
@@ -325,24 +391,18 @@ std::string Variable::ToString() const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Variable::LoadGridData(
-	RecapConfigObject * pobjConfig,
+std::string Variable::LoadGridData(
 	size_t sTime
 ) {
-	// Verify initialization
-	if (m_pvarreg == NULL) {
-		_EXCEPTIONT("Invalid VariableRegistry");
-	}
-
-	// Verify argument
-	if (pobjConfig == NULL) {
-		_EXCEPTIONT("Invalid pobjConfig argument");
-	}
-
 	// Single time index (variable already loaded)
+	std::vector<long> vecAuxIndices = m_vecAuxIndices;
+
 	if (m_sTime == SingleTimeIndex) {
-		return;
+		return std::string("");
 	}
+
+	// Get a pointer to the RecapConfigObject
+	RecapConfigObject * pobjConfig = m_pvarreg->GetRecapConfigObject();
 
 	// Get Mesh
 	GridObject * pobjGrid = pobjConfig->GetGrid();
@@ -363,7 +423,7 @@ void Variable::LoadGridData(
 		if (m_data.GetRows() != mesh.sDOFCount) {
 			_EXCEPTIONT("Logic error");
 		}
-		return;
+		return std::string("");
 	}
 
 	// Allocate data
@@ -371,13 +431,20 @@ void Variable::LoadGridData(
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
-		m_sTime =
+		std::string strError =
 			pobjFileList->LoadData_float(
 				m_strName,
+				m_vecAuxIndices,
 				sTime,
 				m_data);
 
-		return;
+		if (strError != "") {
+			return strError;
+		}
+
+		m_sTime = sTime;
+
+		return std::string("");
 	}
 
 	// Evaluate the climate mean operator
@@ -385,7 +452,7 @@ void Variable::LoadGridData(
 
 		// Climate mean data has already been calculated
 		if (m_sTime == SingleTimeIndex) {
-			return;
+			return std::string("");
 		}
 
 		if (m_vecArg.size() != 1) {
@@ -403,7 +470,7 @@ void Variable::LoadGridData(
 		// Calculate climate mean
 		size_t sTimeCount = pobjFileList->GetTimeCount();
 		for (size_t t = 0; t < sTimeCount; t++) {
-			pvar->LoadGridData(pobjConfig, t);
+			pvar->LoadGridData(t);
 
 			const DataArray1D<float> & dataVar = pvar->m_data;
 
@@ -439,8 +506,8 @@ void Variable::LoadGridData(
 			_EXCEPTION1("%s", strErrorRight.c_str());
 		}
 
-		pvarLeft->LoadGridData(pobjConfig, sTime);
-		pvarRight->LoadGridData(pobjConfig, sTime);
+		pvarLeft->LoadGridData(sTime);
+		pvarRight->LoadGridData(sTime);
 
 		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
 		const DataArray1D<float> & dataRight = pvarRight->GetData();
@@ -622,23 +689,17 @@ void Variable::LoadGridData(
 	} else {
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 	}
+
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Variable::AllocateGridData(
-	RecapConfigObject * pobjConfig,
 	size_t sTime
 ) {
-	// Verify initialization
-	if (m_pvarreg == NULL) {
-		_EXCEPTIONT("Invalid VariableRegistry");
-	}
-
-	// Verify argument
-	if (pobjConfig == NULL) {
-		_EXCEPTIONT("Invalid pobjConfig argument");
-	}
+	// Get a pointer to the RecapConfigObject
+	RecapConfigObject * pobjConfig = m_pvarreg->GetRecapConfigObject();
 
 	// Get Mesh
 	GridObject * pobjGrid = pobjConfig->GetGrid();
@@ -657,14 +718,26 @@ void Variable::AllocateGridData(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Variable::WriteGridData(
-	RecapConfigObject * pobjConfig,
+std::string Variable::WriteGridData(
 	size_t sTime
 ) {
-	// Verify initialization
-	if (m_pvarreg == NULL) {
-		_EXCEPTIONT("Invalid VariableRegistry");
+	// Get a pointer to the RecapConfigObject
+	RecapConfigObject * pobjConfig = m_pvarreg->GetRecapConfigObject();
+
+	// Get FileList
+	FileListObject * pobjFileList = pobjConfig->GetFileList();
+	if (pobjFileList == NULL) {
+		_EXCEPTIONT("Invalid configuration: Missing file_list");
 	}
+
+	std::string strError =
+		pobjFileList->WriteData_float(
+			m_strName,
+			m_vecAuxIndices,
+			sTime,
+			m_data);
+
+	return strError;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -672,7 +745,7 @@ void Variable::WriteGridData(
 void Variable::UnloadGridData() {
 
 	// Force data to be loaded within this structure
-	m_sTime = (-2);
+	m_sTime = InvalidTimeIndex;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

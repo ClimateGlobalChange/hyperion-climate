@@ -19,10 +19,11 @@
 
 #include "netcdfcpp.h"
 
+#include "AccessMode.h"
 #include "DataArray1D.h"
-#include "GridObject.h"
 
 #include <vector>
+#include <map>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -44,10 +45,26 @@ class VariableRegistry {
 
 public:
 	///	<summary>
-	///		Find or register a variable.
+	///		Constructor for VariableRegistry.
+	///	</summary>
+	VariableRegistry(
+		RecapConfigObject * pobjConfig
+	);
+
+public:
+	///	<summary>
+	///		Get the pointer to the RecapConfigObject.
+	///	</summary>
+	RecapConfigObject * GetRecapConfigObject() {
+		return m_pobjConfig;
+	}
+
+	///	<summary>
+	///		Find or register a variable.  Automatically recursively identify
+	///		arguments if this is an operator combination, unless fStandalone
+	///		is set to true.
 	///	</summary>
 	std::string FindOrRegister(
-		RecapConfigObject * pobjConfig,
 		const std::string & strVariableName,
 		Variable ** ppVariable
 	);
@@ -73,6 +90,11 @@ public:
 	void UnloadAllGridData();
 
 private:
+	///	<summary>
+	///		Pointer to parent RecapConfigObject.
+	///	</summary>
+	RecapConfigObject * m_pobjConfig;
+
 	///	<summary>
 	///		Set of Variables.
 	///	</summary>
@@ -120,12 +142,18 @@ public:
 		const VariableInfo * pvarinfo
 	);
 
-
 private:
 	///	<summary>
 	///		Initialize the Variable.
 	///	</summary>
 	std::string Initialize();
+
+	///	<summary>
+	///		Initialize auxiliary information associated with this Variable.
+	///	</summary>
+	std::string InitializeAuxiliary(
+		const std::vector<Variable *> vecVarArguments
+	);
 
 public:
 	///	<summary>
@@ -149,8 +177,7 @@ public:
 	///	<summary>
 	///		Load a data block from disk.
 	///	</summary>
-	void LoadGridData(
-		RecapConfigObject * pobjConfig,
+	std::string LoadGridData(
 		size_t sTime
 	);
 
@@ -158,15 +185,13 @@ public:
 	///		Allocate an empty data block for the specified variable.
 	///	</summary>
 	void AllocateGridData(
-		RecapConfigObject * pobjConfig,
 		size_t sTime
 	);
 
 	///	<summary>
 	///		Write a data block to disk.
 	///	</summary>
-	void WriteGridData(
-		RecapConfigObject * pobjConfig,
+	std::string WriteGridData(
 		size_t sTime
 	);
 
@@ -188,6 +213,13 @@ public:
 	///	</summary>
 	const std::string & Units() const {
 		return m_strUnits;
+	}
+
+	///	<summary>
+	///		Dimension names accessor.
+	///	</summary>
+	const std::vector<std::string> & DimNames() const {
+		return m_vecDimNames;
 	}
 
 	///	<summary>
@@ -234,6 +266,22 @@ protected:
 	///	</summary>
 	std::string m_strUnits;
 
+	///	<summary>
+	///		Auxiliary dimensions associated with this variable.
+	///	</summary>
+	std::vector<std::string> m_vecDimNames;
+
+	///	<summary>
+	///		Auxiliary indices associated with data loaded in this Variable.
+	///	</summary>
+	std::vector<long> m_vecAuxIndices;
+
+	///	<summary>
+	///		Index of the record dimension.
+	///	</summary>
+	int m_iTimeDimIx;
+
+protected:
 	///	<summary>
 	///		Pointer to the associated VariableInfo structure in
 	///		FileListObject, or NULL if this is a combination of variables.

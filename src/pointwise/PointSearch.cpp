@@ -1197,7 +1197,7 @@ std::string PointSearch(
 		return strError;
 	}
 
-	pvarSearchBy->LoadGridData(pobjConfig, sTime);
+	pvarSearchBy->LoadGridData(sTime);
 
 	const DataArray1D<float> & dataSearch = pvarSearchBy->GetData();
 
@@ -1384,7 +1384,7 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecThresholdOp[tc].m_pvar->LoadGridData(pobjConfig, sTime);
+		vecThresholdOp[tc].m_pvar->LoadGridData(sTime);
 
 		const DataArray1D<float> & dataState =
 			vecThresholdOp[tc].m_pvar->GetData();
@@ -1422,7 +1422,7 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecClosedContourOp[ccc].m_pvar->LoadGridData(pobjConfig, sTime);
+		vecClosedContourOp[ccc].m_pvar->LoadGridData(sTime);
 
 		const DataArray1D<float> & dataState =
 			vecClosedContourOp[ccc].m_pvar->GetData();
@@ -1460,7 +1460,7 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecNoClosedContourOp[ccc].m_pvar->LoadGridData(pobjConfig, sTime);
+		vecNoClosedContourOp[ccc].m_pvar->LoadGridData(sTime);
 
 		const DataArray1D<float> & dataState =
 			vecNoClosedContourOp[ccc].m_pvar->GetData();
@@ -1543,7 +1543,7 @@ std::string PointSearch(
 		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 
 			// Load the search variable data
-			vecOutputOp[outc].m_pvar->LoadGridData(pobjConfig, sTime);
+			vecOutputOp[outc].m_pvar->LoadGridData(sTime);
 
 			const DataArray1D<float> & dataState =
 				vecOutputOp[outc].m_pvar->GetData();

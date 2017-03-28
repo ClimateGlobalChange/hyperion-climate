@@ -194,8 +194,9 @@ std::string TempestRegridObject::Call(
 
 			Variable * pvarTarget;
 			strError =
-				m_pobjTargetConfig->GetVariable(
-					vecVariables[v],
+				m_pobjTargetConfig->AddVariableFromTemplate(
+					m_pobjSourceConfig,
+					pvarSource,
 					&pvarTarget);
 
 			if (strError != "") {
@@ -204,12 +205,11 @@ std::string TempestRegridObject::Call(
 
 			// Apply the regridding operation to a reduction
 			if (pvarSource->IsReductionOp()) {
+
 				pvarSource->LoadGridData(
-					m_pobjSourceConfig,
 					Variable::SingleTimeIndex);
 
 				pvarTarget->AllocateGridData(
-					m_pobjTargetConfig,
 					Variable::SingleTimeIndex);
 
 				const DataArray1D<float> & dataSource =
@@ -223,19 +223,14 @@ std::string TempestRegridObject::Call(
 					dataTarget);
 
 				pvarTarget->WriteGridData(
-					m_pobjTargetConfig,
 					Variable::SingleTimeIndex);
 
 			// Apply the regridding operation to all times
 			} else {
 				for (size_t t = 0; t < pobjSourceFileList->GetTimeCount(); t++) {
-					pvarSource->LoadGridData(
-						m_pobjSourceConfig,
-						t);
+					pvarSource->LoadGridData(t);
 
-					pvarTarget->AllocateGridData(
-						m_pobjTargetConfig,
-						t);
+					pvarTarget->AllocateGridData(t);
 
 					const DataArray1D<float> & dataSource =
 						pvarSource->GetData();
@@ -247,9 +242,7 @@ std::string TempestRegridObject::Call(
 						dataSource,
 						dataTarget);
 
-					pvarTarget->WriteGridData(
-						m_pobjTargetConfig,
-						t);
+					pvarTarget->WriteGridData(t);
 				}
 			}
 		}
