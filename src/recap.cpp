@@ -509,7 +509,7 @@ try {
 				if ((vecCommandLineType[2] == ObjectType_Op) &&
 					(vecCommandLine[2] == "[")
 				) {
-					printf("LIST: %s\n", vecCommandLine[0].c_str());
+					printf("LIST %s\n", vecCommandLine[0].c_str());
 
 					ListObject * pobjList = new ListObject(vecCommandLine[0]);
 

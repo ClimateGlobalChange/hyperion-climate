@@ -24,6 +24,7 @@
 #include "GaussLobattoQuadrature.h"
 #include "STLStringHelper.h"
 #include "MeshUtilitiesFuzzy.h"
+#include "ShpLoader.h"
 
 #include <ctime>
 #include <cmath>
@@ -47,17 +48,21 @@ int Face::GetEdgeIndex(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Face::RemoveZeroEdges() {
+int Face::RemoveZeroEdges() {
 
 	// Loop through all edges of this face
+	int nRemoved = 0;
 	for (int i = 0; i < edges.size(); i++) {
 
 		// Remove zero edges
 		if (edges[i][0] == edges[i][1]) {
 			edges.erase(edges.begin()+i);
 			i--;
+			nRemoved++;
 		}
 	}
+
+	return nRemoved;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -68,6 +73,7 @@ void Mesh::Clear() {
 	eDataLayout = DataLayout_Volumetric;
 	nodes.clear();
 	faces.clear();
+	fConcave = false;
 	vecSourceFaceIx.clear();
 	vecTargetFaceIx.clear();
 	sDOFCount = 0;
@@ -1238,10 +1244,60 @@ void Mesh::Write(const std::string & strFile) const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Mesh::Read(const std::string & strFile) {
+void Mesh::Read(
+	const std::string & strFile,
+	bool fAppend
+) {
 
 	const int ParamFour = 4;
 	const int ParamLenString = 33;
+
+	// Check for SHP file
+	if (strFile.length() >= 3) {
+		if (strFile.substr(strFile.length()-3) == "shp") {
+			if (fAppend) {
+				if (eDataLayout != DataLayout_Volumetric) {
+					_EXCEPTIONT("Incompatible DataLayout with append()");
+				}
+				if (fRectilinear) {
+					_EXCEPTIONT("Rectilinear layout incompatible with append()");
+				}
+				if ((vecDimNames.size() > 1) || (vecDimSizes.size() > 1)) {
+					_EXCEPTIONT("Rectilinear layout incompatible with append()");
+				}
+
+				edgemap.clear();
+				adjlist.clear();
+				revnodearray.clear();
+			}
+
+			std::string strError =
+				LoadShpFile(
+					strFile,
+					(*this),
+					fAppend);
+
+			if (strError != "") {
+				_EXCEPTIONT(strError.c_str());
+			}
+
+			if (vecDimNames.size() == 0) {
+				vecDimNames.push_back("poly");
+			}
+			if (vecDimSizes.size() == 0) {
+				vecDimSizes.resize(1, 0);
+			}
+			vecDimSizes[0] = faces.size();
+
+			eDataLayout = DataLayout_Volumetric;
+			sDOFCount = faces.size();
+
+			// Assume concave SHP files
+			fConcave = true;
+
+			return;
+		}
+	}
 
 	// Open the NetCDF file
 	NcFile ncFile(strFile.c_str(), NcFile::ReadOnly);
@@ -1794,8 +1850,12 @@ void Mesh::Read(const std::string & strFile) {
 void Mesh::RemoveZeroEdges() {
 
 	// Remove zero edges from all Faces
+	int nRemoved = 0;
 	for (int i = 0; i < faces.size(); i++) {
-		faces[i].RemoveZeroEdges();
+		nRemoved += faces[i].RemoveZeroEdges();
+	}
+	if (nRemoved > 0) {
+		Announce("%i zero-length edge(s) removed", nRemoved);
 	}
 }
 
@@ -2472,6 +2532,11 @@ bool ConvexifyFace(
 
 	bool fHasReflexNodes = false;
 
+	// Triangles are automatically convex
+	if (nEdges <= 3) {
+		return false;
+	}
+
 	// Search for reflex nodes on Face
 	for (int i = 0; i < nEdges; i++) {
 		
@@ -2565,9 +2630,74 @@ bool ConvexifyFace(
 			}
 		}
 
-		// No dividing node found -- add a Steiner vertex
+		// No dividing node found; perform a more exhaustive search
 		if (ixDividingNode == (-1)) {
+			if (fVerbose) {
+				Announce("No dividing node found");
+			}
+/*
+			for (int j = 0; j < nEdges; j++) {
+				int ixTarget = (j + ixCurr) % nEdges;
+				//int ixTarget = (j + ixCurr + nEdges/2) % nEdges;
+				if (ixTarget == ixCurr) {
+					continue;
+				}
+				if (ixTarget == (ixCurr+1) % nEdges) {
+					continue;
+				}
+				if (ixTarget == (ixCurr+nEdges-1) % nEdges) {
+					continue;
+				}
 
+				bool fIntersect = false;
+				for (int k = 0; k < nEdges; k++) {
+					std::vector<Node> vecIntersections;
+
+					if ((k == ixCurr) || ((k+1)%nEdges == ixCurr)) {
+						continue;
+					}
+					if ((k == ixTarget) || ((k+1)%nEdges == ixTarget)) {
+						continue;
+					}
+
+					bool fCoincident = meshutils.CalculateEdgeIntersections(
+						nodeCurr,
+						mesh.nodes[face[ixTarget]],
+						Edge::Type_GreatCircleArc,
+						mesh.nodes[face[k]],
+						mesh.nodes[face[(k+1)%nEdges]],
+						Edge::Type_GreatCircleArc,
+						vecIntersections);
+
+					if (fCoincident) {
+						continue;
+					}
+					if (vecIntersections.size() > 0) {
+						fIntersect = true;
+						break;
+					}
+				}
+
+				if (!fIntersect) {
+					ixDividingNode = ixTarget;
+					break;
+				}
+			}
+			if (ixDividingNode == (-1)) {
+				nodeCurr.Print("Curr");
+				for (int j = 0; j < nEdges; j++) {
+					printf("[%1.15e %1.15e %1.15e],\n",
+						mesh.nodes[face[j]].x,
+						mesh.nodes[face[j]].y,
+						mesh.nodes[face[j]].z);
+				}
+				std::cout << nEdges << std::endl;
+				_EXCEPTION();
+			}
+		}
+*/
+
+   			// Steiner vertex approach
 			if (fVerbose) {
 				Announce("No dividing node found -- adding a Steiner vertex");
 			}
@@ -2594,6 +2724,11 @@ bool ConvexifyFace(
 
 				std::vector<Node> vecIntersections;
 
+				if (meshutils.AreNodesEqual(mesh.nodes[face[j]], mesh.nodes[face[(j+1)%nEdges]])) {
+					continue;
+				}
+
+
 				bool fCoincident = meshutils.CalculateEdgeIntersectionsSemiClip(
 					mesh.nodes[face[j]],
 					mesh.nodes[face[(j+1)%nEdges]],
@@ -2604,7 +2739,7 @@ bool ConvexifyFace(
 					vecIntersections);
 
 				if (fCoincident) {
-					_EXCEPTIONT("Coincident lines detected");
+					continue;//_EXCEPTIONT("Coincident lines detected");
 				}
 
 				if (vecIntersections.size() > 1) {
@@ -2662,6 +2797,10 @@ bool ConvexifyFace(
 			ConvexifyFace(meshout, meshout, nFaces-2, true, fVerbose);
 
 		// Divide the mesh at the reflex node
+
+		//if (ixDividingNode == (-1)) {
+			//_EXCEPTIONT("No dividing node found");
+
 		} else {
 			if (fVerbose) {
 				Announce("Dividing node found %i", face[ixDividingNode]);
@@ -2730,6 +2869,12 @@ void ConvexifyMesh(
 			AnnounceEndBlock("Done");
 		}
 	}
+
+	// Set dimensions
+	mesh.vecDimSizes.resize(1);
+	mesh.vecDimSizes[0] = mesh.faces.size();
+	mesh.vecDimNames.resize(1);
+	mesh.vecDimNames[0] = "ncol";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2781,6 +2926,15 @@ void ConvexifyMesh(
 	if (meshout.vecMultiFaceMap.size() != meshout.faces.size()) {
 		_EXCEPTIONT("Logic error");
 	}
+
+	// Set dimensions
+	meshout.vecDimSizes.resize(1);
+	meshout.vecDimSizes[0] = meshout.faces.size();
+	meshout.vecDimNames.resize(1);
+	meshout.vecDimNames[0] = "ncol";
+
+	// Set degrees of freedom
+	meshout.sDOFCount = meshout.faces.size();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

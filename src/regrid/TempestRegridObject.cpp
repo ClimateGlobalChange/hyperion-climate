@@ -135,11 +135,10 @@ std::string TempestRegridObject::Call(
 				dynamic_cast<StringObject *>(
 					objreg.GetObject(vecCommandLine[0]));
 			if (pobjVariableString == NULL) {
-				return std::string("ERROR: First argument of regrid() must be"
-					" of type list or string");
+				vecVariables.push_back(vecCommandLine[0]);
+			} else {
+				vecVariables.push_back(pobjVariableString->Value());
 			}
-
-			vecVariables.push_back(pobjVariableString->Value());
 
 		} else {
 			for (size_t i = 0; i < pobjVariableList->Count(); i++) {
@@ -331,6 +330,10 @@ std::string TempestRegridObject::Initialize(
 	GridObject * pobjSourceGrid = pobjSourceConfig->GetGrid();
 	GridObject * pobjTargetGrid = pobjTargetConfig->GetGrid();
 
+	// Pointers to Meshes
+	Mesh * pmeshSource = &(pobjSourceGrid->GetMesh());
+	Mesh * pmeshTarget = &(pobjTargetGrid->GetMesh());
+
 	// Monotone type
 	int nMonotoneType = 0;
 
@@ -341,13 +344,19 @@ std::string TempestRegridObject::Initialize(
 	bool fBubble = true;
 
 	// Concave faces in mesh
-	bool fSourceConcave = false;
+	bool fSourceConcave = pmeshSource->fConcave;
 
 	// Concave faces in mesh
-	bool fTargetConcave = false;
+	bool fTargetConcave = pmeshTarget->fConcave;
 
 	// Generate EdgeMap on source mesh if not available
-	Mesh & meshSource = pobjSourceGrid->GetMesh();
+	if (fSourceConcave) {
+		Announce("Convexifying source mesh");
+		pmeshSource = new Mesh;
+		ConvexifyMesh(pobjSourceGrid->GetMesh(), *pmeshSource);
+	}
+	Mesh & meshSource = (*pmeshSource);
+
 	meshSource.ConstructReverseNodeArray();
 	meshSource.ConstructEdgeMap();
 	double dSourceArea = meshSource.CalculateFaceAreas(fSourceConcave);
@@ -366,8 +375,22 @@ std::string TempestRegridObject::Initialize(
 	DataArray3D<double> dataSourceGLLJacobian;
 
 	if (meshSource.eDataLayout == Mesh::DataLayout_Volumetric) {
-		m_mapRemap.SetSourceAreas(meshSource.vecFaceArea);
-		m_mapRemap.InitializeSourceCoordinatesFromMeshFV(meshSource);
+		if (meshSource.vecMultiFaceMap.size() != 0) {
+			DataArray1D<double> vecSourceAreas(
+				pobjSourceGrid->GetMesh().faces.size());
+
+			for (size_t f = 0; f < meshSource.vecMultiFaceMap.size(); f++) {
+				vecSourceAreas[meshSource.vecMultiFaceMap[f]] +=
+					meshSource.vecFaceArea[f];
+			}
+			m_mapRemap.SetSourceAreas(vecSourceAreas);
+
+		} else {
+			m_mapRemap.SetSourceAreas(meshSource.vecFaceArea);
+		}
+
+		m_mapRemap.InitializeSourceCoordinatesFromMeshFV(
+			pobjSourceGrid->GetMesh());
 
 	} else {
 		double dSourceNumericalArea =
@@ -396,7 +419,15 @@ std::string TempestRegridObject::Initialize(
 	}
 
 	// Generate EdgeMap on target mesh if not available
-	Mesh & meshTarget = pobjTargetGrid->GetMesh();
+	if (fTargetConcave) {
+		Announce("Convexifying target mesh");
+		pmeshTarget = new Mesh;
+		ConvexifyMesh(pobjTargetGrid->GetMesh(), *pmeshTarget);
+	}
+	Mesh & meshTarget = (*pmeshTarget);
+	Announce("Target mesh has %i faces", meshTarget.faces.size());
+	Announce("Target mesh has %i nodes", meshTarget.nodes.size());
+
 	meshTarget.ConstructReverseNodeArray();
 	meshTarget.ConstructEdgeMap();
 	double dTargetArea = meshTarget.CalculateFaceAreas(fTargetConcave);
@@ -415,8 +446,20 @@ std::string TempestRegridObject::Initialize(
 	DataArray3D<double> dataTargetGLLJacobian;
 
  	if (meshTarget.eDataLayout == Mesh::DataLayout_Volumetric) {
-		m_mapRemap.SetTargetAreas(meshTarget.vecFaceArea);
-		m_mapRemap.InitializeTargetCoordinatesFromMeshFV(meshTarget);
+		if (meshTarget.vecMultiFaceMap.size() != 0) {
+			DataArray1D<double> vecTargetAreas(
+				pobjTargetGrid->GetMesh().faces.size());
+			for (size_t f = 0; f < meshTarget.vecMultiFaceMap.size(); f++) {
+				vecTargetAreas[meshTarget.vecMultiFaceMap[f]] +=
+					meshTarget.vecFaceArea[f];
+			}
+			m_mapRemap.SetTargetAreas(vecTargetAreas);
+
+		} else {
+			m_mapRemap.SetTargetAreas(meshTarget.vecFaceArea);
+		}
+		m_mapRemap.InitializeTargetCoordinatesFromMeshFV(
+			pobjTargetGrid->GetMesh());
 	} else {
 		double dTargetNumericalArea =
 			GenerateMetaData(
@@ -465,7 +508,6 @@ std::string TempestRegridObject::Initialize(
 			HRegrid::OverlapMeshMethod_Fuzzy);
 
 		pMeshOverlap->ExchangeFirstAndSecondMesh();
-
 	}
 	AnnounceEndBlock("Done");
 
@@ -499,9 +541,18 @@ std::string TempestRegridObject::Initialize(
 		_EXCEPTIONT("Not implemented");
 	}
 
-	AnnounceEndBlock("Done");
+	// Delete the convexified Mesh
+	if (fSourceConcave) {
+		delete pmeshSource;
+	}
+	if (fTargetConcave) {
+		delete pmeshTarget;
+	}
 
+	// Delete the overlap mesh
 	delete pMeshOverlap;
+
+	AnnounceEndBlock("Done");
 
 	return std::string("");
 }

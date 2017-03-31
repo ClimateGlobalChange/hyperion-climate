@@ -97,7 +97,7 @@ public:
 	///		Comparator operator using floating point tolerance.
 	///	</summary>
 	bool operator< (const Node & node) const {
-		static const double Tolerance = 1.0e-8; //ReferenceTolerance;
+		static const double Tolerance = ReferenceTolerance;
 
 		if (x - node.x <= -Tolerance) {
 			return true;
@@ -581,7 +581,7 @@ public:
 	///	<summary>
 	///		Remove zero Edges (Edges with repeated Node indices)
 	///	</summary>
-	void RemoveZeroEdges();
+	int RemoveZeroEdges();
 };
 
 ///	<summary>
@@ -639,6 +639,11 @@ public:
 	///		Vector of Faces for this mesh.
 	///	<summary>
 	FaceVector faces;
+
+	///	<summary>
+	///		Flag indicating the mesh contains concave elements.
+	///	</summary>
+	bool fConcave;
 
 	///	<summary>
 	///		Vector of first mesh Face indices (used for regridding).
@@ -721,6 +726,7 @@ public:
 	///	</summary>
 	Mesh() :
 		eDataLayout(DataLayout_Volumetric),
+		fConcave(false),
 		sDOFCount(0),
 		fRectilinear(false)
 	{ }
@@ -730,6 +736,7 @@ public:
 	///	</summary>
 	Mesh(const std::string & strFile) :
 		eDataLayout(DataLayout_Volumetric),
+		fConcave(false),
 		sDOFCount(0),
 		fRectilinear(false)
 	{
@@ -816,7 +823,10 @@ public:
 	///	<summary>
 	///		Read the mesh to a NetCDF file.
 	///	</summary>
-	void Read(const std::string & strFile);
+	void Read(
+		const std::string & strFile,
+		bool fAppend = false
+	);
 
 	///	<summary>
 	///		Remove zero edges from all Faces.

@@ -1494,7 +1494,7 @@ void GenerateOverlapFace(
 						Edge::Type_GreatCircleArc,
 						nodesSource[evecSource[i][0]],
 						nodesSource[evecSource[i][1]],
-						evecSource[i].type,
+						Edge::Type_GreatCircleArc,
 						vecIntersections);
 /*
 				nodesSource[evecSource[i][0]].Print("S0");
@@ -1515,7 +1515,13 @@ void GenerateOverlapFace(
 					nodevecOutput.push_back(vecIntersections[0]);
 
 				} else {
-					_EXCEPTIONT("Logic error");
+					std::cout << vecIntersections.size() << std::endl;
+					nodeS.Print("S");
+					nodeE.Print("E");
+					nodesSource[evecSource[i][0]].Print("0");
+					nodesSource[evecSource[i][1]].Print("1");
+					Announce("WARNING: Incompatible intersection");
+					//_EXCEPTIONT("Logic error");
 				}
 
 				//vecIntersections[0].Print("Add");

@@ -17,6 +17,8 @@
 #include "GridObject.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+// GridObjectConstructor
+///////////////////////////////////////////////////////////////////////////////
 
 std::string GridObjectConstructor::Call(
 	const ObjectRegistry & objreg,
@@ -52,15 +54,22 @@ std::string GridObjectConstructor::Call(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// GridObject
+///////////////////////////////////////////////////////////////////////////////
 
 std::string GridObject::Initialize(
 	const ObjectRegistry & objreg,
 	const std::vector<std::string> & vecFuncArguments,
 	const std::vector<ObjectType> & vecFuncArgumentsType
 ) {
-	// Check arguments
+	// Create a blank grid
 	if (vecFuncArguments.size() == 0) {
-		return std::string("ERROR: Missing grid() arguments");
+		return std::string("");
+	}
+
+	// At most two arguments expected
+	if (vecFuncArguments.size() > 2) {
+		return std::string("ERROR: Invalid arguments to grid()");
 	}
 
 	// Initialize from file name
@@ -241,6 +250,50 @@ std::string GridObject::InitializeRLLGrid(
 		nLongitudes);
 
 	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string GridObject::Call(
+	const ObjectRegistry & objreg,
+	const std::string & strFunctionName,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	// Output information about the FileList to a CSV file
+	if (strFunctionName == "append") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"append\"");
+		}
+
+		m_mesh.Read(vecCommandLine[0], true);
+
+		return std::string("");
+	}
+
+	// Write the mesh to file
+	if (strFunctionName == "write") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"write\"");
+		}
+
+		m_mesh.Write(vecCommandLine[0]);
+
+		return std::string("");
+	}
+
+	return
+		Object::Call(
+			objreg,
+			strFunctionName,
+			vecCommandLine,
+			vecCommandLineType,
+			ppReturn);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

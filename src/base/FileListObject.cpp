@@ -378,7 +378,13 @@ std::string FileListObject::LoadData_float(
 	size_t sFile = iter->second.first;
 	int iTime = iter->second.second;
 
-	Announce("Loading data [%s] [%lu]", strVariableName.c_str(), sTime);
+	if (sTime != (-1)) {
+		Announce("Loading data [%s] [%s]",
+			strVariableName.c_str(),
+			m_vecTimes[sTime].ToString().c_str());
+	} else {
+		Announce("Loading data [%s] [NoTime]", strVariableName.c_str());
+	}
 
 	// Open the correct NetCDF file
 	NcFile ncfile(m_vecFilenames[sFile].c_str());
@@ -606,6 +612,8 @@ std::string FileListObject::WriteData_float(
 			_EXCEPTION1("Unable to create variable \"%s\"",
 				strVariableName.c_str());
 		}
+
+		var->add_att("units", varinfo.m_strUnits.c_str());
 	}
 
 	// Set current position

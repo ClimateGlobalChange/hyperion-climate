@@ -202,9 +202,13 @@ bool MeshUtilitiesFuzzy::CalculateEdgeIntersectionsSemiClip(
 
 	// Check for coincident nodes
 	if (AreNodesEqual(node11, node12)) {
+		node11.Print("node11");
+		node12.Print("node12");
 		_EXCEPTIONT("Coincident nodes used to define edge");
 	}
 	if (AreNodesEqual(node21, node22)) {
+		node21.Print("node21");
+		node22.Print("node22");
 		_EXCEPTIONT("Coincident nodes used to define edge");
 	}
 

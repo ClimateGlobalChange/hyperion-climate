@@ -34,7 +34,8 @@ FILES= Announce.cpp \
 	   FiniteElementTools.cpp \
 	   MeshUtilities.cpp \
 	   MeshUtilitiesFuzzy.cpp \
-	   GridElements.cpp
+	   GridElements.cpp \
+	   ShpLoader.cpp
 
 LIB_TARGET= libhyperionbase.a
 

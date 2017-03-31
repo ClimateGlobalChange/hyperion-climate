@@ -23,6 +23,8 @@
 
 #include "Announce.h"
 
+#include <iostream>
+
 ///////////////////////////////////////////////////////////////////////////////
 
 
@@ -987,6 +989,7 @@ void LinearRemapSE4(
 				}
 			}
 			}
+
 		}
 
 		// Increment the current overlap index

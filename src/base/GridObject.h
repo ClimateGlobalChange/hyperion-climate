@@ -114,6 +114,18 @@ protected:
 
 public:
 	///	<summary>
+	///		Call a member function of this Object.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::string & strFunctionName,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+
+public:
+	///	<summary>
 	///		Get a reference to the Mesh.
 	///	</summary>
 	const Mesh & GetMesh() const {
