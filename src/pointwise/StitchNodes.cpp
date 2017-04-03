@@ -384,6 +384,9 @@ public:
 	// Time step stride
 	int nTimeStride;
 
+	// Vector of path headers
+	std::vector<std::string> * pvecPathHeaders;
+
 	// Vector of path threshold operators
 	std::vector<PathThresholdOp> * pvecPathThresholdOp;
 };
@@ -726,8 +729,15 @@ std::string StitchNodes(
 
 	// Store results
 	if (pobjPathData != NULL) {
+		pobjPathData->SetHeaders(*pobjPointData);
+
 		std::vector< MultiTypeDataArray2D > & vecPathData =
 			pobjPathData->GetData();
+
+		std::vector< std::vector<int> > & vecPathHeaders =
+			pobjPathData->GetHeaders();
+
+		vecPathHeaders.resize(vecPaths.size());
 
 		vecPathData.resize(vecPaths.size());
 
@@ -738,6 +748,33 @@ std::string StitchNodes(
 				pobjPointData->GetDoubleFieldCount());
 
 			vecPathData[i].Resize(vecPaths[i].m_iTimes.size());
+
+			if (vecPaths[i].m_iTimes.size() == 0) {
+				_EXCEPTIONT("Invalid path");
+			}
+
+			for (int j = 0; j < param.pvecPathHeaders->size(); j++) {
+				const std::string & strHeader = (*param.pvecPathHeaders)[j];
+
+				const Time & time =
+					pobjFileList->GetTime(vecPaths[i].m_iTimes[0]);
+
+				if (strHeader == "%count") {
+					vecPathHeaders[i].push_back(vecPaths[i].m_iTimes.size());
+				} else if (strHeader == "%year") {
+					vecPathHeaders[i].push_back(time.GetYear());
+				} else if (strHeader == "%month") {
+					vecPathHeaders[i].push_back(time.GetMonth());
+				} else if (strHeader == "%day") {
+					vecPathHeaders[i].push_back(time.GetDay());
+				} else if (strHeader == "%hour") {
+					vecPathHeaders[i].push_back(time.GetSecond() / 3600);
+				} else if (strHeader == "%second") {
+					vecPathHeaders[i].push_back(time.GetSecond() % 3600);
+				} else {
+					_EXCEPTIONT("Invalid header");
+				}
+			}
 
 			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
 				int iTime = vecPaths[i].m_iTimes[t];
@@ -913,6 +950,43 @@ std::string StitchNodesFunction::Call(
 	}
 
 	snparam.pvecPathThresholdOp = &vecPathThresholdOps;
+
+	// Path headers
+	std::vector<std::string> vecPathHeaders;
+
+	ListObject * pobjPathHeaderList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(pobjParam->ChildName("pathhead")));
+
+	if (pobjPathHeaderList != NULL) {
+		for (size_t i = 0; i < pobjPathHeaderList->ChildrenCount(); i++) {
+			StringObject * pobjChild =
+				dynamic_cast<StringObject *>(
+					pobjPathHeaderList->GetChild(i));
+
+			if (pobjChild == NULL) {
+				return std::string("ERROR: All elements of \"pathhead\" list must "
+					"be of type string");
+			}
+
+			vecPathHeaders.push_back(pobjChild->Value());
+
+			if ((pobjChild->Value() != "%year") &&
+				(pobjChild->Value() != "%month") &&
+				(pobjChild->Value() != "%day") &&
+				(pobjChild->Value() != "%hour") &&
+				(pobjChild->Value() != "%second") &&
+				(pobjChild->Value() != "%count")
+			) {
+				return std::string("ERROR: Invalid string in \"pathhead\"");
+			}
+		}
+
+	} else {
+		vecPathHeaders.push_back("%count");
+	}
+
+	snparam.pvecPathHeaders = &vecPathHeaders;
 
 	// Gather data to root node
 	pobjPointData->Gather();

@@ -49,7 +49,16 @@ std::string PathDataObject::OutputCSV(
 	MultiTypeDataHeaders::OutputCSV(ofOutput);
 
 	for (size_t i = 0; i < m_vecPathData.size(); i++) {
-		ofOutput << "Path " << i << std::endl;
+		if (m_vecPathHeaders.size() >= i) {
+			for (size_t h = 0; h < m_vecPathHeaders[i].size(); h++) {
+				ofOutput << m_vecPathHeaders[i][h];
+				if (h != m_vecPathHeaders[i].size()-1) {
+					ofOutput << ",";
+				} else {
+					ofOutput << std::endl;
+				}
+			}
+		}
 		m_vecPathData[i].OutputCSV(ofOutput);
 	}
 /*

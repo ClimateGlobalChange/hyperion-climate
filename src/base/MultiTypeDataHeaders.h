@@ -35,6 +35,18 @@ protected:
 	MultiTypeDataHeaders()
 	{ }
 
+public:
+	///	<summary>
+	///		Copy over headers from another MultiTypeDataHeaders.
+	///	</summary>
+	void SetHeaders(const MultiTypeDataHeaders & headers) {
+		m_strIntFieldHeaders = headers.m_strIntFieldHeaders;
+		m_strFloatFieldHeaders = headers.m_strFloatFieldHeaders;
+		m_strDoubleFieldHeaders = headers.m_strDoubleFieldHeaders;
+		m_strFloatFieldUnits = headers.m_strFloatFieldUnits;
+		m_strDoubleFieldUnits = headers.m_strDoubleFieldUnits;
+	}
+
 protected:
 	///	<summary>
 	///		Set the number of fields used by the object.

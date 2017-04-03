@@ -419,13 +419,13 @@ public:
 				return std::string("ERROR: Invalid variable name \"\"");
 			}
 
-			if (strValue[0] == '@') {
+			if (strValue[0] == '%') {
 				m_strSpecialName = strValue;
-				if ((strValue != "@year") &&
-				    (strValue != "@month") &&
-				    (strValue != "@day") &&
-				    (strValue != "@hour") &&
-				    (strValue != "@second")
+				if ((strValue != "%year") &&
+				    (strValue != "%month") &&
+				    (strValue != "%day") &&
+				    (strValue != "%hour") &&
+				    (strValue != "%second")
 				) {
 					return std::string("ERROR: Invalid variable name \"")
 						+ strValue + std::string("\"");
@@ -1593,21 +1593,25 @@ std::string PointSearch(
 				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 					const Time & time = pobjFileList->GetTime(sTime);
-					if (vecOutputOp[outc].m_strSpecialName == "@year") {
+					if (vecOutputOp[outc].m_strSpecialName == "%year") {
 						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
 							= time.GetYear();
 
-					} else if (vecOutputOp[outc].m_strSpecialName == "@month") {
+					} else if (vecOutputOp[outc].m_strSpecialName == "%month") {
 						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
 							= time.GetMonth();
 
-					} else if (vecOutputOp[outc].m_strSpecialName == "@day") {
+					} else if (vecOutputOp[outc].m_strSpecialName == "%day") {
 						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
 							= time.GetDay();
 
-					} else if (vecOutputOp[outc].m_strSpecialName == "@second") {
+					} else if (vecOutputOp[outc].m_strSpecialName == "%hour") {
 						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
-							= time.GetSecond();
+							= time.GetSecond() / 3600;
+
+					} else if (vecOutputOp[outc].m_strSpecialName == "%second") {
+						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
+							= time.GetSecond() % 3600;
 
 					} else {
 						_EXCEPTION();

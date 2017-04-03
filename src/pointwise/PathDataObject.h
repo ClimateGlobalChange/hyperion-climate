@@ -87,6 +87,13 @@ public:
 	);
 
 	///	<summary>
+	///		Get the vector of path headers.
+	///	</summary>
+	std::vector< std::vector<int> > & GetHeaders() {
+		return m_vecPathHeaders;
+	}
+
+	///	<summary>
 	///		Get the vector of path data information.
 	///	</summary>
 	std::vector< MultiTypeDataArray2D > & GetData() {
@@ -101,6 +108,11 @@ public:
 	}
 
 protected:
+	///	<summary>
+	///		Path data headers.
+	///	</summary>
+	std::vector< std::vector<int> > m_vecPathHeaders;
+
 	///	<summary>
 	///		A vector of path data information.
 	///	</summary>
