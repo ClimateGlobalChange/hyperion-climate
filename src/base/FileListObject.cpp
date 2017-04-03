@@ -167,7 +167,7 @@ std::string FileListObject::PopulateFromSearchString(
 	std::string strFileSearchString;
 	for (int i = strSearchString.length(); i >= 0; i--) {
 		if (strSearchString[i] == '/') {
-			strDir = strSearchString.substr(0,i);
+			strDir = strSearchString.substr(0,i+1);
 			strFileSearchString =
 				strSearchString.substr(i+1, std::string::npos);
 			break;

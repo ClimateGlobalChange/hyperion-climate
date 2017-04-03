@@ -305,9 +305,6 @@ public:
 				(fabs(dCandidateValue) <= m_dValue)
 			) {
 				nCount++;
-
-			} else {
-				_EXCEPTIONT("Invalid op");
 			}
 		}
 
@@ -736,7 +733,7 @@ std::string StitchNodes(
 
 		for (int i = 0; i < vecPaths.size(); i++) {
 			vecPathData[i].SetFieldCount(
-				2,
+				pobjPointData->GetIntFieldCount(),
 				pobjPointData->GetFloatFieldCount(),
 				pobjPointData->GetDoubleFieldCount());
 
@@ -749,10 +746,10 @@ std::string StitchNodes(
 				int tlocal = vecPaths[i].m_iTimes[t];
 				int iGlobalIx = vecFirstCandidate[tlocal] + iCandidate;
 
-				vecPathData[i].DataInt(t,0) =
-					pobjPointData->DataInt(iGlobalIx,0);
-				vecPathData[i].DataInt(t,1) =
-					pobjPointData->DataInt(iGlobalIx,1);
+				for (int j = 0; j < pobjPointData->GetIntFieldCount(); j++) {
+					vecPathData[i].DataInt(t,j) =
+						pobjPointData->DataInt(iGlobalIx,j);
+				}
 				for (int j = 0; j < pobjPointData->GetFloatFieldCount(); j++) {
 					vecPathData[i].DataFloat(t,j) =
 						pobjPointData->DataFloat(iGlobalIx,j);

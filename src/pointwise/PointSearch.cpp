@@ -413,17 +413,37 @@ public:
 		const StringObject * pobjString =
 			dynamic_cast<const StringObject *>(pobj);
 		if (pobjString != NULL) {
-			std::string strError =
-				pobjConfig->GetVariable(
-					pobjString->Value(),
-					&m_pvar);
+			const std::string & strValue = pobjString->Value();
 
-			if (strError != "") {
-				return strError;
+			if (strValue.length() == 0) {
+				return std::string("ERROR: Invalid variable name \"\"");
 			}
 
-			m_eOp = Max;
-			m_dDistance = 0.0;
+			if (strValue[0] == '@') {
+				m_strSpecialName = strValue;
+				if ((strValue != "@year") &&
+				    (strValue != "@month") &&
+				    (strValue != "@day") &&
+				    (strValue != "@hour") &&
+				    (strValue != "@second")
+				) {
+					return std::string("ERROR: Invalid variable name \"")
+						+ strValue + std::string("\"");
+				}
+
+			} else {
+				std::string strError =
+					pobjConfig->GetVariable(
+						pobjString->Value(),
+						&m_pvar);
+
+				if (strError != "") {
+					return strError;
+				}
+
+				m_eOp = Max;
+				m_dDistance = 0.0;
+			}
 
 			return std::string("");
 		}
@@ -543,6 +563,11 @@ public:
 	///		Pointer to variable to use for output.
 	///	</summary>
 	Variable * m_pvar;
+
+	///	<summary>
+	///		Name of special variable used for output.
+	///	</summary>
+	std::string m_strSpecialName;
 
 	///	<summary>
 	///		Operation.
@@ -1141,6 +1166,9 @@ std::string PointSearch(
 	const PointSearchParam & param,
 	PointDataObject * pobjPointData
 ) {
+	// Get the FileList object
+	const FileListObject * pobjFileList = pobjConfig->GetFileList();
+
 	// Set the Announce buffer
 	if (param.fpLog == NULL) {
 		_EXCEPTIONT("Invalid log buffer");
@@ -1519,8 +1547,19 @@ std::string PointSearch(
 	// Write results to PointDataObject
 	if (pobjPointData != NULL) {
 
+		// Count number of special fields
+		int nSpecialFields = 2;
+		int nVariableFields = 0;
+		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+			if (vecOutputOp[outc].m_strSpecialName != "") {
+				nSpecialFields++;
+			} else {
+				nVariableFields++;
+			}
+		}
+
 		// Resize the results structure
-		pobjPointData->SetFieldCount(2, vecOutputOp.size(), 0);
+		pobjPointData->SetFieldCount(nSpecialFields, nVariableFields, 0);
 		pobjPointData->Resize(setCandidates.size());
 
 		// Add time and location for all candidates
@@ -1540,92 +1579,135 @@ std::string PointSearch(
 		}
 
 		// Apply output operators
+		int iSpecialFieldCount = 2;
+		int iVariableFieldCount = 0;
 		for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 
-			// Load the search variable data
-			vecOutputOp[outc].m_pvar->LoadGridData(sTime);
+			// Special output operator
+			if (vecOutputOp[outc].m_strSpecialName != "") {
+				
+				std::set<int>::const_iterator iterCandidate
+					= setCandidates.begin();
 
-			const DataArray1D<float> & dataState =
-				vecOutputOp[outc].m_pvar->GetData();
+				int iCandidateCount = 0;
+				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-			// Add all candidate data to PointDataObject
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
+					const Time & time = pobjFileList->GetTime(sTime);
+					if (vecOutputOp[outc].m_strSpecialName == "@year") {
+						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
+							= time.GetYear();
 
-			int iCandidateCount = 0;
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+					} else if (vecOutputOp[outc].m_strSpecialName == "@month") {
+						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
+							= time.GetMonth();
 
-				int ixExtremum;
-				float dValue;
-				float dRMax;
+					} else if (vecOutputOp[outc].m_strSpecialName == "@day") {
+						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
+							= time.GetDay();
 
-				if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
-					FindLocalMinMax<float>(
-						mesh,
-						false,
-						dataState,
-						*iterCandidate,
-						vecOutputOp[outc].m_dDistance,
-						ixExtremum,
-						dValue,
-						dRMax);
+					} else if (vecOutputOp[outc].m_strSpecialName == "@second") {
+						pobjPointData->DataInt(iCandidateCount,iSpecialFieldCount)
+							= time.GetSecond();
 
-					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
+					} else {
+						_EXCEPTION();
+					}
 
-				} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
-					FindLocalMinMax<float>(
-						mesh,
-						false,
-						dataState,
-						*iterCandidate,
-						vecOutputOp[outc].m_dDistance,
-						ixExtremum,
-						dValue,
-						dRMax);
-
-					pobjPointData->DataFloat(iCandidateCount,outc) = dRMax;
-
-				} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
-					FindLocalMinMax<float>(
-						mesh,
-						true,
-						dataState,
-						*iterCandidate,
-						vecOutputOp[outc].m_dDistance,
-						ixExtremum,
-						dValue,
-						dRMax);
-
-					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
-
-				} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
-					FindLocalMinMax<float>(
-						mesh,
-						true,
-						dataState,
-						*iterCandidate,
-						vecOutputOp[outc].m_dDistance,
-						ixExtremum,
-						dValue,
-						dRMax);
-
-					pobjPointData->DataFloat(iCandidateCount,outc) = dRMax;
-
-				} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
-					FindLocalAverage<float>(
-						mesh,
-						dataState,
-						*iterCandidate,
-						vecOutputOp[outc].m_dDistance,
-						dValue);
-
-					pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
-
-				} else {
-					_EXCEPTIONT("Invalid Output operator");
+					iCandidateCount++;
 				}
 
-				iCandidateCount++;
+				iSpecialFieldCount++;
+
+			// Regular output operator
+			} else {
+
+				// Load the search variable data
+				vecOutputOp[outc].m_pvar->LoadGridData(sTime);
+
+				const DataArray1D<float> & dataState =
+					vecOutputOp[outc].m_pvar->GetData();
+
+				// Add all candidate data to PointDataObject
+				std::set<int>::const_iterator iterCandidate
+					= setCandidates.begin();
+
+				int iCandidateCount = 0;
+				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+					int ixExtremum;
+					float dValue;
+					float dRMax;
+
+					if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
+						FindLocalMinMax<float>(
+							mesh,
+							false,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						pobjPointData->DataFloat(iCandidateCount,iVariableFieldCount) = dValue;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
+						FindLocalMinMax<float>(
+							mesh,
+							false,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						pobjPointData->DataFloat(iCandidateCount,iVariableFieldCount) = dRMax;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
+						FindLocalMinMax<float>(
+							mesh,
+							true,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						pobjPointData->DataFloat(iCandidateCount,outc) = dValue;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
+						FindLocalMinMax<float>(
+							mesh,
+							true,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						pobjPointData->DataFloat(iCandidateCount,iVariableFieldCount) = dRMax;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
+						FindLocalAverage<float>(
+							mesh,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							dValue);
+
+						pobjPointData->DataFloat(iCandidateCount,iVariableFieldCount) = dValue;
+
+					} else {
+						_EXCEPTIONT("Invalid Output operator");
+					}
+
+					iCandidateCount++;
+				}
+
+				iVariableFieldCount++;
 			}
 		}
 /*
@@ -1968,23 +2050,29 @@ std::string PointSearchFunction::Call(
 
 		pobjPointDataCombined->Concatenate(vecpobjPointData);
 
-		if (pobjPointDataCombined->GetIntFieldCount() != 2) {
-			_EXCEPTIONT("Logic error");
-		}
-		if (pobjPointDataCombined->GetFloatFieldCount() != vecOutputOps.size()) {
-			_EXCEPTIONT("Logic error");
-		}
-
 		// Set field headers
 		pobjPointDataCombined->SetIntFieldHeader(0, "time_ix");
 		pobjPointDataCombined->SetIntFieldHeader(1, "space_ix");
 
-		for (size_t i = 0; i < vecOutputOps.size(); i++) {
-			pobjPointDataCombined->SetFloatFieldHeader(
-				i, vecOutputOps[i].m_pvar->Name());
+		int iSpecialField = 2;
+		int iVariableField = 0;
 
-			pobjPointDataCombined->SetFloatFieldUnits(
-				i, vecOutputOps[i].m_pvar->Units());
+		for (size_t i = 0; i < vecOutputOps.size(); i++) {
+			if (vecOutputOps[i].m_strSpecialName != "") {
+				pobjPointDataCombined->SetIntFieldHeader(
+					iSpecialField, vecOutputOps[i].m_strSpecialName);
+
+				iSpecialField++;
+
+			} else {
+				pobjPointDataCombined->SetFloatFieldHeader(
+					iVariableField, vecOutputOps[i].m_pvar->Name());
+
+				pobjPointDataCombined->SetFloatFieldUnits(
+					iVariableField, vecOutputOps[i].m_pvar->Units());
+
+				iVariableField++;
+			}
 		}
 
 		// Cleanup

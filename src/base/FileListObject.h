@@ -282,6 +282,23 @@ public:
 	}
 
 	///	<summary>
+	///		Get the Time with the specified index.
+	///	</summary>
+	const Time & GetTime(int iTime) const {
+		if (iTime >= m_vecTimes.size()) {
+			_EXCEPTIONT("Out of range");
+		}
+		return m_vecTimes[iTime];
+	}
+
+	///	<summary>
+	///		Get the vector of Times associated with the FileList.
+	///	</summary>
+	const std::vector<Time> & GetTimes() const {
+		return m_vecTimes;
+	}
+
+	///	<summary>
 	///		Get the size of the specified dimension.
 	///	</summary>
 	long GetDimSize(const std::string & strDimName) const {
