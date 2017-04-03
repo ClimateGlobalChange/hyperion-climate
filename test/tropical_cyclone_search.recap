@@ -33,7 +33,7 @@ dcu_param = parameter_list()
 dcu_param.searchbymin = "PSL"
 dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
-dcu_param.output = ["lon", "lat", "PSL", "ZBOT", wind_mag]
+dcu_param.output = ["@year","@month","@day","@second","lon", "lat", "PSL", "ZBOT", wind_mag]
 
 candidates = point_search(config, dcu_param)
 

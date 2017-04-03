@@ -1,0 +1,22 @@
+# Input data
+config = recap_configuration()
+config.grid = grid("nhemi_30_x4.g", "sem_np4")
+config.data = file_list("nhemi_*00000.nc")
+config.lookup = variable_lookup("nhemi_lookup.txt")
+
+# Output data
+config_out = recap_configuration("create")
+config_out.grid = grid()
+#config_out.grid.append("SierraNevada_Windward.shp")
+config_out.grid.append("SierraNevada_Leeward.shp")
+config_out.data = file_list()
+config_out.lookup = variable_lookup("nhemi_lookup.txt")
+config_out.set_reduce_target("nhemi_prect_ratios.nc")
+
+# Create a new regridder
+remapparam = parameter_list()
+my_regrid = tempestregrid(config, config_out, remapparam)
+
+# Regrid
+my_regrid.regrid("_CLIMMEAN(PRECT)")
+
