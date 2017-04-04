@@ -242,13 +242,6 @@ public:
 	);
 
 	///	<summary>
-	///		Add a file for reading and index.
-	///	</summary>
-	std::string AddFile(
-		const std::string & strFilename
-	);
-
-	///	<summary>
 	///		Add a single timeslice file with the given filename.
 	///	</summary>
 	std::string CreateFileNoTime(
@@ -385,7 +378,7 @@ protected:
 	///		Index variable data.
 	///	</summary>
 	std::string IndexVariableData(
-		size_t iFileIx = InvalidFileIx
+		size_t sFileIx = InvalidFileIx
 	);
 
 protected:
@@ -418,9 +411,19 @@ protected:
 	std::vector<Time> m_vecTimes;
 
 	///	<summary>
+	///		A map from Time to m_vecTimes vector index
+	///	</summary>
+	std::map<Time, size_t> m_mapTimeToIndex;
+
+	///	<summary>
 	///		The list of variable names that appear in the FileList.
 	///	</summary>
 	std::vector<VariableInfo> m_vecVariableInfo;
+
+	///	<summary>
+	///		A map between the variable name and index in m_vecVariableInfo.
+	///	</summary>
+	std::map<std::string, size_t> m_mapVariableNameToIndex;
 
 	///	<summary>
 	///		A map between dimension name and size in the FileList.

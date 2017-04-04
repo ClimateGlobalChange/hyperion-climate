@@ -60,6 +60,10 @@ std::string FileListObjectConstructor::Call(
 		std::string strError =
 			pobjFileList->PopulateFromSearchString(
 				vecCommandLine[0]);
+
+		if (strError != "") {
+			return strError;
+		}
 	}
 
 	// Set the return value
@@ -106,11 +110,11 @@ std::string FileListObject::Call(
 	}
 
 	// Create a copy of the FileList with modified filenames
-	if (strFunctionName == "append") {
+	if (strFunctionName == "duplicate_for_writing") {
 		if ((vecCommandLineType.size() != 1) ||
 		    (vecCommandLineType[0] != ObjectType_String)
 		) {
-			return std::string("ERROR: Invalid parameters to function \"append\"");
+			return std::string("ERROR: Invalid parameters to function \"duplicate_for_writing\"");
 		}
 
 		FileListObject * pobjNewFileList = new FileListObject("");
@@ -148,15 +152,15 @@ std::string FileListObject::Call(
 		return std::string("");
 	}
 
-	// Add a new file
-	if (strFunctionName == "add_file") {
+	// Append files to the file_list
+	if (strFunctionName == "append") {
 		if ((vecCommandLineType.size() != 1) ||
 		    (vecCommandLineType[0] != ObjectType_String)
 		) {
 			return std::string("ERROR: Invalid parameters to function \"add_file\"");
 		}
 
-		return AddFile(vecCommandLine[0]);
+		return PopulateFromSearchString(vecCommandLine[0]);
 	}
 
 	return
@@ -208,28 +212,18 @@ std::string FileListObject::PopulateFromSearchString(
 			// File found, insert into list of filenames
 			std::string strFullFilename = strDir + strFilename;
 			m_vecFilenames.push_back(strFullFilename);
+
+			std::string strError =
+				IndexVariableData(m_vecFilenames.size()-1);
+
+			if (strError != "") {
+				return strError;
+			}
 		}
 	}
 	closedir(pDir);
 
-	return IndexVariableData();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-std::string FileListObject::AddFile(
-	const std::string & strFilename
-) {
-	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
-		if (m_vecFilenames[f] == strFilename) {
-			return std::string("ERROR: File \"") + strFilename
-				+ std::string("\" already exists in file_list");
-		}
-	}
-
-	m_vecFilenames.push_back(strFilename);
-
-	return IndexVariableData(m_vecFilenames.size()-1);
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -781,24 +775,17 @@ long FileListObject::GetDimensionSize(
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string FileListObject::IndexVariableData(
-	size_t iFileIx
+	size_t sFileIx
 ) {
-
-	// A map from Variable name to m_vecVariableInfo vector index
-	std::map<std::string, size_t> mapVariableNameToIndex;
-
-	// A map from Time to m_vecTimes vector index
-	std::map<Time, size_t> mapTimeToIndex;
-
 	// Open all files
-	size_t iFileIxBegin = 0;
-	size_t iFileIxEnd = m_vecFilenames.size();
-	if (iFileIx != InvalidFileIx) {
-		iFileIxBegin = iFileIx;
-		iFileIxEnd = iFileIx + 1;
+	size_t sFileIxBegin = 0;
+	size_t sFileIxEnd = m_vecFilenames.size();
+	if (sFileIx != InvalidFileIx) {
+		sFileIxBegin = sFileIx;
+		sFileIxEnd = sFileIx + 1;
 	}
 
-	for (size_t f = iFileIxBegin; f < iFileIxEnd; f++) {
+	for (size_t f = sFileIxBegin; f < sFileIxEnd; f++) {
 
 		// Open the NetCDF file
 		NcFile ncFile(m_vecFilenames[f].c_str(), NcFile::ReadOnly);
@@ -893,13 +880,13 @@ std::string FileListObject::IndexVariableData(
 				}
 
 				std::map<Time, size_t>::const_iterator iterTime =
-					mapTimeToIndex.find(time);
+					m_mapTimeToIndex.find(time);
 
-				if (iterTime == mapTimeToIndex.end()) {
+				if (iterTime == m_mapTimeToIndex.end()) {
 					size_t sNewIndex = m_vecTimes.size();
 					m_vecTimes.push_back(time);
 					vecFileTimeIndices.push_back(sNewIndex);
-					mapTimeToIndex.insert(
+					m_mapTimeToIndex.insert(
 						std::pair<Time, size_t>(time, sNewIndex));
 				} else {
 					vecFileTimeIndices.push_back(iterTime->second);
@@ -946,17 +933,17 @@ std::string FileListObject::IndexVariableData(
 
 			// Find the corresponding VariableInfo structure
 			std::map<std::string, size_t>::const_iterator iter =
-				mapVariableNameToIndex.find(strVariableName);
+				m_mapVariableNameToIndex.find(strVariableName);
 
 			size_t sVarIndex;
 
-			if (iter == mapVariableNameToIndex.end()) {
+			if (iter == m_mapVariableNameToIndex.end()) {
 				sVarIndex = m_vecVariableInfo.size();
 
 				m_vecVariableInfo.push_back(
 					VariableInfo(strVariableName));
 
-				iter = mapVariableNameToIndex.insert(
+				iter = m_mapVariableNameToIndex.insert(
 					std::pair<std::string, size_t>(
 						strVariableName, sVarIndex)).first;
 
@@ -965,6 +952,10 @@ std::string FileListObject::IndexVariableData(
 			}
 
 			VariableInfo & info = m_vecVariableInfo[sVarIndex];
+
+			if (strVariableName == "PSL") {
+				std::cout << "PSL " << sVarIndex << " " << info.m_mapTimeFile.size() << std::endl;
+			}
 
 			// Get units, if available
 			NcAtt * attUnits = var->get_att("units");
