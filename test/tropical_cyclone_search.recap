@@ -52,7 +52,7 @@ stitch_param.range = "8.0deg"
 stitch_param.minduration = 8
 stitch_param.maxgap = 2
 stitch_param.thresholdcmd = [topo_threshold]
-stitch_param.pathhead = ["%year", "%month", "%day", "%count", "%hour"]
+stitch_param.pathhead = "BEGIN %year,%month,%day,%count,%hour"
 
 cyclone_paths = stitch_nodes(config, candidates, stitch_param)
 

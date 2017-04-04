@@ -385,7 +385,7 @@ public:
 	int nTimeStride;
 
 	// Vector of path headers
-	std::vector<std::string> * pvecPathHeaders;
+	std::string strPathHeaderFormat;
 
 	// Vector of path threshold operators
 	std::vector<PathThresholdOp> * pvecPathThresholdOp;
@@ -734,7 +734,7 @@ std::string StitchNodes(
 		std::vector< MultiTypeDataArray2D > & vecPathData =
 			pobjPathData->GetData();
 
-		std::vector< std::vector<int> > & vecPathHeaders =
+		std::vector<std::string> & vecPathHeaders =
 			pobjPathData->GetHeaders();
 
 		vecPathHeaders.resize(vecPaths.size());
@@ -753,6 +753,70 @@ std::string StitchNodes(
 				_EXCEPTIONT("Invalid path");
 			}
 
+			const Time & time =
+				pobjFileList->GetTime(vecPaths[i].m_iTimes[0]);
+
+			// Construct path headers
+			std::string strPathHeader;
+			size_t sFormatLen = param.strPathHeaderFormat.length();
+			for (size_t j = 0; j < sFormatLen; j++) {
+				if (param.strPathHeaderFormat[j] == '%') {
+
+					// Number of times in path
+					if (param.strPathHeaderFormat.substr(j,6) == "%count") {
+						strPathHeader +=
+							std::to_string(
+								static_cast<unsigned long>(vecPaths[i].m_iTimes.size()));
+						j += 5;
+
+					// Path index
+					} else if (param.strPathHeaderFormat.substr(j,6) == "%path") {
+						strPathHeader +=
+							std::to_string(static_cast<unsigned long>(i));
+						j += 4;
+
+					// Year from first path
+					} else if (param.strPathHeaderFormat.substr(j,5) == "%year") {
+						strPathHeader +=
+							std::to_string(static_cast<long long>(time.GetYear()));
+						j += 4;
+
+					// Month from first path
+					} else if (param.strPathHeaderFormat.substr(j,6) == "%month") {
+						strPathHeader +=
+							std::to_string(static_cast<long long>(time.GetMonth()));
+						j += 5;
+
+					// Day from first path
+					} else if (param.strPathHeaderFormat.substr(j,4) == "%day") {
+						strPathHeader +=
+							std::to_string(static_cast<long long>(time.GetDay()));
+						j += 3;
+
+					// Hour from first path
+					} else if (param.strPathHeaderFormat.substr(j,5) == "%hour") {
+						strPathHeader +=
+							std::to_string(
+								static_cast<long long>(time.GetSecond() / 3600));
+						j += 4;
+
+					// Second from first path
+					} else if (param.strPathHeaderFormat.substr(j,7) == "%second") {
+						strPathHeader +=
+							std::to_string(
+								static_cast<long long>(time.GetSecond() % 3600));
+						j += 6;
+
+					} else {
+						return std::string("ERROR: Invalid \% sequence in header");
+					}
+
+				} else {
+					strPathHeader += param.strPathHeaderFormat[j];
+				}
+			}
+			vecPathHeaders[i] = strPathHeader;
+/*
 			for (int j = 0; j < param.pvecPathHeaders->size(); j++) {
 				const std::string & strHeader = (*param.pvecPathHeaders)[j];
 
@@ -775,6 +839,7 @@ std::string StitchNodes(
 					_EXCEPTIONT("Invalid header");
 				}
 			}
+*/
 
 			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
 				int iTime = vecPaths[i].m_iTimes[t];
@@ -951,42 +1016,16 @@ std::string StitchNodesFunction::Call(
 
 	snparam.pvecPathThresholdOp = &vecPathThresholdOps;
 
-	// Path headers
-	std::vector<std::string> vecPathHeaders;
-
-	ListObject * pobjPathHeaderList =
-		dynamic_cast<ListObject *>(
+	// Path header format
+	StringObject * pobjPathHeaderFormat =
+		dynamic_cast<StringObject *>(
 			objreg.GetObject(pobjParam->ChildName("pathhead")));
 
-	if (pobjPathHeaderList != NULL) {
-		for (size_t i = 0; i < pobjPathHeaderList->ChildrenCount(); i++) {
-			StringObject * pobjChild =
-				dynamic_cast<StringObject *>(
-					pobjPathHeaderList->GetChild(i));
-
-			if (pobjChild == NULL) {
-				return std::string("ERROR: All elements of \"pathhead\" list must "
-					"be of type string");
-			}
-
-			vecPathHeaders.push_back(pobjChild->Value());
-
-			if ((pobjChild->Value() != "%year") &&
-				(pobjChild->Value() != "%month") &&
-				(pobjChild->Value() != "%day") &&
-				(pobjChild->Value() != "%hour") &&
-				(pobjChild->Value() != "%second") &&
-				(pobjChild->Value() != "%count")
-			) {
-				return std::string("ERROR: Invalid string in \"pathhead\"");
-			}
-		}
-
+	if (pobjPathHeaderFormat != NULL) {
+		snparam.strPathHeaderFormat = pobjPathHeaderFormat->Value();
 	} else {
-		vecPathHeaders.push_back("%count");
+		snparam.strPathHeaderFormat = "%count";
 	}
-
-	snparam.pvecPathHeaders = &vecPathHeaders;
 
 	// Gather data to root node
 	pobjPointData->Gather();

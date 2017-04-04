@@ -89,8 +89,8 @@ public:
 	///	<summary>
 	///		Get the vector of path headers.
 	///	</summary>
-	std::vector< std::vector<int> > & GetHeaders() {
-		return m_vecPathHeaders;
+	std::vector< std::string > & GetHeaders() {
+		return m_vecPathHeader;
 	}
 
 	///	<summary>
@@ -112,6 +112,11 @@ protected:
 	///		Path data headers.
 	///	</summary>
 	std::vector< std::vector<int> > m_vecPathHeaders;
+
+	///	<summary>
+	///		Path data headers.
+	///	</summary>
+	std::vector<std::string> m_vecPathHeader;
 
 	///	<summary>
 	///		A vector of path data information.
