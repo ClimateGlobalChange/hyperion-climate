@@ -242,6 +242,13 @@ public:
 	);
 
 	///	<summary>
+	///		Add a file for reading and index.
+	///	</summary>
+	std::string AddFile(
+		const std::string & strFilename
+	);
+
+	///	<summary>
 	///		Add a single timeslice file with the given filename.
 	///	</summary>
 	std::string CreateFileNoTime(
@@ -377,7 +384,9 @@ protected:
 	///	<summary>
 	///		Index variable data.
 	///	</summary>
-	std::string IndexVariableData();
+	std::string IndexVariableData(
+		size_t iFileIx = InvalidFileIx
+	);
 
 protected:
 	///	<summary>

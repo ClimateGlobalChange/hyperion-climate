@@ -148,6 +148,17 @@ std::string FileListObject::Call(
 		return std::string("");
 	}
 
+	// Add a new file
+	if (strFunctionName == "add_file") {
+		if ((vecCommandLineType.size() != 1) ||
+		    (vecCommandLineType[0] != ObjectType_String)
+		) {
+			return std::string("ERROR: Invalid parameters to function \"add_file\"");
+		}
+
+		return AddFile(vecCommandLine[0]);
+	}
+
 	return
 		Object::Call(
 			objreg,
@@ -202,6 +213,23 @@ std::string FileListObject::PopulateFromSearchString(
 	closedir(pDir);
 
 	return IndexVariableData();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::AddFile(
+	const std::string & strFilename
+) {
+	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
+		if (m_vecFilenames[f] == strFilename) {
+			return std::string("ERROR: File \"") + strFilename
+				+ std::string("\" already exists in file_list");
+		}
+	}
+
+	m_vecFilenames.push_back(strFilename);
+
+	return IndexVariableData(m_vecFilenames.size()-1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -752,7 +780,9 @@ long FileListObject::GetDimensionSize(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-std::string FileListObject::IndexVariableData() {
+std::string FileListObject::IndexVariableData(
+	size_t iFileIx
+) {
 
 	// A map from Variable name to m_vecVariableInfo vector index
 	std::map<std::string, size_t> mapVariableNameToIndex;
@@ -761,7 +791,14 @@ std::string FileListObject::IndexVariableData() {
 	std::map<Time, size_t> mapTimeToIndex;
 
 	// Open all files
-	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
+	size_t iFileIxBegin = 0;
+	size_t iFileIxEnd = m_vecFilenames.size();
+	if (iFileIx != InvalidFileIx) {
+		iFileIxBegin = iFileIx;
+		iFileIxEnd = iFileIx + 1;
+	}
+
+	for (size_t f = iFileIxBegin; f < iFileIxEnd; f++) {
 
 		// Open the NetCDF file
 		NcFile ncFile(m_vecFilenames[f].c_str(), NcFile::ReadOnly);
