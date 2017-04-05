@@ -357,12 +357,13 @@ bool StringObject::ToUnit(
 	// Value
 	const double dValue = atof(strNumber.c_str());
 
-	// Perform unit conversion from great circle distance (degrees)
-	if (strUnit == "deg") {
-		if (strTargetUnit == "deg") {
-			(*dValueOut) = dValue;
+	// Unit is equal to TargetUnit
+	if (strUnit == strTargetUnit) {
+		(*dValueOut) = dValue;
 
-		} else if (strTargetUnit == "rad") {
+	// Perform unit conversion from great circle distance (degrees)
+	} else if (strUnit == "deg") {
+		if (strTargetUnit == "rad") {
 			(*dValueOut) = dValue * M_PI / 180.0;
 
 		} else if (strTargetUnit == "m") {
@@ -380,9 +381,6 @@ bool StringObject::ToUnit(
 		if (strTargetUnit == "deg") {
 			(*dValueOut) = 180.0 / M_PI * dValue;
 
-		} else if (strTargetUnit == "rad") {
-			(*dValueOut) = dValue;
-
 		} else if (strTargetUnit == "m") {
 			(*dValueOut) = 6.37122e6 * dValue;
 
@@ -394,6 +392,7 @@ bool StringObject::ToUnit(
 		}
 
 	// Perform unit conversion from great circle distance (meters)
+	// or altitude (meters)
 	} else if (strUnit == "m") {
 		if (strTargetUnit == "deg") {
 			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e6;
@@ -401,11 +400,11 @@ bool StringObject::ToUnit(
 		} else if (strTargetUnit == "rad") {
 			(*dValueOut) = dValue / 6.37122e6;
 
-		} else if (strTargetUnit == "m") {
-			(*dValueOut) = dValue;
-
 		} else if (strTargetUnit == "km") {
 			(*dValueOut) = dValue / 1000.0;
+
+		} else if (strTargetUnit == "m2/s2") {
+			(*dValueOut) = dValue * 9.80616;
 
 		} else {
 			return false;
@@ -422,8 +421,8 @@ bool StringObject::ToUnit(
 		} else if (strTargetUnit == "m") {
 			(*dValueOut) = dValue * 1000.0;
 
-		} else if (strTargetUnit == "km") {
-			(*dValueOut) = dValue;
+		} else if (strTargetUnit == "m2/s2") {
+			(*dValueOut) = dValue * 1000.0 * 9.80616;
 
 		} else {
 			return false;
@@ -431,10 +430,7 @@ bool StringObject::ToUnit(
 
 	// Perform unit conversion from temperature (K)
 	} else if (strUnit == "K") {
-		if (strTargetUnit == "K") {
-			(*dValueOut) = dValue;
-
-		} else if (strTargetUnit == "degC") {
+		if (strTargetUnit == "degC") {
 			if (fIsDelta) {
 				(*dValueOut) = dValue;
 			} else {
@@ -454,20 +450,13 @@ bool StringObject::ToUnit(
 				(*dValueOut) = dValue + 273.15;
 			}
 
-		} else if (strTargetUnit == "degC") {
-			(*dValueOut) = dValue;
-
 		} else {
 			return false;
 		}
 
 	// Perform unit conversion from pressure (Pa)
 	} else if (strUnit == "Pa") {
-		if (strTargetUnit == "Pa") {
-			(*dValueOut) = dValue;
-
-		} else if (
-		    (strTargetUnit == "hPa") ||
+		if ((strTargetUnit == "hPa") ||
 		    (strTargetUnit == "mb") ||
 		    (strTargetUnit == "mbar")
 		) {
@@ -511,8 +500,17 @@ bool StringObject::ToUnit(
 		) {
 			(*dValueOut) = dValue * 1013.25;
 
-		} else if (strTargetUnit == "atm") {
-			(*dValueOut) = dValue;
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from geopotential (m2/s2)
+	} else if (strUnit == "m2/s2") {
+		if (strTargetUnit == "m") {
+			(*dValueOut) = dValue / 9.80616;
+
+		} else if (strUnit == "km") {
+			(*dValueOut) = dValue / 9.80616 / 1000.0;
 
 		} else {
 			return false;
