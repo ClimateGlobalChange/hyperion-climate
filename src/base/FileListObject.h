@@ -407,7 +407,8 @@ protected:
 	std::vector<std::string> m_vecFilenames;
 
 	///	<summary>
-	///		The list of Times that appear in the FileList.
+	///		The list of Times that appear in the FileList (not necessarily
+	///		in chronological order).
 	///	</summary>
 	std::vector<Time> m_vecTimes;
 

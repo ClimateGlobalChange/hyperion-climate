@@ -330,8 +330,16 @@ void FileListObject::GetOnRankTimeIndices(
 	std::vector<size_t> & vecTimeIndices,
 	size_t sTimeStride
 ) {
+	if (m_vecTimes.size() != m_mapTimeToIndex.size()) {
+		_EXCEPTIONT("vecTimes / mapTimeToIndex inconsistency");
+	}
+	if ((sTimeStride == 0) || (sTimeStride > 1000)) {
+		_EXCEPTIONT("TimeStride out of range");
+	}
+
 #if defined(HYPERION_MPIOMP)
-	size_t sTimeCount = m_vecTimes.size() / sTimeStride;
+	size_t sTimeCount = m_vecTimes.size();
+	size_t sTimeCountWithStride = sTimeCount / sTimeStride;
 
 	int nCommRank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &nCommRank);
@@ -339,8 +347,8 @@ void FileListObject::GetOnRankTimeIndices(
 	int nCommSize;
 	MPI_Comm_size(MPI_COMM_WORLD, &nCommSize);
 
-	int nMaxTimesPerRank = static_cast<int>(sTimeCount) / nCommSize;
-	if (sTimeCount % nCommSize != 0) {
+	int nMaxTimesPerRank = static_cast<int>(sTimeCountWithStride) / nCommSize;
+	if (sTimeCountWithStride % nCommSize != 0) {
 		nMaxTimesPerRank++;
 	}
 
@@ -350,12 +358,27 @@ void FileListObject::GetOnRankTimeIndices(
 		iEnd = sTimeCount;
 	}
 
-	for (size_t i = iBegin; i < iEnd; i++) {
-		vecTimeIndices.push_back(i * sTimeStride);
+	std::map<Time, size_t>::const_iterator iter = m_mapTimeToIndex.begin();
+	for (size_t i = 0; i < sTimeCountWithStride; i++) {
+		if ((i >= iBegin) && (i < iEnd)) {
+			vecTimeIndices.push_back(iter->second);
+		}
+		for (size_t j = 0; j < sTimeStride; j++) {
+			iter++;
+			if (iter == m_mapTimeToIndex.end()) {
+				break;
+			}
+		}
+		if (iter == m_mapTimeToIndex.end()) {
+			break;
+		}
 	}
 #else
-	for (size_t i = 0; i < m_vecTimes.size(); i += sTimeStride) {
-		vecTimeIndices.push_back(i);
+	std::map<Time, size_t>::const_iterator iter = m_mapTimeToIndex.begin();
+	for (int i = 0; iter != m_mapTimeToIndex.end(); iter++, i++) {
+		if (i % sTimeStride == 0) {
+			vecTimeIndices.push_back(iter->second);
+		}
 	}
 #endif
 }
@@ -954,10 +977,6 @@ std::string FileListObject::IndexVariableData(
 
 			VariableInfo & info = m_vecVariableInfo[sVarIndex];
 
-			if (strVariableName == "PSL") {
-				std::cout << "PSL " << sVarIndex << " " << info.m_mapTimeFile.size() << std::endl;
-			}
-
 			// Get units, if available
 			NcAtt * attUnits = var->get_att("units");
 			if (attUnits != NULL) {
@@ -1062,6 +1081,10 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 	}
 #endif
 
+	if (m_vecTimes.size() != m_mapTimeToIndex.size()) {
+		_EXCEPTIONT("vecTimes / mapTimeToIndex inconsistency");
+	}
+
 	std::vector< std::pair<size_t,int> > iTimeVariableIndex;
 	iTimeVariableIndex.resize(m_vecVariableInfo.size());
 
@@ -1090,8 +1113,11 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 	ofOutput << std::endl;
 
 	// Output variables with time dimension
-	for (size_t t = 0; t < m_vecTimes.size(); t++) {
-		ofOutput << m_vecTimes[t].ToString();
+	std::map<Time, size_t>::const_iterator iterTime = m_mapTimeToIndex.begin();
+	for (; iterTime != m_mapTimeToIndex.end(); iterTime++) {
+		size_t t = iterTime->second;
+
+		ofOutput << iterTime->first.ToString();
 
 		for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
 

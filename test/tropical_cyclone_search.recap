@@ -30,7 +30,7 @@ wind_mag.dist = "4.0deg"
 
 # Parameters for point_search
 dcu_param = parameter_list()
-dcu_param.timestride = 2
+dcu_param.timestride = 1
 dcu_param.searchbymin = "PSL"
 dcu_param.mergedist = "2.0deg"
 dcu_param.closedcontourcmd = [ps_min_criteria, warm_core_criteria]
