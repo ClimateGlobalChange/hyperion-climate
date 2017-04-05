@@ -327,10 +327,11 @@ bool FileListObject::IsCompatible(
 ///////////////////////////////////////////////////////////////////////////////
 
 void FileListObject::GetOnRankTimeIndices(
-	std::vector<size_t> & vecTimeIndices
+	std::vector<size_t> & vecTimeIndices,
+	size_t sTimeStride
 ) {
 #if defined(HYPERION_MPIOMP)
-	int nTimeCount = m_vecTimes.size();
+	size_t sTimeCount = m_vecTimes.size() / sTimeStride;
 
 	int nCommRank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &nCommRank);
@@ -338,22 +339,22 @@ void FileListObject::GetOnRankTimeIndices(
 	int nCommSize;
 	MPI_Comm_size(MPI_COMM_WORLD, &nCommSize);
 
-	int nMaxTimesPerRank = nTimeCount / nCommSize;
-	if (nTimeCount % nCommSize != 0) {
+	int nMaxTimesPerRank = static_cast<int>(sTimeCount) / nCommSize;
+	if (sTimeCount % nCommSize != 0) {
 		nMaxTimesPerRank++;
 	}
 
 	int iBegin = nMaxTimesPerRank * nCommRank;
 	int iEnd = nMaxTimesPerRank * (nCommRank + 1);
-	if (iEnd > nTimeCount) {
-		iEnd = nTimeCount;
+	if (iEnd > sTimeCount) {
+		iEnd = sTimeCount;
 	}
 
-	for (int i = iBegin; i < iEnd; i++) {
-		vecTimeIndices.push_back(i);
+	for (size_t i = iBegin; i < iEnd; i++) {
+		vecTimeIndices.push_back(i * sTimeStride);
 	}
 #else
-	for (int i = 0; i < m_vecTimes.size(); i++) {
+	for (size_t i = 0; i < m_vecTimes.size(); i += sTimeStride) {
 		vecTimeIndices.push_back(i);
 	}
 #endif

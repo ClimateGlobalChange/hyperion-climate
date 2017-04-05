@@ -2039,7 +2039,9 @@ std::string PointSearchFunction::Call(
 	dcuparam.fpLog = stdout;
 
 	std::vector<size_t> vecTimeIndices;
-	pobjConfig->GetFileList()->GetOnRankTimeIndices(vecTimeIndices);
+	pobjConfig->GetFileList()->GetOnRankTimeIndices(
+		vecTimeIndices,
+		dcuparam.nTimeStride);
 
 	std::vector<PointDataObject *> vecpobjPointData;
 	vecpobjPointData.resize(vecTimeIndices.size(), NULL);

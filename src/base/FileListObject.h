@@ -324,7 +324,8 @@ public:
 	///		Distribute available time indices across MPI ranks.
 	///	</summary>
 	void GetOnRankTimeIndices(
-		std::vector<size_t> & vecTimeIndices
+		std::vector<size_t> & vecTimeIndices,
+		size_t sTimeStride = 1
 	);
 
 	///	<summary>
