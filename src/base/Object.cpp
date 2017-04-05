@@ -362,8 +362,14 @@ bool StringObject::ToUnit(
 		(*dValueOut) = dValue;
 
 	// Perform unit conversion from great circle distance (degrees)
-	} else if (strUnit == "deg") {
-		if (strTargetUnit == "rad") {
+	} else if ((strUnit == "deg") || (strUnit == "degrees_north") || (strUnit == "degrees_east")) {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
+			(*dValueOut) = dValue;
+
+		} else if (strTargetUnit == "rad") {
 			(*dValueOut) = dValue * M_PI / 180.0;
 
 		} else if (strTargetUnit == "m") {
@@ -378,7 +384,10 @@ bool StringObject::ToUnit(
 
 	// Perform unit conversion from great circle distance (radians)
 	} else if (strUnit == "rad") {
-		if (strTargetUnit == "deg") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
 			(*dValueOut) = 180.0 / M_PI * dValue;
 
 		} else if (strTargetUnit == "m") {
@@ -394,7 +403,10 @@ bool StringObject::ToUnit(
 	// Perform unit conversion from great circle distance (meters)
 	// or altitude (meters)
 	} else if (strUnit == "m") {
-		if (strTargetUnit == "deg") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
 			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e6;
 
 		} else if (strTargetUnit == "rad") {
@@ -412,7 +424,10 @@ bool StringObject::ToUnit(
 
 	// Perform unit conversion from great circle distance (kilometers)
 	} else if (strUnit == "km") {
-		if (strTargetUnit == "deg") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
 			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e3;
 
 		} else if (strTargetUnit == "rad") {
