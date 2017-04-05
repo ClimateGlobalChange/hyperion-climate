@@ -1803,7 +1803,7 @@ std::string PointSearchFunction::Call(
 	if (((pobjSearchByMin == NULL) && (pobjSearchByMax == NULL)) ||
 	    ((pobjSearchByMin != NULL) && (pobjSearchByMax != NULL))
 	) {
-		return std::string("Exactly one of searchbymin or searchbymax "
+		return std::string("ERROR: Exactly one of searchbymin or searchbymax "
 			"must be specified in param");
 	}
 
@@ -1825,7 +1825,7 @@ std::string PointSearchFunction::Call(
 			pobjMaximumLatitude->ToUnit(
 				"deg", &(dcuparam.dMaxLatitude));
 		if (!fSuccess) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("maxlat")
 				+ std::string(" to \"deg\"");
 		}
@@ -1840,7 +1840,7 @@ std::string PointSearchFunction::Call(
 			pobjMinimumLatitude->ToUnit(
 				"deg", &(dcuparam.dMinLatitude));
 		if (!fSuccessMag) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("minlat")
 				+ std::string(" to \"deg\"");
 		}
@@ -1855,7 +1855,7 @@ std::string PointSearchFunction::Call(
 			pobjMinimumAbsLatitude->ToUnit(
 				"deg", &(dcuparam.dMinAbsLatitude));
 		if (!fSuccess) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("minabslat")
 				+ std::string(" to \"deg\"");
 		}
@@ -1870,7 +1870,7 @@ std::string PointSearchFunction::Call(
 			pobjMaximumLongitude->ToUnit(
 				"deg", &(dcuparam.dMaxLongitude));
 		if (!fSuccess) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("maxlon")
 				+ std::string(" to \"deg\"");
 		}
@@ -1885,7 +1885,7 @@ std::string PointSearchFunction::Call(
 			pobjMinimumLongitude->ToUnit(
 				"deg", &(dcuparam.dMinLongitude));
 		if (!fSuccess) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("minlon")
 				+ std::string(" to \"deg\"");
 		}
@@ -1900,11 +1900,26 @@ std::string PointSearchFunction::Call(
 			pobjMergeDist->ToUnit(
 				"deg", &(dcuparam.dMergeDist));
 		if (!fSuccess) {
-			return std::string("Cannot convert ")
+			return std::string("ERROR: Cannot convert ")
 				+ pobjParam->ChildName("mergedist")
 				+ std::string(" to \"deg\"");
 		}
 	}
+
+	// Time stride for detection
+	Object * pobjTimeStride =
+		dynamic_cast<Object *>(
+			objreg.GetObject(pobjParam->ChildName("timestride")));
+	if (pobjTimeStride != NULL) {
+		IntegerObject * pobjTimeStrideInt =
+			dynamic_cast<IntegerObject *>(pobjTimeStride);
+
+		if (pobjTimeStrideInt == NULL) {
+			return std::string("ERROR: timestride must be of type integer");
+		}
+		dcuparam.nTimeStride = pobjTimeStrideInt->Value();
+	}
+
 
 	// Construct all closed contour objects
 	std::vector<ClosedContourOp> vecClosedContourOps;
