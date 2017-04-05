@@ -332,6 +332,21 @@ std::string Variable::InitializeAuxiliary(
 		return std::string("");
 	}
 
+	// Vector magnitude
+	if (m_strOpName == "_DIFF") {
+		if (vecVarArguments.size() != 2) {
+			return std::string("_DIFF expectes two arguments");
+		}
+
+		// Inherit attributes from argument
+		m_strUnits = vecVarArguments[0]->m_strUnits;
+		m_vecDimNames = vecVarArguments[0]->m_vecDimNames;
+		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
+		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
+
+		return std::string("");
+	}
+
 	_EXCEPTIONT("Missing auxiliary specification for op");
 }
 
@@ -537,6 +552,38 @@ std::string Variable::LoadGridData(
 				sqrt(dataLeft[i] * dataLeft[i]
 					+ dataRight[i] * dataRight[i]);
 		}
+
+	// Evaluate the difference operator
+	} else if (m_strOpName == "_DIFF") {
+		if (m_vecArg.size() != 2) {
+			_EXCEPTION1("_DIFF expects two arguments: %i given",
+				m_vecArg.size());
+		}
+		Variable * pvarLeft = NULL;
+		Variable * pvarRight = NULL;
+
+		std::string strErrorLeft =
+			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strErrorLeft != "") {
+			_EXCEPTION1("%s", strErrorLeft.c_str());
+		}
+
+		std::string strErrorRight =
+			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strErrorRight != "") {
+			_EXCEPTION1("%s", strErrorRight.c_str());
+		}
+
+		pvarLeft->LoadGridData(sTime);
+		pvarRight->LoadGridData(sTime);
+
+		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
+		const DataArray1D<float> & dataRight = pvarRight->GetData();
+
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] = dataLeft[i] - dataRight[i];
+		}
+
 /*
 	// Evaluate the absolute value operator
 	} else if (m_strOpName == "_ABS") {
@@ -575,25 +622,6 @@ std::string Variable::LoadGridData(
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
 			m_data[i] /= static_cast<double>(m_varArg.size());
-		}
-
-	// Evaluate the minus operator
-	} else if (m_strOpName == "_DIFF") {
-		if (m_varArg.size() != 2) {
-			_EXCEPTION1("_VECMAG expects two arguments: %i given",
-				m_varArg.size());
-		}
-		Variable & varLeft = varreg.Get(m_varArg[0]);
-		Variable & varRight = varreg.Get(m_varArg[1]);
-
-		varLeft.LoadGridData(varreg, vecFiles, grid, sTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, sTime);
-
-		const DataArray1D<float> & dataLeft  = varLeft.m_data;
-		const DataArray1D<float> & dataRight = varRight.m_data;
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = dataLeft[i] - dataRight[i];
 		}
 
 	// Evaluate the Coriolis parameter operator
