@@ -78,9 +78,9 @@ public:
 	{ }
 
 	///	<summary>
-	///		Virtual destructor.
+	///		Notify object of its deletion.
 	///	</summary>
-	virtual ~TempestRegridObject();
+	virtual void PrepareDelete();
 
 	///	<summary>
 	///		Self-duplicator.

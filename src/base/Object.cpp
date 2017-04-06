@@ -111,7 +111,10 @@ std::string ObjectRegistry::Remove(
 			+ strName + std::string("\"");
 	}
 
-	Announce("REMOVE %s\n", strName.c_str());
+	Announce("DELETE %s\n", strName.c_str());
+
+	// Notify object of impending deletion
+	iter->second->PrepareDelete();
 
 	// Remove all children of this Object
 	for (size_t i = 0; i < iter->second->m_vecChildren.size(); i++) {

@@ -162,6 +162,12 @@ public:
 	}
 
 	///	<summary>
+	///		Notify object of its deletion.
+	///	</summary>
+	virtual void PrepareDelete() {
+	}
+
+	///	<summary>
 	///		Self-duplicator.
 	///	</summary>
 	virtual Object * Duplicate(
