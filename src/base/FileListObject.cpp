@@ -829,9 +829,12 @@ void FileListObject::SortTimeArray() {
 	}
 
 	// Get the VariableRegistry
-	VariableRegistry & varreg = m_pobjRecapConfig->GetVariableRegistry();
+	if (m_pobjRecapConfig != NULL) {
+		VariableRegistry & varreg =
+			m_pobjRecapConfig->GetVariableRegistry();
 
-	varreg.UpdateTimeIndices(mapTimeIxToNewTimeIx);
+		varreg.UpdateTimeIndices(mapTimeIxToNewTimeIx);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
