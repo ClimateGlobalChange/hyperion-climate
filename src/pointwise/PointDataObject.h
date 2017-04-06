@@ -38,6 +38,7 @@ public:
 	///		Constructor.
 	///	</summary>
 	PointDataObject(const std::string & strName) :
+		m_nTimeStride(1),
 		DistributedObject(strName),
 		MultiTypeDataArray2D(),
 		MultiTypeDataHeaders()
@@ -134,6 +135,27 @@ public:
 
 		DistributedObject::UnsetDistributed();
 	}
+
+public:
+	///	<summary>
+	///		Get the time stride.
+	///	</summary>
+	int GetTimeStride() const {
+		return m_nTimeStride;
+	}
+
+	///	<summary>
+	///		Set the time stride.
+	///	</summary>
+	void SetTimeStride(int nTimeStride) {
+		m_nTimeStride = nTimeStride;
+	}
+
+protected:
+	///	<summary>
+	///		Time stride used for this point data.
+	///	</summary>
+	int m_nTimeStride;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -372,10 +372,10 @@ public:
 	// Minimum path length
 	int nMinDuration;
 
-	// Minimum distance between endpoints of path
+	// Minimum distance between endpoints of path (in degrees)
 	double dMinEndpointDistance;
 
-	// Minimum path length
+	// Minimum path length (in degrees)
 	double dMinPathDistance;
 
 	// Maximum time gap (in time steps)
@@ -405,6 +405,9 @@ std::string StitchNodes(
 
 	// Number of times
 	const size_t sTimes = pobjFileList->GetTimeCount();
+
+	// Time stride from the point data
+	const int nTimeStride = pobjPointData->GetTimeStride();
 
 	// Null pointer
 	int * noptr = NULL;
@@ -496,7 +499,6 @@ std::string StitchNodes(
 
 	AnnounceEndBlock("Done");
 
-
 	// Create set of path segments
 	AnnounceStartBlock("Populating set of path segments");
 
@@ -517,7 +519,8 @@ std::string StitchNodes(
 			double dY = vecNodes[t][i].y;
 			double dZ = vecNodes[t][i].z;
 
-			for (int g = 1; g <= param.nMaxGapSize+1; g++) {
+			const int nMaxFutureTime = nTimeStride * (param.nMaxGapSize + 1);
+			for (int g = nTimeStride; g <= nMaxFutureTime; g += nTimeStride) {
 
 				if (vecNodes[t+g].size() == 0) {
 					continue;

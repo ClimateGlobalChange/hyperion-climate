@@ -1558,6 +1558,9 @@ std::string PointSearch(
 			}
 		}
 
+		// Set the time stride
+		pobjPointData->SetTimeStride(param.nTimeStride);
+
 		// Resize the results structure
 		pobjPointData->SetFieldCount(nSpecialFields, nVariableFields, 0);
 		pobjPointData->Resize(setCandidates.size());
