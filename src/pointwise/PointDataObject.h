@@ -117,10 +117,15 @@ public:
 			return;
 		}
 
+		m_nTimeStride = vecpobjPointData[0]->m_nTimeStride;
+
 		std::vector<MultiTypeDataArray2D *> vecpMultiTypeData;
 		vecpMultiTypeData.resize(vecpobjPointData.size());
 		for (size_t i = 0; i < vecpobjPointData.size(); i++) {
 			vecpMultiTypeData[i] = vecpobjPointData[i];
+			if (m_nTimeStride != vecpobjPointData[i]->GetTimeStride()) {
+				_EXCEPTIONT("TimeStride mismatch");
+			}
 		}
 		MultiTypeDataArray2D::Concatenate(vecpMultiTypeData);
 	}
