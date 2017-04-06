@@ -89,6 +89,13 @@ public:
 	///	</summary>
 	void UnloadAllGridData();
 
+	///	<summary>
+	///		Update time indices for all Variables.
+	///	</summary>
+	void UpdateTimeIndices(
+		const std::map<size_t, size_t> & mapTimeIxToNewTimeIx
+	);
+
 private:
 	///	<summary>
 	///		Pointer to parent RecapConfigObject.

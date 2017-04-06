@@ -170,6 +170,30 @@ void VariableRegistry::UnloadAllGridData() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::UpdateTimeIndices(
+	const std::map<size_t, size_t> & mapTimeIxToNewTimeIx
+) {
+	for (size_t v = 0; v < m_vecVariables.size(); v++) {
+		if (m_vecVariables[v].m_sTime == Variable::InvalidTimeIndex) {
+			continue;
+		}
+		if (m_vecVariables[v].m_sTime == Variable::SingleTimeIndex) {
+			continue;
+		}
+
+		std::map<size_t, size_t>::const_iterator iterTimeIxMap =
+			mapTimeIxToNewTimeIx.find(m_vecVariables[v].m_sTime);
+
+		if (iterTimeIxMap == mapTimeIxToNewTimeIx.end()) {
+			_EXCEPTIONT("Invalid Variable time index");
+		}
+
+		m_vecVariables[v].m_sTime = iterTimeIxMap->second;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Variable
 ///////////////////////////////////////////////////////////////////////////////
 

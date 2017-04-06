@@ -165,6 +165,33 @@ public:
 		Variable ** ppvarOut
 	);
 
+public:
+	///	<summary>
+	///		When adding a lock to a RecapConfigObject, also
+	///		lock the file_list and grid.
+	///	</summary>
+	virtual void AddLock() {
+		FileListObject * pobjFileList = GetFileList();
+		GridObject * pobjGrid = GetGrid();
+
+		pobjFileList->AddLock();
+		pobjGrid->AddLock();
+		Object::AddLock();
+	}
+
+	///	<summary>
+	///		When releasing a lock to a RecapConfigObject, also
+	///		lock the file_list and grid.
+	///	</summary>
+	virtual void ReleaseLock() {
+		FileListObject * pobjFileList = GetFileList();
+		GridObject * pobjGrid = GetGrid();
+
+		pobjFileList->ReleaseLock();
+		pobjGrid->ReleaseLock();
+		Object::ReleaseLock();
+	}
+
 protected:
 	///	<summary>
 	///		RecapConfigObject only supports three child objects:

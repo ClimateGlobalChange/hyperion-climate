@@ -376,10 +376,17 @@ public:
 
 protected:
 	///	<summary>
+	///		Sort the array of Times to keep m_vecTimes in
+	///		chronological order.
+	///	</summary>
+	void SortTimeArray();
+
+	///	<summary>
 	///		Index variable data.
 	///	</summary>
 	std::string IndexVariableData(
-		size_t sFileIx = InvalidFileIx
+		size_t sFileIxBegin = InvalidFileIx,
+		size_t sFileIxEnd = InvalidFileIx
 	);
 
 protected:
@@ -407,8 +414,8 @@ protected:
 	std::vector<std::string> m_vecFilenames;
 
 	///	<summary>
-	///		The list of Times that appear in the FileList (not necessarily
-	///		in chronological order).
+	///		The list of Times that appear in the FileList
+	///		(in chronological order).
 	///	</summary>
 	std::vector<Time> m_vecTimes;
 

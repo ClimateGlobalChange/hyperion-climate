@@ -237,20 +237,27 @@ public:
 	///	<summary>
 	///		Add a lock to this Object.
 	///	</summary>
-	void AddLock() {
+	virtual void AddLock() {
 		m_nLocks++;
 	}
 
 	///	<summary>
 	///		Release a lock from this Object.
 	///	</summary>
-	void ReleaseLock() {
+	virtual void ReleaseLock() {
 		if (m_nLocks == 0) {
 			_EXCEPTIONT("No locks on object");
 		}
 		m_nLocks--;
 	}
-	
+
+	///	<summary>
+	///		Check if this Object is locked.
+	///	</summary>
+	bool IsLocked() const {
+		return (m_nLocks > 0);
+	}
+
 protected:
 	///	<summary>
 	///		Name of the Object.
@@ -262,6 +269,7 @@ protected:
 	///	</summary>
 	ObjectChildrenVector m_vecChildren;
 
+private:
 	///	<summary>
 	///		Number of locks placed on this Object.  An object with a 
 	///		non-zero lock count cannot be deleted.

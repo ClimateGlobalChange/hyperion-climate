@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "FileListObject.h"
+#include "RecapConfigObject.h"
 #include "STLStringHelper.h"
 #include "GridElements.h"
 #include "GridObject.h"
@@ -160,6 +161,10 @@ std::string FileListObject::Call(
 			return std::string("ERROR: Invalid parameters to function \"add_file\"");
 		}
 
+		if (IsLocked()) {
+			return std::string("ERROR: Cannot append files to a locked file_list");
+		}
+
 		return PopulateFromSearchString(vecCommandLine[0]);
 	}
 
@@ -201,7 +206,7 @@ std::string FileListObject::PopulateFromSearchString(
 	}
 
 	// Search all files in the directory for match to search string
-	//int iFile = 0;
+	size_t iFileBegin = m_vecFilenames.size();
 	struct dirent * pDirent;
 	while ((pDirent = readdir(pDir)) != NULL) {
 		std::string strFilename = pDirent->d_name;
@@ -212,18 +217,12 @@ std::string FileListObject::PopulateFromSearchString(
 			// File found, insert into list of filenames
 			std::string strFullFilename = strDir + strFilename;
 			m_vecFilenames.push_back(strFullFilename);
-
-			std::string strError =
-				IndexVariableData(m_vecFilenames.size()-1);
-
-			if (strError != "") {
-				return strError;
-			}
 		}
 	}
 	closedir(pDir);
 
-	return std::string("");
+	// Index the variable data
+	return IndexVariableData(iFileBegin, m_vecFilenames.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -330,16 +329,12 @@ void FileListObject::GetOnRankTimeIndices(
 	std::vector<size_t> & vecTimeIndices,
 	size_t sTimeStride
 ) {
-	if (m_vecTimes.size() != m_mapTimeToIndex.size()) {
-		_EXCEPTIONT("vecTimes / mapTimeToIndex inconsistency");
-	}
 	if ((sTimeStride == 0) || (sTimeStride > 1000)) {
-		_EXCEPTIONT("TimeStride out of range");
+		_EXCEPTIONT("timestride out of range");
 	}
 
 #if defined(HYPERION_MPIOMP)
-	size_t sTimeCount = m_vecTimes.size();
-	size_t sTimeCountWithStride = sTimeCount / sTimeStride;
+	size_t sTimeCount = m_vecTimes.size() / sTimeStride;
 
 	int nCommRank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &nCommRank);
@@ -347,8 +342,8 @@ void FileListObject::GetOnRankTimeIndices(
 	int nCommSize;
 	MPI_Comm_size(MPI_COMM_WORLD, &nCommSize);
 
-	int nMaxTimesPerRank = static_cast<int>(sTimeCountWithStride) / nCommSize;
-	if (sTimeCountWithStride % nCommSize != 0) {
+	int nMaxTimesPerRank = static_cast<int>(sTimeCount) / nCommSize;
+	if (sTimeCount % nCommSize != 0) {
 		nMaxTimesPerRank++;
 	}
 
@@ -358,27 +353,12 @@ void FileListObject::GetOnRankTimeIndices(
 		iEnd = sTimeCount;
 	}
 
-	std::map<Time, size_t>::const_iterator iter = m_mapTimeToIndex.begin();
-	for (size_t i = 0; i < sTimeCountWithStride; i++) {
-		if ((i >= iBegin) && (i < iEnd)) {
-			vecTimeIndices.push_back(iter->second);
-		}
-		for (size_t j = 0; j < sTimeStride; j++) {
-			iter++;
-			if (iter == m_mapTimeToIndex.end()) {
-				break;
-			}
-		}
-		if (iter == m_mapTimeToIndex.end()) {
-			break;
-		}
+	for (size_t i = iBegin; i < iEnd; i++) {
+		vecTimeIndices.push_back(i * sTimeStride);
 	}
 #else
-	std::map<Time, size_t>::const_iterator iter = m_mapTimeToIndex.begin();
-	for (int i = 0; iter != m_mapTimeToIndex.end(); iter++, i++) {
-		if (i % sTimeStride == 0) {
-			vecTimeIndices.push_back(iter->second);
-		}
+	for (size_t i = 0; i < m_vecTimes.size(); i += sTimeStride) {
+		vecTimeIndices.push_back(i);
 	}
 #endif
 }
@@ -798,15 +778,74 @@ long FileListObject::GetDimensionSize(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void FileListObject::SortTimeArray() {
+
+	if (m_vecTimes.size() != m_mapTimeToIndex.size()) {
+		_EXCEPTIONT("vecTimes / mapTimeToIndex mismatch");
+	}
+
+	// Check if the array needs sorting, and map from old indices to new
+	bool fSorted = true;
+	std::map<size_t, size_t>  mapTimeIxToNewTimeIx;
+	std::map<Time, size_t>::iterator iterTime = m_mapTimeToIndex.begin();
+	for (size_t i = 0; iterTime != m_mapTimeToIndex.end(); iterTime++, i++) {
+		if ((fSorted) && (i != iterTime->second)) {
+			fSorted = false;
+		}
+		mapTimeIxToNewTimeIx.insert(
+			std::pair<size_t, size_t>(iterTime->second, i));
+	}
+
+	if (fSorted) {
+		return;
+	}
+
+	// Sort m_vecTimes and m_mapTimeToIndex
+	iterTime = m_mapTimeToIndex.begin();
+	for (size_t i = 0; iterTime != m_mapTimeToIndex.end(); iterTime++, i++) {
+		m_vecTimes[i] = iterTime->first;
+		iterTime->second = i;
+	}
+
+	// Rebuild VariableInfo VariableTimeFileMap with new time indices
+	for (size_t i = 0; i < m_vecVariableInfo.size(); i++) {	
+		VariableTimeFileMap mapTimeFileBak = m_vecVariableInfo[i].m_mapTimeFile;
+		m_vecVariableInfo[i].m_mapTimeFile.clear();
+
+		VariableTimeFileMap::const_iterator iterFileMap = mapTimeFileBak.begin();
+		for (; iterFileMap != mapTimeFileBak.end(); iterFileMap++) {
+			if (iterFileMap->first == InvalidTimeIx) {
+				m_vecVariableInfo[i].m_mapTimeFile.insert(
+					VariableTimeFileMap::value_type(
+						InvalidTimeIx,
+						iterFileMap->second));
+			} else {
+				m_vecVariableInfo[i].m_mapTimeFile.insert(
+					VariableTimeFileMap::value_type(
+						mapTimeIxToNewTimeIx[iterFileMap->first],
+						iterFileMap->second));
+			}
+		}
+	}
+
+	// Get the VariableRegistry
+	VariableRegistry & varreg = m_pobjRecapConfig->GetVariableRegistry();
+
+	varreg.UpdateTimeIndices(mapTimeIxToNewTimeIx);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string FileListObject::IndexVariableData(
-	size_t sFileIx
+	size_t sFileIxBegin,
+	size_t sFileIxEnd
 ) {
 	// Open all files
-	size_t sFileIxBegin = 0;
-	size_t sFileIxEnd = m_vecFilenames.size();
-	if (sFileIx != InvalidFileIx) {
-		sFileIxBegin = sFileIx;
-		sFileIxEnd = sFileIx + 1;
+	if (sFileIxBegin == InvalidFileIx) {
+		sFileIxBegin = 0;
+	}
+	if (sFileIxEnd == InvalidFileIx) {
+		sFileIxEnd = m_vecFilenames.size();
 	}
 
 	for (size_t f = sFileIxBegin; f < sFileIxEnd; f++) {
@@ -983,7 +1022,7 @@ std::string FileListObject::IndexVariableData(
 				std::string strUnits = attUnits->as_string(0);
 				if (strUnits != "") {
 					if ((info.m_strUnits != "") && (strUnits != info.m_strUnits)) {
-						return std::string("Variable \"") + strVariableName
+						return std::string("ERROR: Variable \"") + strVariableName
 							+ std::string("\" has inconsistent units across files");
 					}
 					if (info.m_strUnits == "") {
@@ -1012,7 +1051,7 @@ std::string FileListObject::IndexVariableData(
 					if (info.m_iTimeDimIx == (-1)) {
 						info.m_iTimeDimIx = d;
 					} else if (info.m_iTimeDimIx != d) {
-						return std::string("Variable \"") + strVariableName
+						return std::string("ERROR: Variable \"") + strVariableName
 							+ std::string("\" has inconsistent \"time\" dimension across files");
 					}
 				}
@@ -1064,6 +1103,9 @@ std::string FileListObject::IndexVariableData(
 		}
 	}
 
+	// Sort the Time array
+	SortTimeArray();
+
 	return std::string("");
 }
 
@@ -1082,7 +1124,7 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 #endif
 
 	if (m_vecTimes.size() != m_mapTimeToIndex.size()) {
-		_EXCEPTIONT("vecTimes / mapTimeToIndex inconsistency");
+		_EXCEPTIONT("vecTimes / mapTimeToIndex mismatch");
 	}
 
 	std::vector< std::pair<size_t,int> > iTimeVariableIndex;
@@ -1113,11 +1155,8 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 	ofOutput << std::endl;
 
 	// Output variables with time dimension
-	std::map<Time, size_t>::const_iterator iterTime = m_mapTimeToIndex.begin();
-	for (; iterTime != m_mapTimeToIndex.end(); iterTime++) {
-		size_t t = iterTime->second;
-
-		ofOutput << iterTime->first.ToString();
+	for (size_t t = 0; t < m_vecTimes.size(); t++) {
+		ofOutput << m_vecTimes[t].ToString();
 
 		for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
 
