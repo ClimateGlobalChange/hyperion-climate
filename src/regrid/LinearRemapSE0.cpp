@@ -935,7 +935,8 @@ void LinearRemapSE4(
 			}
 
 			if (fabs(dTargetArea - meshInput.vecFaceArea[ixFirst]) > 1.0e-10) {
-				Announce("Partial element: %i", ixFirst);
+				Announce("Partial element: %i [%1.10e %1.10e]",
+					ixFirst, dTargetArea, meshInput.vecFaceArea[ixFirst]);
 
 			} else {
 				dCoeff.Allocate(nOverlapFaces, nP * nP);

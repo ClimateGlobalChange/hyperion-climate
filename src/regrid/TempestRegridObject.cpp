@@ -67,7 +67,7 @@ std::string TempestRegridObjectConstructor::Call(
 // TempestRegridObject
 ///////////////////////////////////////////////////////////////////////////////
 
-TempestRegridObject::~TempestRegridObject() {
+void TempestRegridObject::PrepareDelete() {
 	if (m_pobjSourceConfig != NULL) {
 		m_pobjSourceConfig->ReleaseLock();
 	}
@@ -104,25 +104,7 @@ std::string TempestRegridObject::Call(
 		if (vecCommandLineType.size() != 1) {
 			return std::string("ERROR: Invalid parameters to function \"regrid\"");
 		}
-/*
-		// Source files
-		FileListObject * pobjSourceFileListObject =
-			dynamic_cast<FileListObject *>(
-				objreg.GetObject(vecCommandLine[0]));
-		if (pobjSourceFileListObject == NULL) {
-			return std::string("ERROR: First argument of regrid() must be"
-				" of type file_list");
-		}
 
-		// Target file(s)
-		FileListObject * pobjTargetFileListObject =
-			dynamic_cast<FileListObject *>(
-				objreg.GetObject(vecCommandLine[1]));
-		if (pobjTargetFileListObject == NULL) {
-			return std::string("ERROR: Second argument of regrid() must be"
-				" of type file_list");
-		}
-*/
 		// Variables
 		std::vector<std::string> vecVariables;
 
@@ -245,6 +227,7 @@ std::string TempestRegridObject::Call(
 				}
 			}
 		}
+
 /*
 		for (size_t f = 0; f < sSourceFilenameCount; f++) {
 			Announce("Input File:  %s", pobjSourceFileList->GetFilename(f).c_str());
@@ -349,7 +332,7 @@ std::string TempestRegridObject::Initialize(
 	// Concave faces in mesh
 	bool fTargetConcave = pmeshTarget->fConcave;
 
-	// Generate EdgeMap on source mesh if not available
+	// Convexify the source mesh if it contains concave elements
 	if (fSourceConcave) {
 		Announce("Convexifying source mesh");
 		pmeshSource = new Mesh;
