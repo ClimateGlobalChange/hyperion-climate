@@ -571,11 +571,11 @@ void Mesh::ConstructAdjacencyList(
 			std::set<int>::const_iterator iter0 =
 				setadj[iter->second[1]].find(iter->second[0]);
 
-			if (iter1 != setadj[iter->second[0]].end()) {
+			if (iter1 == setadj[iter->second[0]].end()) {
 				setadj[iter->second[0]].insert(iter->second[1]);
 				adjlist[iter->second[0]].push_back(iter->second[1]);
 			}
-			if (iter0 != setadj[iter->second[1]].end()) {
+			if (iter0 == setadj[iter->second[1]].end()) {
 				setadj[iter->second[1]].insert(iter->second[0]);
 				adjlist[iter->second[1]].push_back(iter->second[0]);
 			}
