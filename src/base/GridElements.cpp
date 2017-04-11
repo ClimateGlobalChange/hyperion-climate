@@ -545,8 +545,8 @@ void Mesh::ConstructAdjacencyList(
 	}
 
 	// For each Edge in the EdgeMap add a connection between the FacePair
-	adjlist.resize(faces.size());
 	adjlist.clear();
+	adjlist.resize(faces.size());
 
 	std::vector< std::set<int> > setadj;
 	setadj.resize(faces.size());

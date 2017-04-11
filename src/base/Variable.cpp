@@ -120,6 +120,25 @@ std::string VariableRegistry::FindOrRegister(
 		return std::string("");
 	}
 
+	// Check for special variable names
+	if ((strVariableName == "lon") ||
+	    (strVariableName == "lat")
+	) {
+		// Register the operator combination
+		Variable varNew(this, strVariableName, NULL);
+		varNew.m_strUnits = "deg";
+
+		// Insert new variable into registry
+		iterVar =
+			m_mapVariables.insert(
+				std::pair<std::string, Variable>(
+					strVariableName, varNew)).first;
+
+		(*ppVariable) = &(iterVar->second);
+
+		return std::string("");
+	}
+
 	// Invalid variable name
 	return std::string("Invalid variable name \"")
 		+ strVariableName + std::string("\"");
@@ -487,6 +506,28 @@ std::string Variable::LoadGridData(
 
 	// Allocate data
 	m_data.Allocate(mesh.sDOFCount);
+
+	// Check for special variable names
+	if (m_pvarinfo == NULL) {
+		if ((m_strName == "lon") && (mesh.dCenterLon.GetRows() == mesh.sDOFCount)) {
+			Announce("Extracting grid data [%s] [NoTime]", m_strName.c_str());
+			for (size_t i = 0; i < mesh.sDOFCount; i++) {
+				m_data[i] = static_cast<float>(mesh.dCenterLon[i]);
+			}
+
+			m_sTime = SingleTimeIndex;
+			return std::string("");
+		}
+		if ((m_strName == "lat") && (mesh.dCenterLat.GetRows() == mesh.sDOFCount)) {
+			Announce("Extracting grid data [%s] [NoTime]", m_strName.c_str());
+			for (size_t i = 0; i < mesh.sDOFCount; i++) {
+				m_data[i] = static_cast<float>(mesh.dCenterLat[i]);
+			}
+
+			m_sTime = SingleTimeIndex;
+			return std::string("");
+		}
+	}
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
