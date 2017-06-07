@@ -286,14 +286,34 @@ public:
 	Time operator+(double dSeconds) const;
 */
 	///	<summary>
+	///		Calculate the day number for this Time.
+	///	</summary>
+	int DayNumber() const;
+
+	///	<summary>
 	///		Determine the number of seconds between two Times.
 	///	</summary>
 	double operator-(const Time & time) const;
 
 	///	<summary>
-	///		Determine the number of seconds between this time and 0.
+	///		Determine the number of seconds from this time to the given Time.
 	///	</summary>
-	double GetSeconds() const;
+	double DeltaSeconds(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of minutes from this time to the given Time.
+	///	</summary>
+	double DeltaMinutes(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of hours from this time to the given Time.
+	///	</summary>
+	double DeltaHours(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of days from this time to the given Time.
+	///	</summary>
+	double DeltaDays(const Time & time) const;
 
 public:
 	///	<summary>
@@ -477,6 +497,15 @@ public:
 	void FromCFCompliantUnitsOffsetDouble(
 		const std::string & strFormattedTime,
 		double dOffset
+	);
+
+	///	<summary>
+	///		Get the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	double GetCFCompliantUnitsOffsetDouble(
+		const std::string & strFormattedTime
 	);
 
 	///	<summary>

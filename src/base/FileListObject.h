@@ -171,6 +171,7 @@ public:
 			_EXCEPTIONT("Out of memory");
 		}
 
+		_EXCEPTIONT("TO BE FIXED");
 		pobjDuplicate->m_strRecordDimName = m_strRecordDimName;
 		pobjDuplicate->m_vecFilenames = m_vecFilenames;
 		pobjDuplicate->m_vecTimes = m_vecTimes;
@@ -239,6 +240,15 @@ public:
 	///	</summary>
 	std::string PopulateFromSearchString(
 		const std::string & strSearchString
+	);
+
+	///	<summary>
+	///		Add a series of files with the given filename template.
+	///	</summary>
+	std::string CreateFilesFromTemplate(
+		const std::string & strFilenameTemplate,
+		const GridObject * pobjGrid,
+		int nTimesPerFile
 	);
 
 	///	<summary>
@@ -409,9 +419,19 @@ protected:
 	std::string m_strRecordDimName;
 
 	///	<summary>
+	///		The base directory.
+	///	</summary>
+	std::string m_strBaseDir;
+
+	///	<summary>
 	///		The list of filenames.
 	///	</summary>
 	std::vector<std::string> m_vecFilenames;
+
+	///	<summary>
+	///		The format of the record variable.
+	///	</summary>
+	std::string m_strTimeUnits;
 
 	///	<summary>
 	///		The list of Times that appear in the FileList

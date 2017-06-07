@@ -375,7 +375,7 @@ std::string Variable::InitializeAuxiliary(
 		return std::string("");
 	}
 
-	// Vector magnitude
+	// Vector difference
 	if (m_strOpName == "_DIFF") {
 		if (vecVarArguments.size() != 2) {
 			return std::string("_DIFF expectes two arguments");
@@ -383,6 +383,21 @@ std::string Variable::InitializeAuxiliary(
 
 		// Inherit attributes from argument
 		m_strUnits = vecVarArguments[0]->m_strUnits;
+		m_vecDimNames = vecVarArguments[0]->m_vecDimNames;
+		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
+		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
+
+		return std::string("");
+	}
+
+	// Vector product
+	if (m_strOpName == "_PROD") {
+		if (vecVarArguments.size() != 2) {
+			return std::string("_PROD expectes two arguments");
+		}
+
+		// Inherit attributes from argument
+		m_strUnits = vecVarArguments[0]->m_strUnits + vecVarArguments[1]->m_strUnits;
 		m_vecDimNames = vecVarArguments[0]->m_vecDimNames;
 		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
 		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
@@ -647,6 +662,37 @@ std::string Variable::LoadGridData(
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
 			m_data[i] = dataLeft[i] - dataRight[i];
+		}
+
+	// Evaluate the product operator
+	} else if (m_strOpName == "_PROD") {
+		if (m_vecArg.size() != 2) {
+			_EXCEPTION1("_PROD expects two arguments: %i given",
+				m_vecArg.size());
+		}
+		Variable * pvarLeft = NULL;
+		Variable * pvarRight = NULL;
+
+		std::string strErrorLeft =
+			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strErrorLeft != "") {
+			_EXCEPTION1("%s", strErrorLeft.c_str());
+		}
+
+		std::string strErrorRight =
+			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strErrorRight != "") {
+			_EXCEPTION1("%s", strErrorRight.c_str());
+		}
+
+		pvarLeft->LoadGridData(sTime);
+		pvarRight->LoadGridData(sTime);
+
+		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
+		const DataArray1D<float> & dataRight = pvarRight->GetData();
+
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] = dataLeft[i] * dataRight[i];
 		}
 
 /*

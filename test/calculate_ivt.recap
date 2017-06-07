@@ -1,0 +1,32 @@
+# Input data
+config = recap_configuration()
+config.grid = grid("nhemi_30_x4.g", "sem_np4")
+config.data = file_list("nhemi_*00000.nc")
+config.lookup = variable_lookup("nhemi_lookup.txt")
+
+# Generate a new RLL grid
+rllparam = parameter_list()
+rllparam.gridtype = "rll"
+rllparam.minlon = "-180.0deg"
+rllparam.maxlon = "-100.0deg"
+rllparam.minlat = "15.0deg"
+rllparam.maxlat = "50.0deg"
+rllparam.nlon = 640
+rllparam.nlat = 360
+
+# Output data
+config_out = recap_configuration("create")
+config_out.grid = grid(rllparam)
+config_out.data = config.data.duplicate_for_writing("./out")
+config_out.lookup = variable_lookup("nhemi_lookup.txt")
+
+config_out.create_output_files("nhemi_30_x4_fixedSST.cam.h4.%T.regrid.nc", 4)
+
+# Create a new regridder
+remapparam = parameter_list()
+remapparam.mono = "true"
+my_regrid = tempestregrid(config, config_out, remapparam)
+
+# Regrid
+my_regrid.regrid("_PROD(U850,V850)")
+

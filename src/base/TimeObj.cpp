@@ -299,100 +299,83 @@ void Time::AddTime(const Time & timeDelta) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/*
-Time Time::operator+(double dSeconds) const {
-	Time timeNew = (*this);
-	timeNew += dSeconds;
-	return timeNew;
+
+int Time::DayNumber() const {
+
+	// Based on https://alcor.concordia.ca/~gpkatch/gdate-algorithm.html
+	// but modified since m_iMonth and m_iDay are zero-indexed
+	if (m_eCalendarType == CalendarNoLeap) {
+		int nM = (m_iMonth + 10) % 12;
+		int nY = m_iYear - nM/10;
+		int nDay = 365 * nY + (nM * 306 + 5) / 10 + m_iDay;
+
+		return nDay;
+
+	} else if (m_eCalendarType == CalendarStandard) {
+		int nM = (m_iMonth + 10) % 12;
+		int nY = m_iYear - nM/10;
+		int nDay = 365 * nY + nY / 4 - nY / 100 + nY / 400
+			+ (nM * 306 + 5) / 10 + m_iDay;
+
+		return nDay;
+
+	} else {
+		_EXCEPTIONT("Not implemented");
+	}
 }
-*/
+
 ///////////////////////////////////////////////////////////////////////////////
 
 double Time::operator-(const Time & time) const {
-
-	double dDeltaSeconds = 0;
-
-	// Calendar with no leap years
-	if (m_eCalendarType == CalendarNoLeap) {
-
-		const int nDaysPerMonth[]
-			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-		dDeltaSeconds =
-			+ static_cast<double>(m_iYear - time.m_iYear) * 31536000.0
-			+ static_cast<double>(m_iSecond - time.m_iSecond)
-			+ static_cast<double>(m_iMicroSecond - time.m_iMicroSecond)
-				* 1.0e-6;
-
-		// Remove intervening months
-		if (m_iMonth > time.m_iMonth) {
-			dDeltaSeconds +=
-				+ 86400.0 * static_cast<double>(
-					nDaysPerMonth[time.m_iMonth] - time.m_iDay)
-				+ 86400.0 * static_cast<double>(m_iDay);
-
-			for (int i = time.m_iMonth+1; i < m_iMonth; i++) {
-				dDeltaSeconds +=
-					static_cast<double>(nDaysPerMonth[i]) * 86400.0;
-			}
-
-		// Remove intervening months
-		} else if (m_iMonth < time.m_iMonth) {
-			dDeltaSeconds -=
-				+ 86400.0 * static_cast<double>(
-					nDaysPerMonth[m_iMonth] - m_iDay)
-				+ 86400.0 * static_cast<double>(time.m_iDay);
-
-			for (int i = m_iMonth+1; i < time.m_iMonth; i++) {
-				dDeltaSeconds -=
-					86400.0 * static_cast<double>(nDaysPerMonth[i]);
-			}
-
-		// Same month, just take the difference in days
-		} else {
-			dDeltaSeconds +=
-				86400.0 * static_cast<double>(m_iDay - time.m_iDay);
-		}
-
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
-	}
-	
-	return dDeltaSeconds;
+	return -DeltaSeconds(time);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-double Time::GetSeconds() const {
+double Time::DeltaSeconds(const Time & time) const {
 
-	double dDeltaSeconds = 0;
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
 
-	// Calendar with no leap years
-	if (m_eCalendarType == CalendarNoLeap) {
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 86400.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond)
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 1.0e6;
+}
 
-		const int nDaysPerMonth[]
-			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+///////////////////////////////////////////////////////////////////////////////
 
-		// Basic number of seconds
-		dDeltaSeconds =
-			+ static_cast<double>(m_iYear) * 31536000.0
-			+ static_cast<double>(m_iDay) * 86400.0
-			+ static_cast<double>(m_iSecond)
-			+ static_cast<double>(m_iMicroSecond) * 1.0e-6;
+double Time::DeltaMinutes(const Time & time) const {
 
-		// Number of seconds from month
-		for (int i = 0; i < m_iMonth; i++) {
-			dDeltaSeconds +=
-				static_cast<double>(nDaysPerMonth[i]) * 86400.0;
-		}
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
 
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
-	}
-	
-	return dDeltaSeconds;
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 1440.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 60.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 6.0e7;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::DeltaHours(const Time & time) const {
+
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
+
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 24.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 3600.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 3.6e9;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::DeltaDays(const Time & time) const {
+
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
+
+	return static_cast<double>(nDayNumber2 - nDayNumber1)
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 86400.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 8.64e10;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -909,6 +892,48 @@ void Time::FromCFCompliantUnitsOffsetDouble(
 
 		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 60.0);
 		AddSeconds(nSeconds);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::GetCFCompliantUnitsOffsetDouble(
+	const std::string & strFormattedTime
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		Time timeBuf;
+		std::string strSubStr = strFormattedTime.substr(11);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaDays(*this);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		Time timeBuf;
+		std::string strSubStr = strFormattedTime.substr(12);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaHours(*this);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		Time timeBuf;
+		std::string strSubStr = strFormattedTime.substr(14);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaMinutes(*this);
 
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");

@@ -24,6 +24,7 @@
 #include "DataArray2D.h"
 #include "netcdfcpp.h"
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <fstream>
@@ -123,8 +124,35 @@ std::string FileListObject::Call(
 			return std::string("ERROR: Unable to allocate new FileListObject");
 		}
 
-		pobjNewFileList->m_vecFilenames = m_vecFilenames;
+		pobjNewFileList->m_strBaseDir = vecCommandLine[0];
+		if (vecCommandLine[0][vecCommandLine[0].length()-1] != '/') {
+			pobjNewFileList->m_strBaseDir += "/";
+		}
 
+		// Create the directory if it doesn't exist
+		DIR * pDir = opendir(pobjNewFileList->m_strBaseDir.c_str());
+		if (pDir == NULL) {
+			int iError =
+				mkdir(
+					pobjNewFileList->m_strBaseDir.c_str(),
+					S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+			if (iError != 0) {
+				return std::string("Unable to create directory \"")
+					+ pobjNewFileList->m_strBaseDir + std::string("\"");
+			}
+
+		} else {
+			closedir(pDir);
+		}
+
+		// Copy times
+		pobjNewFileList->m_vecTimes = m_vecTimes;
+		pobjNewFileList->m_mapTimeToIndex = m_mapTimeToIndex;
+		pobjNewFileList->m_strTimeUnits = m_strTimeUnits;
+
+/*
+		// Add file extension
 		for (size_t f = 0; f < pobjNewFileList->m_vecFilenames.size(); f++) {
 			int nLength = pobjNewFileList->m_vecFilenames[f].length();
 			int iExt = nLength-1;
@@ -144,7 +172,7 @@ std::string FileListObject::Call(
 					+ m_vecFilenames[f].substr(iExt);
 			}
 		}
-
+*/
 		if (ppReturn != NULL) {
 			(*ppReturn) = pobjNewFileList;
 		} else {
@@ -165,7 +193,7 @@ std::string FileListObject::Call(
 			return std::string("ERROR: Cannot append files to a locked file_list");
 		}
 
-		return PopulateFromSearchString(vecCommandLine[0]);
+		return PopulateFromSearchString(m_strBaseDir + vecCommandLine[0]);
 	}
 
 	return
@@ -182,27 +210,31 @@ std::string FileListObject::Call(
 std::string FileListObject::PopulateFromSearchString(
 	const std::string & strSearchString
 ) {
+	// Check if already initialized
+	if (m_vecFilenames.size() != 0) {
+		_EXCEPTIONT("FileListObject has already been initialized");
+	}
+
 	// File the directory in the search string
-	std::string strDir;
 	std::string strFileSearchString;
 	for (int i = strSearchString.length(); i >= 0; i--) {
 		if (strSearchString[i] == '/') {
-			strDir = strSearchString.substr(0,i+1);
+			m_strBaseDir = strSearchString.substr(0,i+1);
 			strFileSearchString =
 				strSearchString.substr(i+1, std::string::npos);
 			break;
 		}
 	}
-	if ((strDir == "") && (strFileSearchString == "")) {
+	if ((m_strBaseDir == "") && (strFileSearchString == "")) {
 		strFileSearchString = strSearchString;
-		strDir = "./";
+		m_strBaseDir = "./";
 	}
 
 	// Open the directory
-	DIR * pDir = opendir(strDir.c_str());
+	DIR * pDir = opendir(m_strBaseDir.c_str());
 	if (pDir == NULL) {
 		return std::string("Unable to open directory \"")
-			+ strDir + std::string("\"");
+			+ m_strBaseDir + std::string("\"");
 	}
 
 	// Search all files in the directory for match to search string
@@ -215,14 +247,115 @@ std::string FileListObject::PopulateFromSearchString(
 				strFilename.c_str())
 		) {
 			// File found, insert into list of filenames
-			std::string strFullFilename = strDir + strFilename;
-			m_vecFilenames.push_back(strFullFilename);
+			m_vecFilenames.push_back(strFilename);
 		}
 	}
 	closedir(pDir);
 
 	// Index the variable data
 	return IndexVariableData(iFileBegin, m_vecFilenames.size());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::CreateFilesFromTemplate(
+	const std::string & strFilenameTemplate,
+	const GridObject * pobjGrid,
+	int nTimesPerFile
+) {
+	if (pobjGrid == NULL) {
+		_EXCEPTION();
+	}
+
+	// Search for time specifier in template
+	int iTemplatePos = (-1);
+	for (int i = 0; i < strFilenameTemplate.length()-1; i++) {
+		if ((strFilenameTemplate[i] == '%') &&
+			(strFilenameTemplate[i+1] == 'T')
+		) {
+			if (iTemplatePos == (-1)) {
+				iTemplatePos = i;
+			} else {
+				return std::string("ERROR: Time specifier appears more than once in filename template");
+			}
+		}
+	}
+	if (iTemplatePos == (-1)) {
+		return std::string("ERROR: Time specifier missing from filename template");
+	}
+
+	// Loop through all times
+	for (int t = 0; t < m_vecTimes.size(); t += nTimesPerFile) {
+		std::string strFilename =
+			strFilenameTemplate.substr(0,iTemplatePos)
+			+ m_vecTimes[t].ToShortString()
+			+ strFilenameTemplate.substr(iTemplatePos+2, std::string::npos);
+
+		// Create the file from the Grid
+		std::string strError =
+			CreateFileNoTime(
+				strFilename,
+				pobjGrid);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		// Add record dimension
+		std::string strFullFilename = m_strBaseDir + strFilename;
+		NcFile ncFile(strFullFilename.c_str(), NcFile::Write);
+		if (!ncFile.is_valid()) {
+			return std::string("ERROR: Unable to open \"")
+				+ strFilename + std::string("\" for writing");
+		}
+
+		if (m_strRecordDimName == "") {
+			return std::string("ERROR: NetCDF file template has no record dimension");
+		}
+
+		NcDim * dimRecord = ncFile.add_dim(m_strRecordDimName.c_str(), 0);
+		if (dimRecord == NULL) {
+			return std::string("ERROR: Unable to create record dimension \"")
+				+ m_strRecordDimName + std::string("\" in file ")
+				+ strFilename;
+		}
+
+		NcVar * varRecord = ncFile.add_var(m_strRecordDimName.c_str(), ncDouble, dimRecord);
+		if (varRecord == NULL) {
+			return std::string("ERROR: Unable to create record variable \"")
+				+ m_strRecordDimName + std::string("\" in file ")
+				+ strFilename;
+		}
+
+		NcBool fAttUnits = varRecord->add_att("units", m_strTimeUnits.c_str());
+		if (!fAttUnits) {
+			return std::string("ERROR: Unable to add attributes to variable \"")
+				+ m_strRecordDimName + std::string("\" in file ")
+				+ strFilename;
+		}
+
+		// Output times
+		int nTimes = nTimesPerFile;
+		if (t + nTimes >= m_vecTimes.size()) {
+			nTimes = m_vecTimes.size() - t;
+		}
+
+		std::vector<double> dTimes;
+		dTimes.resize(nTimes);
+		for (int s = 0; s < nTimes; s++) {
+			dTimes[s] = m_vecTimes[t+s].GetCFCompliantUnitsOffsetDouble(m_strTimeUnits);
+		}
+		varRecord->put(&(dTimes[0]), nTimes);
+
+		// Populate m_mapOutputTimeFile
+		for (int s = 0; s < nTimes; s++) {
+			m_mapOutputTimeFile.insert(
+				std::pair<size_t, LocalFileTimePair>(
+					t+s, LocalFileTimePair(t/nTimesPerFile, s)));
+		}
+	}
+	
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -247,10 +380,12 @@ std::string FileListObject::CreateFileNoTime(
 	size_t sNewFileIx = m_vecFilenames.size();
 	m_vecFilenames.push_back(strFilename);
 
-	NcFile ncFile(strFilename.c_str(), NcFile::Replace);
+	std::string strFullFilename = m_strBaseDir + strFilename;
+
+	NcFile ncFile(strFullFilename.c_str(), NcFile::Replace);
 	if (!ncFile.is_valid()) {
 		return std::string("ERROR: Unable to open \"")
-			+ strFilename + std::string("\" for writing");
+			+ strFullFilename + std::string("\" for writing");
 	}
 
 	// Add grid dimensions to file
@@ -413,9 +548,10 @@ std::string FileListObject::LoadData_float(
 	}
 
 	// Open the correct NetCDF file
-	NcFile ncfile(m_vecFilenames[sFile].c_str());
+	std::string strFullFilename = m_strBaseDir + m_vecFilenames[sFile];
+	NcFile ncfile(strFullFilename.c_str());
 	if (!ncfile.is_valid()) {
-		_EXCEPTION1("Cannot open file \"%s\"", m_vecFilenames[sFile].c_str());
+		_EXCEPTION1("Cannot open file \"%s\"", strFullFilename.c_str());
 	}
 
 	// Get the correct variable from the file
@@ -596,9 +732,10 @@ std::string FileListObject::WriteData_float(
 	}
 
 	// Write data
-	NcFile ncout(m_vecFilenames[sFile].c_str(), NcFile::Write);
+	std::string strFullFilename = m_strBaseDir + m_vecFilenames[sFile];
+	NcFile ncout(strFullFilename.c_str(), NcFile::Write);
 	if (!ncout.is_valid()) {
-		_EXCEPTIONT("Unable to open output file");
+		_EXCEPTION1("Unable to open output file \"%s\"", strFullFilename.c_str());
 	}
 
 	// Get dimensions
@@ -854,13 +991,14 @@ std::string FileListObject::IndexVariableData(
 	for (size_t f = sFileIxBegin; f < sFileIxEnd; f++) {
 
 		// Open the NetCDF file
-		NcFile ncFile(m_vecFilenames[f].c_str(), NcFile::ReadOnly);
+		std::string strFullFilename = m_strBaseDir + m_vecFilenames[f];
+		NcFile ncFile(strFullFilename.c_str(), NcFile::ReadOnly);
 		if (!ncFile.is_valid()) {
 			return std::string("Unable to open data file \"")
-				+ m_vecFilenames[f] + std::string("\" for reading");
+				+ strFullFilename + std::string("\" for reading");
 		}
 
-		printf("Indexing %s\n", m_vecFilenames[f].c_str());
+		printf("Indexing %s\n", strFullFilename.c_str());
 
 		// time indices stored in this file
 		std::vector<size_t> vecFileTimeIndices;
@@ -882,7 +1020,6 @@ std::string FileListObject::IndexVariableData(
 			}
 
 			Time::CalendarType timecal;
-			std::string strTimeUnits;
 
 			NcDim * dimTime = varTime->get_dim(0);
 			if (dimTime == NULL) {
@@ -907,9 +1044,9 @@ std::string FileListObject::IndexVariableData(
 			// Get units attribute
 			NcAtt * attTimeUnits = varTime->get_att("units");
 			if (attTimeUnits != NULL) {
-				strTimeUnits = attTimeUnits->as_string(0);
+				m_strTimeUnits = attTimeUnits->as_string(0);
 			}
-			if (strTimeUnits == "") {
+			if (m_strTimeUnits == "") {
 				return std::string("Unknown units for \"")
 					+ m_strRecordDimName
 					+ std::string("\" in \"")
@@ -932,15 +1069,15 @@ std::string FileListObject::IndexVariableData(
 
 			for (int t = 0; t < dimTime->size(); t++) {
 				Time time(timecal);
-				if (strTimeUnits != "") {
+				if (m_strTimeUnits != "") {
 					if (varTime->type() == ncInt) {
 						time.FromCFCompliantUnitsOffsetInt(
-							strTimeUnits,
+							m_strTimeUnits,
 							nTimes[t]);
 
 					} else if (varTime->type() == ncDouble) {
 						time.FromCFCompliantUnitsOffsetDouble(
-							strTimeUnits,
+							m_strTimeUnits,
 							dTimes[t]);
 					}
 				}
@@ -1181,7 +1318,7 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 
 	ofOutput << "file_ix,filename" << std::endl;
 	for (size_t f = 0; f < m_vecFilenames.size(); f++) {
-		ofOutput << f << ",\"" << m_vecFilenames[f] << "\"" << std::endl;
+		ofOutput << f << ",\"" << m_strBaseDir << m_vecFilenames[f] << "\"" << std::endl;
 	}
 
 	return ("");

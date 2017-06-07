@@ -110,8 +110,74 @@ std::string RecapConfigObject::Call(
 		return
 			pobjFileList->SetReduceTarget(
 				vecCommandLine[0]);
-
 	}
+
+	// Create multiple new files for write targets
+	if (strFunctionName == "create_output_files") {
+
+		if ((vecCommandLineType.size() != 2) ||
+		    (vecCommandLineType[0] != ObjectType_String) ||
+		    (vecCommandLineType[1] != ObjectType_Integer)
+		) {
+			return std::string("ERROR: Invalid arguments to function create_output_files()");
+		}
+
+		if (m_eAccessMode == AccessMode_ReadOnly) {
+			return std::string("ERROR: create_output_files() requires "
+				"write-permissions in recap_configuration");
+		}
+
+		FileListObject * pobjFileList = GetFileList();
+
+		return
+			pobjFileList->CreateFilesFromTemplate(
+				vecCommandLine[0],
+				GetGrid(),
+				atoi(vecCommandLine[1].c_str()));
+	}
+
+/*
+	// Evaluate a variable
+	if (strFunctionName == "evaluate") {
+
+		RecapConfigObject * pTarget = NULL;
+
+		if (vecCommandLineType.size() == 0) {
+			return std::string("ERROR: Invalid arguments to function evaluate()");
+		}
+
+		// Self-target for evaluation
+		if ((vecCommandLineType.size() == 1) &&
+		    (vecCommandLineType[0] == ObjectType_String)
+		) {
+			if (m_eAccessMode == AccessMode_ReadOnly) {
+				return std::string("ERROR: Cannot \"evaluate\" on read-only recap_configuration");
+			} else {
+				pTarget = this;
+			}
+
+		// External target for evaluation
+		} else if ((vecCommandLineType.size() == 2) &&
+		    (vecCommandLineType[0] == ObjectType_String) &&
+			(vecCommandLineType[1] == ObjectType_Token)
+		) {
+			pTarget = dynamic_cast<RecapConfigObject *>(objreg.GetObject(vecCommandLine[1]));
+			if (pTarget == NULL) {
+				return std::string("ERROR: Second argument to function evaluate() "
+					"must be of type recap_configuration");
+			}
+			if (pTarget->m_eAccessMode == AccessMode_ReadOnly) {
+				return std::string("ERROR: Cannot \"evaluate\" to read-only recap_configuration");
+			}
+
+		// Invalid arguments
+		} else {
+			return std::string("ERROR: Invalid arguments to function evaluate()");
+		}
+
+		return("");
+	}
+*/
 /*
 	// Add a new file to the FileList for single time slices
 	if (strFunctionName == "add_data_file") {
