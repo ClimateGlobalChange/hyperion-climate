@@ -206,7 +206,6 @@ public:
 				return (*this);
 			}
 		}
-		m_vecValue[0] = m_vecSize[0];
 		m_fEnd = true;
 		return (*this);
 	}
@@ -226,12 +225,11 @@ public:
 		if (m_vecSize.size() != iter.m_vecSize.size()) {
 			_EXCEPTIONT("Invalid comparison");
 		}
-		if (m_vecSize.size() == 0) {
-			if (m_fEnd == iter.m_fEnd) {
-				return true;
-			} else {
-				return false;
-			}
+		if ((m_fEnd) && (iter.m_fEnd)) {
+			return true;
+		}
+		if (m_fEnd != iter.m_fEnd) {
+			return false;
 		}
 		for (size_t d = 0; d < m_vecSize.size(); d++) {
 			if (m_vecValue[d] != iter.m_vecValue[d]) {
@@ -267,14 +265,6 @@ public:
 	///	</summary>
 	std::string ToString() const {
 		std::string strOut;
-		if (m_vecSize.size() == 0) {
-			if (m_fEnd) {
-				strOut = std::string("(end)");
-			} else {
-				strOut = std::string("(begin)");
-			}
-			return strOut;
-		}
 		for (size_t d = 0; d < m_vecSize.size(); d++) {
 			strOut +=
 				std::string("(")
@@ -283,6 +273,12 @@ public:
 				+ std::to_string(m_vecSize[d])
 				+ std::string(")");
 		}
+		if (m_fEnd) {
+			strOut += std::string("(end)");
+		} else if (m_vecSize.size() == 0) {
+			strOut += std::string("(begin)");
+		}
+
 		return strOut;
 	}
 
