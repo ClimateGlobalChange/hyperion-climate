@@ -59,7 +59,6 @@ public:
 	) :
 		m_strVariableName(strVariableName),
 		m_iTimeDimIx(-1)
-		//m_nTimeSliceDims(1)
 	{ } 
 
 public:
@@ -74,20 +73,30 @@ public:
 	std::string m_strUnits;
 
 	///	<summary>
+	///		Index of time dimension or (-1) if time dimension doesn't exist.
+	///	</summary>
+	int m_iTimeDimIx;
+
+	///	<summary>
 	///		Dimension names.
 	///	</summary>
 	std::vector<std::string> m_vecDimNames;
 
 	///	<summary>
-	///		Index of time dimension or (-1) if time dimension doesn't exist.
+	///		Size of each dimension.
 	///	</summary>
-	int m_iTimeDimIx;
-/*
+	std::vector<long> m_vecDimSizes;
+
 	///	<summary>
-	///		Dimensionality of one time slice of data.
+	///		Auxiliary dimension names.
 	///	</summary>
-	int m_nTimeSliceDims;
-*/
+	std::vector<std::string> m_vecAuxDimNames;
+
+	///	<summary>
+	///		Size of each auxiliary dimension.
+	///	</summary>
+	std::vector<long> m_vecAuxDimSizes;
+
 	///	<summary>
 	///		Map from Times to filename index and time index.
 	///	</summary>
@@ -159,6 +168,11 @@ public:
 	{ }
 
 	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~FileListObject();
+
+	///	<summary>
 	///		Self-duplicator.
 	///	</summary>
 	virtual Object * Duplicate(
@@ -228,8 +242,8 @@ public:
 		const std::string & strVariableName
 	) const {
 		for (size_t i = 0; i < m_vecVariableInfo.size(); i++) {
-			if (m_vecVariableInfo[i].m_strVariableName == strVariableName) {
-				return &(m_vecVariableInfo[i]);
+			if (m_vecVariableInfo[i]->m_strVariableName == strVariableName) {
+				return (m_vecVariableInfo[i]);
 			}
 		}
 		return NULL;
@@ -344,7 +358,7 @@ public:
 	std::string LoadData_float(
 		const std::string & strVariableName,
 		const std::vector<long> & vecAuxIndices,
-		size_t sTime,
+		//size_t sTime,
 		DataArray1D<float> & data
 	);
 
@@ -354,7 +368,7 @@ public:
 	std::string WriteData_float(
 		const std::string & strVariableName,
 		const std::vector<long> & vecAuxIndices,
-		size_t sTime,
+		//size_t sTime,
 		const DataArray1D<float> & data
 	);
 
@@ -445,9 +459,9 @@ protected:
 	std::map<Time, size_t> m_mapTimeToIndex;
 
 	///	<summary>
-	///		The list of variable names that appear in the FileList.
+	///		Information on variables that appear in the FileList.
 	///	</summary>
-	std::vector<VariableInfo> m_vecVariableInfo;
+	std::vector<VariableInfo *> m_vecVariableInfo;
 
 	///	<summary>
 	///		A map between the variable name and index in m_vecVariableInfo.

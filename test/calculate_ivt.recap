@@ -1,8 +1,11 @@
 # Input data
 config = recap_configuration()
-config.grid = grid("nhemi_30_x4.g", "sem_np4")
-config.data = file_list("nhemi_*00000.nc")
+config.grid = grid("gridVR14.g", "sem_np4")
+config.data = file_list("VR14_HIST.cam.h4.2000-01-01-00000.nc")
 config.lookup = variable_lookup("nhemi_lookup.txt")
+
+# Output the data index associated with this configuration
+config.data.output_csv("VR14_HIST_data_index.csv")
 
 # Generate a new RLL grid
 rllparam = parameter_list()
@@ -20,7 +23,7 @@ config_out.grid = grid(rllparam)
 config_out.data = config.data.duplicate_for_writing("./out")
 config_out.lookup = variable_lookup("nhemi_lookup.txt")
 
-config_out.create_output_files("nhemi_30_x4_fixedSST.cam.h4.%T.regrid.nc", 4)
+config_out.create_output_files("VR14_HIST.cam.h4.%T.regrid.nc", 4)
 
 # Create a new regridder
 remapparam = parameter_list()
@@ -28,5 +31,5 @@ remapparam.mono = "true"
 my_regrid = tempestregrid(config, config_out, remapparam)
 
 # Regrid
-my_regrid.regrid("_PROD(U850,V850)")
+my_regrid.regrid("_VECMAG(_PROD(U,Q),_PROD(V,Q))")
 

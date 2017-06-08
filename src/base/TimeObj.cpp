@@ -130,12 +130,15 @@ void Time::VerifyTime() {
 
 	// Calendar with no leap years
 	if ((m_eCalendarType == CalendarNoLeap) || 
-		(m_eCalendarType == CalendarStandard)
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if (m_eCalendarType == CalendarStandard) {
+		if ((m_eCalendarType == CalendarStandard) ||
+			(m_eCalendarType == CalendarGregorian)
+		) {
 			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
 				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
@@ -172,12 +175,15 @@ void Time::NormalizeTime() {
 
 	// Calendar with no leap years
 	if ((m_eCalendarType == CalendarNoLeap) || 
-		(m_eCalendarType == CalendarStandard)
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if (m_eCalendarType == CalendarStandard) {
+		if ((m_eCalendarType == CalendarStandard) ||
+			(m_eCalendarType == CalendarGregorian)
+		) {
 			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
 				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
@@ -231,7 +237,9 @@ void Time::NormalizeTime() {
 				m_iYear--;
 
 				// Adjust number of days per month
-				if (m_eCalendarType == CalendarStandard) {
+				if ((m_eCalendarType == CalendarStandard) ||
+					(m_eCalendarType == CalendarGregorian)
+				) {
 					nDaysPerMonth[1] = 28;
 					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
@@ -253,7 +261,9 @@ void Time::NormalizeTime() {
 				m_iYear++;
 
 				// Adjust number of days per month
-				if (m_eCalendarType == CalendarStandard) {
+				if ((m_eCalendarType == CalendarStandard) ||
+					(m_eCalendarType == CalendarGregorian)
+				) {
 					nDaysPerMonth[1] = 28;
 					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
@@ -311,7 +321,10 @@ int Time::DayNumber() const {
 
 		return nDay;
 
-	} else if (m_eCalendarType == CalendarStandard) {
+	} else if (
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian)
+	) {
 		int nM = (m_iMonth + 10) % 12;
 		int nY = m_iYear - nM/10;
 		int nDay = 365 * nY + nY / 4 - nY / 100 + nY / 400
@@ -949,6 +962,8 @@ std::string Time::GetCalendarName() const {
 		return std::string("noleap");
 	} else if (m_eCalendarType == CalendarStandard) {
 		return std::string("standard");
+	} else if (m_eCalendarType == CalendarGregorian) {
+		return std::string("gregorian");
 	} else {
 		_EXCEPTIONT("Invalid CalendarType");
 	}

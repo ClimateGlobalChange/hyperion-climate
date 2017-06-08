@@ -153,6 +153,7 @@ std::string TempestRegridObject::Call(
 
 		// Check the size of all variables
 		for (int v = 0; v < vecVariables.size(); v++) {
+
 			Variable * pvarSource;
 			std::string strError =
 				m_pobjSourceConfig->GetVariable(
@@ -184,20 +185,35 @@ std::string TempestRegridObject::Call(
 				return strError;
 			}
 
+			// Allocate data on target
+			pvarTarget->AllocateGridData();
+
+			// Get pointers to source and target data slices
+			const DataArray1D<float> & dataSource =
+				pvarSource->GetData();
+
+			DataArray1D<float> & dataTarget =
+				pvarTarget->GetData();
+
+			// Loop over all auxiliary indices and remap data
+			VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
+			for (; iterAux != pvarSource->GetAuxIndexEnd(); iterAux++) {
+
+				pvarSource->LoadGridData(iterAux);
+
+				m_mapRemap.ApplyFloat(
+					dataSource,
+					dataTarget);
+
+				pvarTarget->WriteGridData(iterAux);
+			}
+
+/*
 			// Apply the regridding operation to a reduction
 			if (pvarSource->IsReductionOp()) {
 
 				pvarSource->LoadGridData(
 					Variable::SingleTimeIndex);
-
-				pvarTarget->AllocateGridData(
-					Variable::SingleTimeIndex);
-
-				const DataArray1D<float> & dataSource =
-					pvarSource->GetData();
-
-				DataArray1D<float> & dataTarget =
-					pvarTarget->GetData();
 
 				m_mapRemap.ApplyFloat(
 					dataSource,
@@ -209,23 +225,21 @@ std::string TempestRegridObject::Call(
 			// Apply the regridding operation to all times
 			} else {
 				for (size_t t = 0; t < pobjSourceFileList->GetTimeCount(); t++) {
-					pvarSource->LoadGridData(t);
 
-					pvarTarget->AllocateGridData(t);
+					VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
+					for (; iterAux != pvarSource->GetAuxIndexEnd(); iterAux++) {
 
-					const DataArray1D<float> & dataSource =
-						pvarSource->GetData();
+						pvarSource->LoadGridData(t); //, iterAux);
 
-					DataArray1D<float> & dataTarget =
-						pvarTarget->GetData();
+						m_mapRemap.ApplyFloat(
+							dataSource,
+							dataTarget);
 
-					m_mapRemap.ApplyFloat(
-						dataSource,
-						dataTarget);
-
-					pvarTarget->WriteGridData(t);
+						pvarTarget->WriteGridData(t); //, iterAux);
+					}
 				}
 			}
+*/
 		}
 
 /*

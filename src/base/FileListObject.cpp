@@ -94,6 +94,14 @@ const long FileListObject::InconsistentDimensionSizes = (-1);
 
 ///////////////////////////////////////////////////////////////////////////////
 
+FileListObject::~FileListObject() {
+	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
+		delete m_vecVariableInfo[v];
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string FileListObject::Call(
 	const ObjectRegistry & objreg,
 	const std::string & strFunctionName,
@@ -503,13 +511,13 @@ void FileListObject::GetOnRankTimeIndices(
 std::string FileListObject::LoadData_float(
 	const std::string & strVariableName,
 	const std::vector<long> & vecAuxIndices,
-	size_t sTime,
+	//size_t sTime,
 	DataArray1D<float> & data
 ) {
 	// Find the VariableInfo structure for this Variable
 	size_t iVarInfo = 0;
 	for (; iVarInfo < m_vecVariableInfo.size(); iVarInfo++) {
-		if (strVariableName == m_vecVariableInfo[iVarInfo].m_strVariableName) {
+		if (strVariableName == m_vecVariableInfo[iVarInfo]->m_strVariableName) {
 			break;
 		}
 	}
@@ -519,13 +527,19 @@ std::string FileListObject::LoadData_float(
 	}
 
 	// Find the local file/time pair associated with this global time index
-	VariableInfo & varinfo = m_vecVariableInfo[iVarInfo];
+	VariableInfo & varinfo = *(m_vecVariableInfo[iVarInfo]);
 
 	// Get the time index
 	if ((varinfo.m_iTimeDimIx != (-1)) &&
 		(varinfo.m_iTimeDimIx >= vecAuxIndices.size())
 	) {
 		_EXCEPTIONT("time index exceeds auxiliary index size");
+	}
+
+	// Extract the global time index
+	size_t sTime = (-1);
+	if (varinfo.m_iTimeDimIx != (-1)) {
+		sTime = vecAuxIndices[varinfo.m_iTimeDimIx];
 	}
 
 	// Find local file/time index
@@ -539,12 +553,26 @@ std::string FileListObject::LoadData_float(
 	size_t sFile = iter->second.first;
 	int iTime = iter->second.second;
 
-	if (sTime != (-1)) {
-		Announce("Loading data [%s] [%s]",
-			strVariableName.c_str(),
-			m_vecTimes[sTime].ToString().c_str());
-	} else {
-		Announce("Loading data [%s] [NoTime]", strVariableName.c_str());
+	{
+		std::string strLoading =
+			std::string("Loading data [") + strVariableName + std::string("]");
+
+		for (size_t d = 0; d < vecAuxIndices.size(); d++) {
+			if (d == varinfo.m_iTimeDimIx) {
+				strLoading +=
+					std::string(" [")
+					+ m_vecTimes[sTime].ToString()
+					+ std::string("]");
+			} else {
+				strLoading +=
+					std::string(" [")
+					+ varinfo.m_vecAuxDimNames[d]
+					+ std::string(": ")
+					+ std::to_string(vecAuxIndices[d])
+					+ std::string("]");
+			}
+		}
+		Announce(strLoading.c_str());
 	}
 
 	// Open the correct NetCDF file
@@ -556,7 +584,7 @@ std::string FileListObject::LoadData_float(
 
 	// Get the correct variable from the file
 	NcVar * var = ncfile.get_var(strVariableName.c_str());
-	const long nDims = var->num_dims();
+	const long nDims = var->num_dims() - m_vecGridDimNames.size();
 
 	if (var == NULL) {
 		_EXCEPTION1("Variable \"%s\" no longer found in file",
@@ -576,27 +604,27 @@ std::string FileListObject::LoadData_float(
 	long lTotalSize = 1;
 	std::vector<long> vecPos = vecAuxIndices;
 	std::vector<long> vecSize = vecAuxIndices;
-	vecSize.resize(vecPos.size(), 1);
 
-	for (int d = 0; d < nDims; d++) {
+	for (size_t d = 0; d < vecAuxIndices.size(); d++) {
 		if (d == varinfo.m_iTimeDimIx) {
-			if (vecAuxIndices[d] != (-1)) {
-				_EXCEPTIONT("Logic error");
-			}
-			vecPos[d] = static_cast<long>(iTime);
-			vecSize[d] = 1;
-
-		} else if (vecPos[d] == (-1)) {
-			long lDimSize = var->get_dim(d)->size();
-			lTotalSize *= lDimSize;
-			vecPos[d] = 0;
-			vecSize[d] = lDimSize;
-
-		} else {
-			vecSize[d] = 1;
+			vecPos[d] = iTime;
 		}
+		vecSize[d] = 1;
 	}
+	for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
+		NcDim * dimGrid = var->get_dim(vecPos.size());
+		vecPos.push_back(0);
+		vecSize.push_back(dimGrid->size());
+		lTotalSize *= dimGrid->size();
+	}
+
 	if (data.GetRows() != lTotalSize) {
+		//for (int d = 0; d < vecAuxIndices.size(); d++) {
+		//	printf("%s %i\n", varinfo.m_vecDimNames[d].c_str(), vecAuxIndices[d]);
+		//}
+		//for (int d = 0; d < nDims; d++) {
+		//	printf("%i %i\n", vecPos[d], vecSize[d]);
+		//}
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
 	}
 
@@ -604,6 +632,15 @@ std::string FileListObject::LoadData_float(
 	var->set_cur(&(vecPos[0]));
 
 	// Load the data
+/*
+	std::cout << varinfo.m_strVariableName << std::endl;
+		for (int d = 0; d < vecAuxIndices.size(); d++) {
+			printf("%s %i\n", varinfo.m_vecDimNames[d].c_str(), vecAuxIndices[d]);
+		}
+		for (int d = 0; d < nDims; d++) {
+			printf("%i %i\n", vecPos[d], vecSize[d]);
+		}
+*/
 	if (var->type() == ncDouble) {
 		DataArray1D<double> data_dbl(data.GetRows());
 		var->get(&(data_dbl[0]), &(vecSize[0]));
@@ -630,13 +667,12 @@ std::string FileListObject::LoadData_float(
 std::string FileListObject::WriteData_float(
 	const std::string & strVariableName,
 	const std::vector<long> & vecAuxIndices,
-	size_t sTime,
 	const DataArray1D<float> & data
 ) {
 	// Find the VariableInfo structure for this Variable
 	size_t iVarInfo = 0;
 	for (; iVarInfo < m_vecVariableInfo.size(); iVarInfo++) {
-		if (strVariableName == m_vecVariableInfo[iVarInfo].m_strVariableName) {
+		if (strVariableName == m_vecVariableInfo[iVarInfo]->m_strVariableName) {
 			break;
 		}
 	}
@@ -651,8 +687,38 @@ std::string FileListObject::WriteData_float(
 	}
 
 	// Get file index from varinfo
-	VariableInfo & varinfo = m_vecVariableInfo[iVarInfo];
+	VariableInfo & varinfo = *(m_vecVariableInfo[iVarInfo]);
 
+	// Extract the time index
+	size_t sTime = (-1);
+	if (varinfo.m_iTimeDimIx != (-1)) {
+		sTime = vecAuxIndices[varinfo.m_iTimeDimIx];
+	}
+
+	// Write message
+	{
+		std::string strWriting =
+			std::string("Writing data [") + strVariableName + std::string("]");
+
+		for (size_t d = 0; d < vecAuxIndices.size(); d++) {
+			if (d == varinfo.m_iTimeDimIx) {
+				strWriting +=
+					std::string(" [")
+					+ m_vecTimes[sTime].ToString()
+					+ std::string("]");
+			} else {
+				strWriting +=
+					std::string(" [")
+					+ varinfo.m_vecAuxDimNames[d]
+					+ std::string(": ")
+					+ std::to_string(vecAuxIndices[d])
+					+ std::string("]");
+			}
+		}
+		Announce(strWriting.c_str());
+	}
+
+	// Check consistency with indexing procedure
 	if ((sTime == (-1)) && (varinfo.m_iTimeDimIx != (-1))) {
 		_EXCEPTIONT("Attempting to write single time index "
 			"for multi-time-index variable");
@@ -700,33 +766,26 @@ std::string FileListObject::WriteData_float(
 	long lTotalSize = 1;
 	std::vector<long> vecPos = vecAuxIndices;
 	std::vector<long> vecSize = vecAuxIndices;
-	vecSize.resize(vecPos.size(), 1);
 
-	const long nDims = varinfo.m_vecDimNames.size();
-	for (int d = 0; d < nDims; d++) {
+	for (size_t d = 0; d < vecAuxIndices.size(); d++) {
 		if (d == varinfo.m_iTimeDimIx) {
-			if (vecAuxIndices[d] != (-1)) {
-				_EXCEPTIONT("Logic error");
-			}
-			vecPos[d] = static_cast<long>(iLocalTime);
-			vecSize[d] = 1;
-
-		} else if (vecPos[d] == (-1)) {
-			const std::string & strDimName = varinfo.m_vecDimNames[d];
-			long lDimSize = GetDimensionSize(strDimName);
-			if (lDimSize == (-1)) {
-				_EXCEPTION1("Invalid dimension name \"%s\"",
-					varinfo.m_vecDimNames[d].c_str());
-			}
-
-			lTotalSize *= lDimSize;
-			vecPos[d] = 0;
-			vecSize[d] = lDimSize;
-
-		} else {
-			vecSize[d] = 1;
+			vecPos[d] = iLocalTime;
 		}
+		vecSize[d] = 1;
 	}
+	for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
+		std::map<std::string, long>::const_iterator iter =
+			m_mapDimNameSize.find(m_vecGridDimNames[d]);
+
+		if (iter == m_mapDimNameSize.end()) {
+			_EXCEPTIONT("Dimension not found in map");
+		}
+
+		vecPos.push_back(0);
+		vecSize.push_back(iter->second);
+		lTotalSize *= iter->second;
+	}
+
 	if (data.GetRows() != lTotalSize) {
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
 	}
@@ -807,17 +866,21 @@ std::string FileListObject::AddVariableFromTemplate(
 
 	// Check if variable already exists
 	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
-		if (m_vecVariableInfo[v].m_strVariableName == pvar->Name()) {
+		if (m_vecVariableInfo[v]->m_strVariableName == pvar->Name()) {
 			return std::string("ERROR: Variable already exists in file_list");
 		}
 	}
 
 	// VariableInfo
-	VariableInfo varinfo(pvar->Name());
-	varinfo.m_strUnits = pvar->Units();
+	VariableInfo * pvarinfo = new VariableInfo(pvar->Name());
+	if (pvarinfo == NULL) {
+		_EXCEPTIONT("Unable to allocate VariableInfo");
+	}
+
+	pvarinfo->m_strUnits = pvar->Units();
 
 	// Add dimensions from variable to output FileList
-	const std::vector<std::string> & vecDimNames = pvar->DimNames();
+	const std::vector<std::string> & vecDimNames = pvar->AuxDimNames();
 	for (int d = 0; d < vecDimNames.size(); d++) {
 		bool fGridDim = false;
 		for (int e = 0; e < pobjSourceFileList->m_vecGridDimNames.size(); e++) {
@@ -835,7 +898,10 @@ std::string FileListObject::AddVariableFromTemplate(
 			_EXCEPTIONT("Logic error");
 		}
 
-		varinfo.m_vecDimNames.push_back(vecDimNames[d]);
+		pvarinfo->m_vecDimNames.push_back(vecDimNames[d]);
+		pvarinfo->m_vecDimSizes.push_back(lDimSize);
+		pvarinfo->m_vecAuxDimNames.push_back(vecDimNames[d]);
+		pvarinfo->m_vecAuxDimSizes.push_back(lDimSize);
 
 		AddDimension(
 			vecDimNames[d], 
@@ -844,27 +910,22 @@ std::string FileListObject::AddVariableFromTemplate(
 
 	// Add grid dimensions
 	for (int d = 0; d < m_vecGridDimNames.size(); d++) {
-		varinfo.m_vecDimNames.push_back(m_vecGridDimNames[d]);
+		pvarinfo->m_vecDimNames.push_back(m_vecGridDimNames[d]);
 	}
 
 	// Identify the time dimension
-	varinfo.m_iTimeDimIx = (-1);
-	for (int d = 0; d < varinfo.m_vecDimNames.size(); d++) {
-		if (varinfo.m_vecDimNames[d] == m_strRecordDimName) {
-			varinfo.m_iTimeDimIx = d;
+	pvarinfo->m_iTimeDimIx = (-1);
+	for (int d = 0; d < pvarinfo->m_vecDimNames.size(); d++) {
+		if (pvarinfo->m_vecDimNames[d] == m_strRecordDimName) {
+			pvarinfo->m_iTimeDimIx = d;
 			break;
 		}
 	}
-/*
-	std::cout << "TEST " << m_vecGridDimNames.size() << std::endl;
-	for (int d = 0; d < varinfo.m_vecDimNames.size(); d++) {
-		std::cout << varinfo.m_vecDimNames[d] << std::endl;
-	}
-*/
-	// Add this VariableInfo to the vector of VariableInfos
-	m_vecVariableInfo.push_back(varinfo);
 
-	(*ppvarinfo) = &(m_vecVariableInfo[m_vecVariableInfo.size()-1]);
+	// Add this VariableInfo to the vector of VariableInfos
+	m_vecVariableInfo.push_back(pvarinfo);
+
+	(*ppvarinfo) = pvarinfo;
 
 	return std::string("");
 }
@@ -891,8 +952,26 @@ std::string FileListObject::AddDimension(
 				strDimName, lDimSize));
 	}
 
+	// Add a grid dimension
 	if (fGridDim) {
 		m_vecGridDimNames.push_back(strDimName);
+		for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
+			if (m_vecVariableInfo[v]->m_vecDimNames.size() !=
+				m_vecVariableInfo[v]->m_vecDimSizes.size()
+			) {
+				_EXCEPTIONT("Logic error");
+			}
+			m_vecVariableInfo[v]->m_vecAuxDimNames.clear();
+			m_vecVariableInfo[v]->m_vecAuxDimSizes.clear();
+			for (size_t d = 0; d < m_vecVariableInfo[v]->m_vecDimSizes.size(); d++) {
+				if (m_vecVariableInfo[v]->m_vecDimNames[d] != strDimName) {
+					m_vecVariableInfo[v]->m_vecAuxDimNames.push_back(
+						m_vecVariableInfo[v]->m_vecDimNames[d]);
+					m_vecVariableInfo[v]->m_vecAuxDimSizes.push_back(
+						m_vecVariableInfo[v]->m_vecDimSizes[d]);
+				}
+			}
+		}
 	}
 
 	return std::string("");
@@ -946,18 +1025,18 @@ void FileListObject::SortTimeArray() {
 
 	// Rebuild VariableInfo VariableTimeFileMap with new time indices
 	for (size_t i = 0; i < m_vecVariableInfo.size(); i++) {	
-		VariableTimeFileMap mapTimeFileBak = m_vecVariableInfo[i].m_mapTimeFile;
-		m_vecVariableInfo[i].m_mapTimeFile.clear();
+		VariableTimeFileMap mapTimeFileBak = m_vecVariableInfo[i]->m_mapTimeFile;
+		m_vecVariableInfo[i]->m_mapTimeFile.clear();
 
 		VariableTimeFileMap::const_iterator iterFileMap = mapTimeFileBak.begin();
 		for (; iterFileMap != mapTimeFileBak.end(); iterFileMap++) {
 			if (iterFileMap->first == InvalidTimeIx) {
-				m_vecVariableInfo[i].m_mapTimeFile.insert(
+				m_vecVariableInfo[i]->m_mapTimeFile.insert(
 					VariableTimeFileMap::value_type(
 						InvalidTimeIx,
 						iterFileMap->second));
 			} else {
-				m_vecVariableInfo[i].m_mapTimeFile.insert(
+				m_vecVariableInfo[i]->m_mapTimeFile.insert(
 					VariableTimeFileMap::value_type(
 						mapTimeIxToNewTimeIx[iterFileMap->first],
 						iterFileMap->second));
@@ -1144,7 +1223,7 @@ std::string FileListObject::IndexVariableData(
 				sVarIndex = m_vecVariableInfo.size();
 
 				m_vecVariableInfo.push_back(
-					VariableInfo(strVariableName));
+					new VariableInfo(strVariableName));
 
 				iter = m_mapVariableNameToIndex.insert(
 					std::pair<std::string, size_t>(
@@ -1154,7 +1233,7 @@ std::string FileListObject::IndexVariableData(
 				sVarIndex = iter->second;
 			}
 
-			VariableInfo & info = m_vecVariableInfo[sVarIndex];
+			VariableInfo & info = *(m_vecVariableInfo[sVarIndex]);
 
 			// Get units, if available
 			NcAtt * attUnits = var->get_att("units");
@@ -1182,10 +1261,9 @@ std::string FileListObject::IndexVariableData(
 			}
 */
 			info.m_vecDimNames.resize(nDims);
-			//info.m_vecDimSizes.resize(nDims);
+			info.m_vecDimSizes.resize(nDims);
 			for (int d = 0; d < nDims; d++) {
 				info.m_vecDimNames[d] = var->get_dim(d)->name();
-				//info.m_vecDimSizes[d] = var->get_dim(d)->size();
 
 				if (info.m_vecDimNames[d] == m_strRecordDimName) {
 					if (info.m_iTimeDimIx == (-1)) {
@@ -1194,6 +1272,9 @@ std::string FileListObject::IndexVariableData(
 						return std::string("ERROR: Variable \"") + strVariableName
 							+ std::string("\" has inconsistent \"time\" dimension across files");
 					}
+					info.m_vecDimSizes[d] = (-1);
+				} else {
+					info.m_vecDimSizes[d] = var->get_dim(d)->size();
 				}
 			}
 
@@ -1246,6 +1327,18 @@ std::string FileListObject::IndexVariableData(
 	// Sort the Time array
 	SortTimeArray();
 
+	// Update the time dimension size
+	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
+		int iTimeDimIx = m_vecVariableInfo[v]->m_iTimeDimIx;
+		if (iTimeDimIx != (-1)) {
+			if (m_vecVariableInfo[v]->m_vecDimSizes.size() < iTimeDimIx) {
+				_EXCEPTIONT("Logic error");
+			}
+			m_vecVariableInfo[v]->m_vecDimSizes[iTimeDimIx] =
+				m_vecVariableInfo[v]->m_mapTimeFile.size();
+		}
+	}
+
 	return std::string("");
 }
 
@@ -1279,14 +1372,14 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 	// Output variables across header
 	ofOutput << "time";
 	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
-		ofOutput << "," << m_vecVariableInfo[v].m_strVariableName;
+		ofOutput << "," << m_vecVariableInfo[v]->m_strVariableName;
 	}
 	ofOutput << std::endl;
 
 	// Output variables with no time dimension
 	ofOutput << "NONE";
 	for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
-		if (m_vecVariableInfo[v].m_iTimeDimIx == (-1)) {
+		if (m_vecVariableInfo[v]->m_iTimeDimIx == (-1)) {
 			ofOutput << ",X";
 		} else {
 			ofOutput << ",";
@@ -1301,9 +1394,9 @@ std::string FileListObject::OutputTimeVariableIndexCSV(
 		for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
 
 			VariableTimeFileMap::const_iterator iterTimeFile =
-				m_vecVariableInfo[v].m_mapTimeFile.find(t);
+				m_vecVariableInfo[v]->m_mapTimeFile.find(t);
 
-			if (iterTimeFile == m_vecVariableInfo[v].m_mapTimeFile.end()) {
+			if (iterTimeFile == m_vecVariableInfo[v]->m_mapTimeFile.end()) {
 				ofOutput << ",";
 			} else {
 				ofOutput << "," << iterTimeFile->second.first

@@ -1629,7 +1629,12 @@ std::string PointSearch(
 			} else {
 
 				// Load the search variable data
-				vecOutputOp[outc].m_pvar->LoadGridData(sTime);
+				std::string strError =
+					vecOutputOp[outc].m_pvar->LoadGridData(sTime);
+
+				if (strError != "") {
+					return strError;
+				}
 
 				const DataArray1D<float> & dataState =
 					vecOutputOp[outc].m_pvar->GetData();
@@ -1717,36 +1722,6 @@ std::string PointSearch(
 				iVariableFieldCount++;
 			}
 		}
-/*
-		// Output all candidates
-		iCandidateCount = 0;
-
-		std::set<int>::const_iterator iterCandidate = setCandidates.begin();
-		for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-			if (grid.m_nGridDim.size() == 1) {
-				fprintf(fpOutput, "\t%i", *iterCandidate);
-
-			} else if (grid.m_nGridDim.size() == 2) {
-				fprintf(fpOutput, "\t%i\t%i",
-					(*iterCandidate) % static_cast<int>(grid.m_nGridDim[1]),
-					(*iterCandidate) / static_cast<int>(grid.m_nGridDim[1]));
-			}
-
-			fprintf(fpOutput, "\t%3.6f\t%3.6f",
-				mesh.dCenterLon[*iterCandidate] * 180.0 / M_PI,
-				mesh.dCenterLat[*iterCandidate] * 180.0 / M_PI);
-
-			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
-				fprintf(fpOutput, "\t%3.6e",
-					dOutput[iCandidateCount][outc]);
-			}
-
-			fprintf(fpOutput, "\n");
-
-			iCandidateCount++;
-		}
-*/
 	}
 
 	return std::string("");

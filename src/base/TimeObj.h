@@ -38,7 +38,8 @@ public:
 		CalendarUnknown,
 		CalendarNone,
 		CalendarNoLeap,
-		CalendarStandard
+		CalendarStandard,
+		CalendarGregorian
 	};
 
 	///	<summary>
@@ -131,6 +132,8 @@ public:
 			return CalendarNoLeap;
 		} else if (strCalendar == "standard") {
 			return CalendarStandard;
+		} else if (strCalendar == "gregorian") {
+			return CalendarGregorian;
 		} else {
 			return CalendarUnknown;
 		}
