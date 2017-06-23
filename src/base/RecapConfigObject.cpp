@@ -400,3 +400,45 @@ std::string RecapConfigObject::AddVariableFromTemplate(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string RecapConfigObject::AddVariableFromTemplateWithNewVerticalDim(
+	const RecapConfigObject * pobjSourceRecapConfig,
+	const Variable * pvar,
+	const std::string & strVerticalDimName,
+	Variable ** ppvarOut
+) {
+	if (!IsValid()) {
+		_EXCEPTIONT("Invalid RecapConfigObject");
+	}
+	if (pobjSourceRecapConfig == NULL) {
+		_EXCEPTIONT("Invalid RecapConfigObject");
+	}
+	if (!pobjSourceRecapConfig->IsValid()) {
+		_EXCEPTIONT("Invalid RecapConfigObject");
+	}
+	if (pvar == NULL) {
+		_EXCEPTIONT("Invalid Variable template");
+	}
+
+	// Add the variable to the FileList
+	VariableInfo * pvarinfo = NULL;
+
+	std::string strError =
+		GetFileList()->AddVariableFromTemplateWithNewVerticalDim(
+			pobjSourceRecapConfig->GetFileList(),
+			pvar,
+			strVerticalDimName,
+			&pvarinfo);
+
+	if (strError != "") {
+		return strError;
+	}
+
+	// Add the variable to the VariableRegistry
+	return
+		m_varreg.FindOrRegister(
+			pvar->Name(),
+			ppvarOut);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+

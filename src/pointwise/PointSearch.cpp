@@ -1166,6 +1166,8 @@ std::string PointSearch(
 	const PointSearchParam & param,
 	PointDataObject * pobjPointData
 ) {
+	std::string strError;
+
 	// Get the FileList object
 	const FileListObject * pobjFileList = pobjConfig->GetFileList();
 
@@ -1216,7 +1218,7 @@ std::string PointSearch(
 	}
 
 	Variable * pvarSearchBy = NULL;
-	std::string strError =
+	strError =
 		pobjConfig->GetVariable(
 			param.strVariableSearchBy,
 			&pvarSearchBy);
@@ -1225,17 +1227,17 @@ std::string PointSearch(
 		return strError;
 	}
 
-	pvarSearchBy->LoadGridData(sTime);
-
-	const DataArray1D<float> & dataSearch = pvarSearchBy->GetData();
+	DataArray1D<float> * pdataSearch = NULL;
+	strError = pvarSearchBy->LoadGridData(sTime, &pdataSearch);
+	if (strError != "") return strError;
 
 	// Tag all minima
 	std::set<int> setCandidates;
 
 	if (param.fSearchByMinima) {
-		FindAllLocalMinima<float>(mesh, dataSearch, setCandidates);
+		FindAllLocalMinima<float>(mesh, (*pdataSearch), setCandidates);
 	} else {
-		FindAllLocalMaxima<float>(mesh, dataSearch, setCandidates);
+		FindAllLocalMaxima<float>(mesh, (*pdataSearch), setCandidates);
 	}
 
 	// Total number of candidates
@@ -1364,20 +1366,20 @@ std::string PointSearch(
 
 			} else {
 				double dValue =
-					static_cast<double>(dataSearch[*iterCandidate]);
+					static_cast<double>((*pdataSearch)[*iterCandidate]);
 
 				bool fExtrema = true;
 				for (;;) {
 					int * ppr = (int *)(kd_res_item_data(kdresMerge));
 
 					if (param.fSearchByMinima) {
-						if (static_cast<double>(dataSearch[*ppr]) < dValue) {
+						if (static_cast<double>((*pdataSearch)[*ppr]) < dValue) {
 							fExtrema = false;
 							break;
 						}
 
 					} else {
-						if (static_cast<double>(dataSearch[*ppr]) > dValue) {
+						if (static_cast<double>((*pdataSearch)[*ppr]) > dValue) {
 							fExtrema = false;
 							break;
 						}
@@ -1412,10 +1414,14 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecThresholdOp[tc].m_pvar->LoadGridData(sTime);
+		DataArray1D<float> * pdataState = NULL;
+		strError =
+			vecThresholdOp[tc].m_pvar->LoadGridData(
+				sTime, &pdataState);
 
-		const DataArray1D<float> & dataState =
-			vecThresholdOp[tc].m_pvar->GetData();
+		if (strError != "") {
+			return strError;
+		}
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1427,7 +1433,7 @@ std::string PointSearch(
 			bool fSatisfiesThreshold =
 				SatisfiesThreshold<float>(
 					mesh,
-					dataState,
+					*pdataState,
 					*iterCandidate,
 					vecThresholdOp[tc].m_eOp,
 					vecThresholdOp[tc].m_dValue,
@@ -1450,10 +1456,14 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecClosedContourOp[ccc].m_pvar->LoadGridData(sTime);
+		DataArray1D<float> * pdataState = NULL;
+		strError =
+			vecClosedContourOp[ccc].m_pvar->LoadGridData(
+				sTime, &pdataState);
 
-		const DataArray1D<float> & dataState =
-			vecClosedContourOp[ccc].m_pvar->GetData();
+		if (strError != "") {
+			return strError;
+		}
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1465,7 +1475,7 @@ std::string PointSearch(
 			bool fHasClosedContour =
 				HasClosedContour<float>(
 					mesh,
-					dataState,
+					*pdataState,
 					*iterCandidate,
 					vecClosedContourOp[ccc].m_dDeltaAmount,
 					vecClosedContourOp[ccc].m_dDistance,
@@ -1488,10 +1498,14 @@ std::string PointSearch(
 		std::set<int> setNewCandidates;
 
 		// Load the search variable data
-		vecNoClosedContourOp[ccc].m_pvar->LoadGridData(sTime);
+		DataArray1D<float> * pdataState = NULL;
+		strError =
+			vecNoClosedContourOp[ccc].m_pvar->LoadGridData(
+				sTime, &pdataState);
 
-		const DataArray1D<float> & dataState =
-			vecNoClosedContourOp[ccc].m_pvar->GetData();
+		if (strError != "") {
+			return strError;
+		}
 
 		// Loop through all pressure minima
 		std::set<int>::const_iterator iterCandidate
@@ -1503,7 +1517,7 @@ std::string PointSearch(
 			bool fHasClosedContour =
 				HasClosedContour<float>(
 					mesh,
-					dataState,
+					*pdataState,
 					*iterCandidate,
 					vecNoClosedContourOp[ccc].m_dDeltaAmount,
 					vecNoClosedContourOp[ccc].m_dDistance,
@@ -1629,15 +1643,9 @@ std::string PointSearch(
 			} else {
 
 				// Load the search variable data
-				std::string strError =
-					vecOutputOp[outc].m_pvar->LoadGridData(sTime);
-
-				if (strError != "") {
-					return strError;
-				}
-
-				const DataArray1D<float> & dataState =
-					vecOutputOp[outc].m_pvar->GetData();
+				DataArray1D<float> * pdataState = NULL;
+				strError = vecOutputOp[outc].m_pvar->LoadGridData(sTime, &pdataState);
+				if (strError != "") return strError;
 
 				// Add all candidate data to PointDataObject
 				std::set<int>::const_iterator iterCandidate
@@ -1654,7 +1662,7 @@ std::string PointSearch(
 						FindLocalMinMax<float>(
 							mesh,
 							false,
-							dataState,
+							*pdataState,
 							*iterCandidate,
 							vecOutputOp[outc].m_dDistance,
 							ixExtremum,
@@ -1667,7 +1675,7 @@ std::string PointSearch(
 						FindLocalMinMax<float>(
 							mesh,
 							false,
-							dataState,
+							*pdataState,
 							*iterCandidate,
 							vecOutputOp[outc].m_dDistance,
 							ixExtremum,
@@ -1680,7 +1688,7 @@ std::string PointSearch(
 						FindLocalMinMax<float>(
 							mesh,
 							true,
-							dataState,
+							*pdataState,
 							*iterCandidate,
 							vecOutputOp[outc].m_dDistance,
 							ixExtremum,
@@ -1693,7 +1701,7 @@ std::string PointSearch(
 						FindLocalMinMax<float>(
 							mesh,
 							true,
-							dataState,
+							*pdataState,
 							*iterCandidate,
 							vecOutputOp[outc].m_dDistance,
 							ixExtremum,
@@ -1705,7 +1713,7 @@ std::string PointSearch(
 					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
 						FindLocalAverage<float>(
 							mesh,
-							dataState,
+							*pdataState,
 							*iterCandidate,
 							vecOutputOp[outc].m_dDistance,
 							dValue);

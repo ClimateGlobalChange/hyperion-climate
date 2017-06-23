@@ -511,7 +511,6 @@ void FileListObject::GetOnRankTimeIndices(
 std::string FileListObject::LoadData_float(
 	const std::string & strVariableName,
 	const std::vector<long> & vecAuxIndices,
-	//size_t sTime,
 	DataArray1D<float> & data
 ) {
 	// Find the VariableInfo structure for this Variable
@@ -555,7 +554,7 @@ std::string FileListObject::LoadData_float(
 
 	{
 		std::string strLoading =
-			std::string("Loading data [") + strVariableName + std::string("]");
+			std::string("READ ") + Name() + std::string("[") + strVariableName + std::string("]");
 
 		for (size_t d = 0; d < vecAuxIndices.size(); d++) {
 			if (d == varinfo.m_iTimeDimIx) {
@@ -689,6 +688,11 @@ std::string FileListObject::WriteData_float(
 	// Get file index from varinfo
 	VariableInfo & varinfo = *(m_vecVariableInfo[iVarInfo]);
 
+	// Check auxiliary indices
+	if (vecAuxIndices.size() != varinfo.m_vecAuxDimSizes.size()) {
+		_EXCEPTIONT("Invalid auxiliary index");
+	}
+
 	// Extract the time index
 	size_t sTime = (-1);
 	if (varinfo.m_iTimeDimIx != (-1)) {
@@ -698,7 +702,7 @@ std::string FileListObject::WriteData_float(
 	// Write message
 	{
 		std::string strWriting =
-			std::string("Writing data [") + strVariableName + std::string("]");
+			std::string("WRITE ") + Name() + std::string("[") + strVariableName + std::string("]");
 
 		for (size_t d = 0; d < vecAuxIndices.size(); d++) {
 			if (d == varinfo.m_iTimeDimIx) {
@@ -785,6 +789,9 @@ std::string FileListObject::WriteData_float(
 		vecSize.push_back(iter->second);
 		lTotalSize *= iter->second;
 	}
+	for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
+		printf("DIM %s %i/%i\n", varinfo.m_vecDimNames[d].c_str(), vecPos[d], vecSize[d]);
+	}
 
 	if (data.GetRows() != lTotalSize) {
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);
@@ -805,8 +812,9 @@ std::string FileListObject::WriteData_float(
 		vecDims[d] = ncout.get_dim(varinfo.m_vecDimNames[d].c_str());
 		if (vecDims[d] != NULL) {
 			if (vecDims[d]->size() != lDimSize) {
-				_EXCEPTION1("Dimension %s mismatch",
-					varinfo.m_vecDimNames[d].c_str());
+				_EXCEPTION3("Dimension %s mismatch (%lu / %li)",
+					varinfo.m_vecDimNames[d].c_str(),
+					vecDims[d]->size(), lDimSize);
 			}
 		} else {
 			vecDims[d] =
@@ -911,6 +919,207 @@ std::string FileListObject::AddVariableFromTemplate(
 	// Add grid dimensions
 	for (int d = 0; d < m_vecGridDimNames.size(); d++) {
 		pvarinfo->m_vecDimNames.push_back(m_vecGridDimNames[d]);
+		std::map<std::string, long>::const_iterator iterDimSize =
+			m_mapDimNameSize.find(m_vecGridDimNames[d]);
+		if (iterDimSize == m_mapDimNameSize.end()) {
+			_EXCEPTIONT("Logic error");
+		}
+		pvarinfo->m_vecDimSizes.push_back(iterDimSize->second);
+	}
+
+	// Identify the time dimension
+	pvarinfo->m_iTimeDimIx = (-1);
+	for (int d = 0; d < pvarinfo->m_vecDimNames.size(); d++) {
+		if (pvarinfo->m_vecDimNames[d] == m_strRecordDimName) {
+			pvarinfo->m_iTimeDimIx = d;
+			break;
+		}
+	}
+
+	// Identify the vertical dimension
+	pvarinfo->m_iVerticalDimIx = (-1);
+	for (int d = 0; d < pvarinfo->m_vecDimNames.size(); d++) {
+		if ((pvarinfo->m_vecDimNames[d] == "lev") ||
+			(pvarinfo->m_vecDimNames[d] == "pres") ||
+			(pvarinfo->m_vecDimNames[d] == "z")
+		) {
+
+			// Vertical dimension index
+			if (pvarinfo->m_iVerticalDimIx != (-1)) {
+				if (pvarinfo->m_iVerticalDimIx != d) {
+					return std::string("ERROR: Possibly multiple vertical dimensions in variable ")
+						+ pvarinfo->m_strVariableName;
+				}
+			}
+			pvarinfo->m_iVerticalDimIx = d;
+
+			// Vertical dimension order (bottom-up or top-down)
+			std::map<std::string, int>::const_iterator iterSourceDimOrder =
+				pobjSourceFileList->m_mapDimNameOrder.find(pvarinfo->m_vecDimNames[d]);
+
+			if (iterSourceDimOrder == pobjSourceFileList->m_mapDimNameOrder.end()) {
+				_EXCEPTIONT("Vertical dimension not found in m_mapDimNameOrder");
+			}
+
+			pvarinfo->m_nVerticalDimOrder = iterSourceDimOrder->second;
+
+			std::map<std::string, int>::const_iterator iterDimOrder =
+				m_mapDimNameOrder.find(pvarinfo->m_vecDimNames[d]);
+
+			if (iterDimOrder == m_mapDimNameOrder.end()) {
+				m_mapDimNameOrder.insert(*iterSourceDimOrder);
+			} else {
+				if (iterDimOrder->second != iterSourceDimOrder->second) {
+					return std::string("ERROR: Inconsistent dimension order for dimension \"")
+						+ pvarinfo->m_vecDimNames[d] + std::string("\"");
+				}
+			}
+		}
+	}
+
+	// Add this VariableInfo to the vector of VariableInfos
+	m_vecVariableInfo.push_back(pvarinfo);
+
+	(*ppvarinfo) = pvarinfo;
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::AddVariableFromTemplateWithNewVerticalDim(
+	const FileListObject * pobjSourceFileList,
+	const Variable * pvar,
+	const std::string & strVerticalDimName,
+	VariableInfo ** ppvarinfo
+) {
+	// Check arguments
+	if (ppvarinfo == NULL) {
+		_EXCEPTIONT("Invalid value for \"ppvarinfo\"");
+	}
+
+	if ((strVerticalDimName != "lev") &&
+		(strVerticalDimName != "pres") &&
+		(strVerticalDimName != "z")
+	) {
+		_EXCEPTIONT("Invalid name for vertical dimension");
+	}
+
+	// Get the vertical dimension size and order
+	long lVerticalDimSize;
+	int nVerticalDimOrder;
+
+	std::map<std::string, long>::const_iterator iterDimSize =
+		m_mapDimNameSize.find(strVerticalDimName);
+
+	if (iterDimSize == m_mapDimNameSize.end()) {
+		return std::string("Vertical dimension \"") + strVerticalDimName
+			+ std::string("\" not found in ") + m_strName;
+	}
+
+	lVerticalDimSize = iterDimSize->second;
+
+	std::map<std::string, int>::const_iterator iterDimOrder =
+		m_mapDimNameOrder.find(strVerticalDimName);
+
+	if (iterDimOrder == m_mapDimNameOrder.end()) {
+		return std::string("Vertical dimension \"") + strVerticalDimName
+			+ std::string("\" is not a vertical dimension in") + m_strName;
+	}
+
+	nVerticalDimOrder = iterDimOrder->second;
+
+	if (lVerticalDimSize < 1) {
+		_EXCEPTIONT("Invalid size for vertical dimension");
+	}
+	if (abs(nVerticalDimOrder) != 1) {
+		_EXCEPTIONT("Invalid order for vertical dimension");
+	}
+
+	// Get the FileList object from the other RecapConfig
+	if (GetRecordDimName() != pobjSourceFileList->GetRecordDimName()) {
+		_EXCEPTIONT("Record dim name mismatch");
+	}
+
+	// Check if variable already exists
+	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
+		if (m_vecVariableInfo[v]->m_strVariableName == pvar->Name()) {
+			return std::string("ERROR: Variable already exists in file_list");
+		}
+	}
+
+	// VariableInfo
+	VariableInfo * pvarinfo = new VariableInfo(pvar->Name());
+	if (pvarinfo == NULL) {
+		_EXCEPTIONT("Unable to allocate VariableInfo");
+	}
+
+	pvarinfo->m_strUnits = pvar->Units();
+
+	// Add dimensions from variable to output FileList
+	const std::vector<std::string> & vecDimNames = pvar->AuxDimNames();
+	for (int d = 0; d < vecDimNames.size(); d++) {
+
+		// Check for grid dimensions
+		bool fGridDim = false;
+		for (int e = 0; e < pobjSourceFileList->m_vecGridDimNames.size(); e++) {
+			if (vecDimNames[d] == pobjSourceFileList->m_vecGridDimNames[e]) {
+				fGridDim = true;
+				break;
+			}
+		}
+		if (fGridDim) {
+			continue;
+		}
+
+		// Check for vertical dimension
+		if (d == pvar->VerticalDimIx()) {
+			pvarinfo->m_vecDimNames.push_back(strVerticalDimName);
+			pvarinfo->m_vecDimSizes.push_back(lVerticalDimSize);
+			pvarinfo->m_vecAuxDimNames.push_back(strVerticalDimName);
+			pvarinfo->m_vecAuxDimSizes.push_back(lVerticalDimSize);
+
+			if (pvarinfo->m_iVerticalDimIx != (-1)) {
+				if (pvarinfo->m_iVerticalDimIx != d) {
+					return std::string("ERROR: Possibly multiple vertical dimensions in variable ")
+						+ pvarinfo->m_strVariableName;
+				}
+			}
+
+			pvarinfo->m_iVerticalDimIx = d;
+			pvarinfo->m_nVerticalDimOrder = nVerticalDimOrder;
+/*
+			AddVerticalDimension(
+				vecDimNames[d],
+				lVerticalDimSize,
+				iterOrder->second);
+*/
+		} else {
+			long lDimSize = pobjSourceFileList->GetDimensionSize(vecDimNames[d]);
+			if (lDimSize == (-1)) {
+				_EXCEPTIONT("Logic error");
+			}
+
+			pvarinfo->m_vecDimNames.push_back(vecDimNames[d]);
+			pvarinfo->m_vecDimSizes.push_back(lDimSize);
+			pvarinfo->m_vecAuxDimNames.push_back(vecDimNames[d]);
+			pvarinfo->m_vecAuxDimSizes.push_back(lDimSize);
+
+			AddDimension(
+				vecDimNames[d],
+				lDimSize);
+		}
+	}
+
+	// Add grid dimensions
+	for (int d = 0; d < m_vecGridDimNames.size(); d++) {
+		pvarinfo->m_vecDimNames.push_back(m_vecGridDimNames[d]);
+		std::map<std::string, long>::const_iterator iterDimSize =
+			m_mapDimNameSize.find(m_vecGridDimNames[d]);
+		if (iterDimSize == m_mapDimNameSize.end()) {
+			_EXCEPTIONT("Logic error");
+		}
+		pvarinfo->m_vecDimSizes.push_back(iterDimSize->second);
 	}
 
 	// Identify the time dimension
@@ -927,6 +1136,24 @@ std::string FileListObject::AddVariableFromTemplate(
 
 	(*ppvarinfo) = pvarinfo;
 
+	if (pvarinfo->m_vecDimNames.size() != pvarinfo->m_vecDimSizes.size()) {
+		_EXCEPTIONT("Logic error");
+	}
+	if (pvarinfo->m_vecAuxDimNames.size() != pvarinfo->m_vecAuxDimSizes.size()) {
+		_EXCEPTIONT("Logic error");
+	}
+	if (pvarinfo->m_vecAuxDimSizes.size() > pvarinfo->m_vecDimSizes.size()) {
+		_EXCEPTIONT("Logic error");
+	}
+/*
+	for (int d = 0; d < pvarinfo->m_vecDimSizes.size(); d++) {
+		printf("%s %i\n", pvarinfo->m_vecDimNames[d].c_str(), pvarinfo->m_vecDimSizes[d]);
+	}
+	for (int d = 0; d < pvarinfo->m_vecAuxDimSizes.size(); d++) {
+		printf("%s %i\n", pvarinfo->m_vecAuxDimNames[d].c_str(), pvarinfo->m_vecAuxDimSizes[d]);
+	}
+	_EXCEPTION();
+*/
 	return std::string("");
 }
 
@@ -954,25 +1181,76 @@ std::string FileListObject::AddDimension(
 
 	// Add a grid dimension
 	if (fGridDim) {
-		m_vecGridDimNames.push_back(strDimName);
-		for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
-			if (m_vecVariableInfo[v]->m_vecDimNames.size() !=
-				m_vecVariableInfo[v]->m_vecDimSizes.size()
-			) {
-				_EXCEPTIONT("Logic error");
+		bool fFound = false;
+		for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
+			if (m_vecGridDimNames[d] == strDimName) {
+				fFound = true;
+				break;
 			}
-			m_vecVariableInfo[v]->m_vecAuxDimNames.clear();
-			m_vecVariableInfo[v]->m_vecAuxDimSizes.clear();
-			for (size_t d = 0; d < m_vecVariableInfo[v]->m_vecDimSizes.size(); d++) {
-				if (m_vecVariableInfo[v]->m_vecDimNames[d] != strDimName) {
-					m_vecVariableInfo[v]->m_vecAuxDimNames.push_back(
-						m_vecVariableInfo[v]->m_vecDimNames[d]);
-					m_vecVariableInfo[v]->m_vecAuxDimSizes.push_back(
-						m_vecVariableInfo[v]->m_vecDimSizes[d]);
+		}
+		if (!fFound) {
+			m_vecGridDimNames.push_back(strDimName);
+			for (size_t v = 0; v < m_vecVariableInfo.size(); v++) {
+				if (m_vecVariableInfo[v]->m_vecDimNames.size() !=
+					m_vecVariableInfo[v]->m_vecDimSizes.size()
+				) {
+					_EXCEPTIONT("Logic error");
+				}
+				for (size_t d = 0; d < m_vecVariableInfo[v]->m_vecAuxDimNames.size(); d++) {
+					if (m_vecVariableInfo[v]->m_vecAuxDimNames[d] == strDimName) {
+						m_vecVariableInfo[v]->m_vecAuxDimNames.erase(
+							m_vecVariableInfo[v]->m_vecAuxDimNames.begin() + d);
+						m_vecVariableInfo[v]->m_vecAuxDimSizes.erase(
+							m_vecVariableInfo[v]->m_vecAuxDimSizes.begin() + d);
+						d--;
+					}
 				}
 			}
 		}
 	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string FileListObject::AddVerticalDimension(
+	const std::string & strDimName,
+	long lDimSize,
+	int nOrder
+) {
+	std::map<std::string, long>::const_iterator iter =
+		m_mapDimNameSize.find(strDimName);
+
+	if (iter != m_mapDimNameSize.end()) {
+		if (iter->second != lDimSize) {
+			_EXCEPTION3("Dimension size mismatch: %s, %li, %li",
+				strDimName.c_str(), lDimSize, iter->second);
+		}
+
+		std::map<std::string, int>::const_iterator iterOrder =
+			m_mapDimNameOrder.find(strDimName);
+
+		if (iterOrder == m_mapDimNameOrder.end()) {
+			return std::string("Dimension \"") + strDimName
+				+ std::string("\" already appears as a non-vertical dimension");
+		}
+		if (iterOrder->second != nOrder) {
+			return std::string("Dimension \"") + strDimName
+				+ std::string("\" already appears as a vertical dimension with different size");
+		}
+
+		return std::string("");
+	}
+
+	// Insert the dimension in the maps
+	m_mapDimNameSize.insert(
+		std::pair<std::string, long>(
+			strDimName, lDimSize));
+
+	m_mapDimNameOrder.insert(
+		std::pair<std::string, int>(
+			strDimName, nOrder));
 
 	return std::string("");
 }
@@ -1276,6 +1554,96 @@ std::string FileListObject::IndexVariableData(
 				} else {
 					info.m_vecDimSizes[d] = var->get_dim(d)->size();
 				}
+
+				if ((info.m_vecDimNames[d] == "lev") ||
+					(info.m_vecDimNames[d] == "pres") ||
+					(info.m_vecDimNames[d] == "z")
+				) {
+					if (info.m_iVerticalDimIx != (-1)) {
+						if (info.m_iVerticalDimIx != d) {
+							return std::string("ERROR: Possibly multiple vertical dimensions in variable ")
+								+ info.m_strVariableName;
+						}
+					}
+					info.m_iVerticalDimIx = d;
+				}
+			}
+
+			// Determine direction of vertical dimension
+			if ((info.m_iVerticalDimIx != (-1)) &&
+				(info.m_vecDimSizes[info.m_iVerticalDimIx] > 1)
+			) {
+				const std::string & strDimName =
+					info.m_vecDimNames[info.m_iVerticalDimIx];
+
+				// Check if dimension is in m_mapDimNameOrder
+				std::map<std::string, int>::iterator iterDimOrder =
+					m_mapDimNameOrder.find(strDimName);
+
+				if (iterDimOrder != m_mapDimNameOrder.end()) {
+					info.m_nVerticalDimOrder = iterDimOrder->second;
+
+				} else {
+					// Determine order of dimension
+					int nDimOrder = (+1);
+
+					// Find the variable associated with this dimension
+					NcVar * varDim = ncFile.get_var(strDimName.c_str());
+					if (varDim != NULL) {
+						if (varDim->num_dims() != 1) {
+							_EXCEPTIONT("Dimension variable must have at most 1 dimension");
+						}
+
+						// Check for presence of "positive" attribute
+						NcAtt * attPositive = varDim->get_att("positive");
+						if (attPositive != NULL) {
+							if (std::string("down") == attPositive->as_string(0)) {
+								nDimOrder = (-1);
+							}
+
+						// Load variable to obtain orientation
+						} else {
+
+							// Dimension variable is of type double
+							if (varDim->type() == ncDouble) {
+								DataArray1D<double> dDimValue(varDim->get_dim(0)->size());
+								varDim->set_cur((long)0);
+								varDim->get(&(dDimValue[0]), varDim->get_dim(0)->size());
+
+								// Positive orientation (bottom-up)
+								if (dDimValue[1] > dDimValue[0]) {
+									nDimOrder = (+1);
+									for (size_t s = 0; s < dDimValue.GetRows()-1; s++) {
+										if (dDimValue[s+1] < dDimValue[s]) {
+											_EXCEPTION1("Dimension variable \"%s\" is not monotone",
+												strDimName.c_str());
+										}
+									}
+
+								// Negative orientation (top-down)
+								} else {
+									nDimOrder = (-1);
+									for (size_t s = 0; s < dDimValue.GetRows()-1; s++) {
+										if (dDimValue[s+1] > dDimValue[s]) {
+											_EXCEPTION1("Dimension variable \"%s\" is not monotone",
+												strDimName.c_str());
+										}
+									}
+								}
+
+							} else {
+								_EXCEPTION1("Unknown type for dimension variable \"%s\"",
+									strDimName.c_str());
+							}
+						}
+					}
+
+					// Insert dimension order into m_mapDimNameOrder
+					m_mapDimNameOrder.insert(
+						std::pair<std::string, int>(strDimName, nDimOrder));
+
+					info.m_nVerticalDimOrder = nDimOrder;
+				}
 			}
 
 			// No time information on this Variable
@@ -1327,15 +1695,37 @@ std::string FileListObject::IndexVariableData(
 	// Sort the Time array
 	SortTimeArray();
 
-	// Update the time dimension size
 	for (int v = 0; v < m_vecVariableInfo.size(); v++) {
-		int iTimeDimIx = m_vecVariableInfo[v]->m_iTimeDimIx;
+
+		VariableInfo & varinfo = *(m_vecVariableInfo[v]);
+
+		// Update the time dimension size for all variables
+		int iTimeDimIx = varinfo.m_iTimeDimIx;
 		if (iTimeDimIx != (-1)) {
-			if (m_vecVariableInfo[v]->m_vecDimSizes.size() < iTimeDimIx) {
+			if (varinfo.m_vecDimSizes.size() < iTimeDimIx) {
 				_EXCEPTIONT("Logic error");
 			}
-			m_vecVariableInfo[v]->m_vecDimSizes[iTimeDimIx] =
-				m_vecVariableInfo[v]->m_mapTimeFile.size();
+			varinfo.m_vecDimSizes[iTimeDimIx] =
+				varinfo.m_mapTimeFile.size();
+		}
+
+		// Initialize auxiliary dimension information for all variables
+		varinfo.m_vecAuxDimNames.clear();
+		varinfo.m_vecAuxDimSizes.clear();
+		for (size_t d = 0; d < varinfo.m_vecDimSizes.size(); d++) {
+			bool fFound = false;
+			for (int g = 0; g < m_vecGridDimNames.size(); g++) {
+				if (m_vecGridDimNames[g] == varinfo.m_vecDimNames[d]) {
+					fFound = true;
+					break;
+				}
+			}
+			if (!fFound) {
+				varinfo.m_vecAuxDimNames.push_back(
+					varinfo.m_vecDimNames[d]);
+				varinfo.m_vecAuxDimSizes.push_back(
+					varinfo.m_vecDimSizes[d]);
+			}
 		}
 	}
 

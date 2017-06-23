@@ -165,6 +165,16 @@ public:
 		Variable ** ppvarOut
 	);
 
+	///	<summary>
+	///		Add a new variable from a template and replace the vertical dimension.
+	///	</summary>
+	std::string AddVariableFromTemplateWithNewVerticalDim(
+		const RecapConfigObject * pobjRecapConfig,
+		const Variable * pvar,
+		const std::string & strVerticalDimName,
+		Variable ** ppvarOut
+	);
+
 public:
 	///	<summary>
 	///		When adding a lock to a RecapConfigObject, also

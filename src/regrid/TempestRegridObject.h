@@ -66,6 +66,15 @@ class TempestRegridObject : public Object {
 
 public:
 	///	<summary>
+	///		Methods for vertical interpolation of data.
+	///	</summary>
+	enum VerticalInterpolationMethod {
+		VerticalInterp_PHISZ3toZ,
+		VerticalInterp_PHISPSTtoZ,
+	};
+
+public:
+	///	<summary>
 	///		Constructor.
 	///	</summary>
 	TempestRegridObject(
@@ -115,6 +124,13 @@ public:
 		const std::vector<ObjectType> & vecFuncArgumentsType
 	);
 
+	///	<summary>
+	///		Perform regridding.
+	///	</summary>
+	std::string Regrid(
+		const std::vector<std::string> & vecVariables
+	);
+
 protected:
 	///	<summary>
 	///		Pointer to source configuration.
@@ -135,6 +151,22 @@ protected:
 	///		The offline map.
 	///	</summary>
 	OfflineMap m_mapRemap;
+
+protected:
+	///	<summary>
+	///		Units for the levels for vertical interpolation.
+	///	</summary>
+	std::string m_strLevelsUnits;
+
+	///	<summary>
+	///		List of levels for vertical interpolation.
+	///	</summary>
+	std::vector<double> m_vecLevelsValues;
+
+	///	<summary>
+	///		Method for vertical interpolation.
+	///	</summary>
+	VerticalInterpolationMethod m_eVertInterpMethod;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

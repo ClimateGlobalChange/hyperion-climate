@@ -24,6 +24,8 @@
 #include "OverlapMesh.h"
 #include "LinearRemapSE0.h"
 
+#include <cfloat>
+
 namespace HRegrid {
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -85,6 +87,8 @@ std::string TempestRegridObject::Call(
 	const std::vector<ObjectType> & vecCommandLineType,
 	Object ** ppReturn
 ) {
+	std::string strError;
+
 	// Output the map as a netcdf file
 	if (strFunctionName == "outputnetcdf") {
 		if ((vecCommandLineType.size() != 1) ||
@@ -108,151 +112,20 @@ std::string TempestRegridObject::Call(
 		// Variables
 		std::vector<std::string> vecVariables;
 
-		ListObject * pobjVariableList =
-			dynamic_cast<ListObject *>(
-				objreg.GetObject(vecCommandLine[0]));
+		strError =
+			ArgumentToStringVector(
+				objreg, vecCommandLine[0], vecVariables);
 
-		if (pobjVariableList == NULL) {
-			StringObject * pobjVariableString =
-				dynamic_cast<StringObject *>(
-					objreg.GetObject(vecCommandLine[0]));
-			if (pobjVariableString == NULL) {
-				vecVariables.push_back(vecCommandLine[0]);
-			} else {
-				vecVariables.push_back(pobjVariableString->Value());
-			}
-
-		} else {
-			for (size_t i = 0; i < pobjVariableList->Count(); i++) {
-				StringObject * pobjVariableString =
-					dynamic_cast<StringObject *>(
-						objreg.GetObject(pobjVariableList->ChildName(i)));
-
-				if (pobjVariableString == NULL) {
-					return std::string("ERROR: First argument of regrid() must be"
-						" a list of string objects");
-				}
-
-				vecVariables.push_back(pobjVariableString->Value());
-			}
+		if (strError != "") {
+			return strError;
 		}
 
-		// Get FileListObjects
-		FileListObject * pobjSourceFileList =
-			m_pobjSourceConfig->GetFileList();
-		FileListObject * pobjTargetFileList =
-			m_pobjTargetConfig->GetFileList();
-
-		// Check if a reduce target is available
-		bool fReduceTargetAvailable =
-			pobjTargetFileList->HasReduceTarget();
-
-		// Check if times are compatible across FileLists
-		bool fFileListCompatible =
-			pobjSourceFileList->IsCompatible(pobjTargetFileList);
-
-		// Check the size of all variables
-		for (int v = 0; v < vecVariables.size(); v++) {
-
-			Variable * pvarSource;
-			std::string strError =
-				m_pobjSourceConfig->GetVariable(
-					vecVariables[v],
-					&pvarSource);
-
-			if (strError != "") {
-				return strError;
-			}
-
-			if ((pvarSource->IsReductionOp()) && (!fReduceTargetAvailable)) {
-				return std::string("ERROR: No reduction target available "
-					"for output of variable reduction \"")
-					+ pvarSource->Name() + std::string("\"");
-			}
-			if ((!pvarSource->IsReductionOp()) && (!fFileListCompatible)) {
-				return std::string("ERROR: Source and target configurations "
-					"are not compatible for regrid operation");
-			}
-
-			Variable * pvarTarget;
-			strError =
-				m_pobjTargetConfig->AddVariableFromTemplate(
-					m_pobjSourceConfig,
-					pvarSource,
-					&pvarTarget);
-
-			if (strError != "") {
-				return strError;
-			}
-
-			// Allocate data on target
-			pvarTarget->AllocateGridData();
-
-			// Get pointers to source and target data slices
-			const DataArray1D<float> & dataSource =
-				pvarSource->GetData();
-
-			DataArray1D<float> & dataTarget =
-				pvarTarget->GetData();
-
-			// Loop over all auxiliary indices and remap data
-			VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
-			for (; iterAux != pvarSource->GetAuxIndexEnd(); iterAux++) {
-
-				pvarSource->LoadGridData(iterAux);
-
-				m_mapRemap.ApplyFloat(
-					dataSource,
-					dataTarget);
-
-				pvarTarget->WriteGridData(iterAux);
-			}
-
-/*
-			// Apply the regridding operation to a reduction
-			if (pvarSource->IsReductionOp()) {
-
-				pvarSource->LoadGridData(
-					Variable::SingleTimeIndex);
-
-				m_mapRemap.ApplyFloat(
-					dataSource,
-					dataTarget);
-
-				pvarTarget->WriteGridData(
-					Variable::SingleTimeIndex);
-
-			// Apply the regridding operation to all times
-			} else {
-				for (size_t t = 0; t < pobjSourceFileList->GetTimeCount(); t++) {
-
-					VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
-					for (; iterAux != pvarSource->GetAuxIndexEnd(); iterAux++) {
-
-						pvarSource->LoadGridData(t); //, iterAux);
-
-						m_mapRemap.ApplyFloat(
-							dataSource,
-							dataTarget);
-
-						pvarTarget->WriteGridData(t); //, iterAux);
-					}
-				}
-			}
-*/
+		// Perform regridding
+		strError = Regrid(vecVariables);
+		if (strError != "") {
+			return strError;
 		}
 
-/*
-		for (size_t f = 0; f < sSourceFilenameCount; f++) {
-			Announce("Input File:  %s", pobjSourceFileList->GetFilename(f).c_str());
-			Announce("Output File: %s", pobjTargetFileList->GetFilename(f).c_str());
-			m_mapRemap.Apply(
-				pobjSourceFileList->GetFilename(f),
-				pobjTargetFileList->GetFilename(f),
-				vecVariables,
-				std::string("ncol"));
-		}
-*/
 		return std::string("");
 	}
 
@@ -272,6 +145,11 @@ std::string TempestRegridObject::Initialize(
 	const std::vector<std::string> & vecFuncArguments,
 	const std::vector<ObjectType> & vecFuncArgumentsType
 ) {
+	std::string strError;
+
+	// Clear level values
+	m_strLevelsUnits = "";
+	m_vecLevelsValues.clear();
 
 	// Set the return value
 	if (vecFuncArguments.size() != 3) {
@@ -315,6 +193,95 @@ std::string TempestRegridObject::Initialize(
 			" of type parameter_list");
 	}
 
+	// Check if vertical remapping is requested
+	Object * pobjLevels = pobjParameters->GetChild("levels");
+	if (pobjLevels != NULL) {
+		std::vector<std::string> vecLevels;
+
+		// Get a list of output levels
+		strError = ArgumentToStringVector(objreg, pobjLevels->Name(), vecLevels);
+		if (strError != "") {
+			return strError;
+		}
+
+		if (vecLevels.size() == 0) {
+			return std::string("ERROR: levels must contain at least one entry");
+		}
+
+		// Check if levels are specified in height units
+		double dValue;
+		bool fIsHeightUnit =
+			StringToValueUnit(
+				vecLevels[0],
+				std::string("m"),
+				dValue,
+				false);
+
+		// Height units
+		if (fIsHeightUnit) {
+
+			// Check for geopotential height at surface
+			Variable * pvarPHIS = NULL;
+			pobjSourceConfig->GetVariable("PHIS", &pvarPHIS);
+			if (pvarPHIS == NULL) {
+				return std::string("ERROR: A surface height variable cannot be found"
+					" but is needed for vertical interpolation");
+			}
+
+			// Check for geopotential height variable
+			Variable * pvarZ3 = NULL;
+			pobjSourceConfig->GetVariable("Z3", &pvarZ3);
+			if (pvarZ3 != NULL) {
+				m_eVertInterpMethod = VerticalInterp_PHISZ3toZ;
+			}
+
+			// Check for surface pressure and temperature
+			Variable * pvarPS = NULL;
+			Variable * pvarT = NULL;
+			pobjSourceConfig->GetVariable("PS", &pvarPS);
+			pobjSourceConfig->GetVariable("T", &pvarT);
+			if ((pvarPS != NULL) && (pvarT != NULL)) {
+				m_eVertInterpMethod = VerticalInterp_PHISPSTtoZ;
+			}
+		}
+
+		// Extract remaining levels
+		bool fExtractSuccess =
+			ExtractValueUnit(
+				vecLevels[0],
+				dValue,
+				m_strLevelsUnits);
+
+		if (!fExtractSuccess) {
+			_EXCEPTIONT("Logic error");
+		}
+
+		m_vecLevelsValues.push_back(dValue);
+
+		for (int k = 1; k < vecLevels.size(); k++) {
+			fExtractSuccess =
+				StringToValueUnit(
+					vecLevels[k],
+					m_strLevelsUnits,
+					dValue,
+					false);
+
+			if (!fExtractSuccess) {
+				return std::string("ERROR: All levels must have the same units");
+			}
+
+			m_vecLevelsValues.push_back(dValue);
+		}
+/*
+		std::cout << "Unit: " << m_strLevelsUnits << std::endl;
+		for (int k = 0; k < m_vecLevelsValues.size(); k++) {
+			std::cout << "Level " << k << ": " << m_vecLevelsValues[k] << std::endl;
+		}
+
+		_EXCEPTION();
+*/
+	}
+
 	// Store pointer
 	m_pobjSourceConfig = pobjSourceConfig;
 	m_pobjTargetConfig = pobjTargetConfig;
@@ -326,6 +293,8 @@ std::string TempestRegridObject::Initialize(
 	// Get the grid
 	GridObject * pobjSourceGrid = pobjSourceConfig->GetGrid();
 	GridObject * pobjTargetGrid = pobjTargetConfig->GetGrid();
+
+	// Check if the two grids are equal to one another
 
 	// Pointers to Meshes
 	Mesh * pmeshSource = &(pobjSourceGrid->GetMesh());
@@ -550,6 +519,361 @@ std::string TempestRegridObject::Initialize(
 	delete pMeshOverlap;
 
 	AnnounceEndBlock("Done");
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string TempestRegridObject::Regrid(
+	const std::vector<std::string> & vecVariables
+) {
+	std::string strError;
+
+	// Get FileListObjects
+	FileListObject * pobjSourceFileList =
+		m_pobjSourceConfig->GetFileList();
+	FileListObject * pobjTargetFileList =
+		m_pobjTargetConfig->GetFileList();
+
+	// Get GridObject
+	GridObject * pobjSourceGrid =
+		m_pobjSourceConfig->GetGrid();
+
+	// Check if a reduce target is available
+	bool fReduceTargetAvailable =
+		pobjTargetFileList->HasReduceTarget();
+
+	// Check if times are compatible across FileLists
+	bool fFileListCompatible =
+		pobjSourceFileList->IsCompatible(pobjTargetFileList);
+
+	// Determine order of target vertical dimension and verify monotonicity
+	int nTargetVerticalDimOrder = (+1);
+	if (m_vecLevelsValues.size() != 0) {
+
+		if (m_vecLevelsValues.size() > 1) {
+			if (m_vecLevelsValues[1] > m_vecLevelsValues[0]) {
+				nTargetVerticalDimOrder = (+1);
+				for (size_t s = 0; s < m_vecLevelsValues.size()-1; s++) {
+					if (m_vecLevelsValues[s+1] <= m_vecLevelsValues[s]) {
+						return std::string("ERROR: Target vertical levels must be monotonic");
+					}
+				}
+			} else if (m_vecLevelsValues[1] < m_vecLevelsValues[0]) {
+				nTargetVerticalDimOrder = (-1);
+				for (size_t s = 0; s < m_vecLevelsValues.size()-1; s++) {
+					if (m_vecLevelsValues[s+1] >= m_vecLevelsValues[s]) {
+						return std::string("ERROR: Target vertical levels must be monotonic");
+					}
+				}
+			} else {
+				return std::string("ERROR: Target vertical levels must be monotonic");
+			}
+		}
+	}
+
+	// Check the size of all variables
+	for (int v = 0; v < vecVariables.size(); v++) {
+
+		bool fInterpolateVertical = (m_vecLevelsValues.size() != 0);
+
+		// Source variable
+		Variable * pvarSource;
+		strError =
+			m_pobjSourceConfig->GetVariable(
+				vecVariables[v],
+				&pvarSource);
+
+		if (strError != "") {
+			return strError;
+		}
+
+		if ((pvarSource->IsReductionOp()) && (!fReduceTargetAvailable)) {
+			return std::string("ERROR: No reduction target available "
+				"for output of variable reduction \"")
+				+ pvarSource->Name() + std::string("\"");
+		}
+		if ((!pvarSource->IsReductionOp()) && (!fFileListCompatible)) {
+			return std::string("ERROR: Source and target configurations "
+				"are not compatible for regrid operation");
+		}
+
+		if ((pvarSource->IsReductionOp()) && (m_vecLevelsValues.size() != 0)) {
+			_EXCEPTIONT("Vertical interpolation on reduction operators not yet supported");
+		}
+
+		if (pvarSource->VerticalDimIx() == (-1)) {
+			fInterpolateVertical = false;
+		}
+
+		// Perform vertical interpolation
+		if (fInterpolateVertical) {
+
+			// Initialize reduced iterators
+			VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
+			VariableAuxIndexIterator iterEnd = pvarSource->GetAuxIndexEnd();
+			//std::cout << iterAux.size() << " / " << pvarSource->VerticalDimIx() << std::endl;
+			//std::cout << iterEnd.size() << " / " << pvarSource->VerticalDimIx() << std::endl;
+			iterAux.RemoveDim(pvarSource->VerticalDimIx());
+			iterEnd.RemoveDim(pvarSource->VerticalDimIx());
+
+			// Target variable
+			Variable * pvarTarget = NULL;
+
+			// Get PHIS, if needed
+			Variable * pvarPHIS = NULL;
+			if ((m_eVertInterpMethod == VerticalInterp_PHISZ3toZ) ||
+				(m_eVertInterpMethod == VerticalInterp_PHISPSTtoZ)
+			) {
+				strError = m_pobjSourceConfig->GetVariable("PHIS", &pvarPHIS);
+				if (strError != "") return strError;
+
+				strError = pobjTargetFileList->AddVerticalDimension(
+					std::string("z"),
+					static_cast<long>(m_vecLevelsValues.size()),
+					nTargetVerticalDimOrder);
+				if (strError != "") return strError;
+
+				strError =
+					m_pobjTargetConfig->AddVariableFromTemplateWithNewVerticalDim(
+						m_pobjSourceConfig,
+						pvarSource,
+						std::string("z"),
+						&pvarTarget);
+				if (strError != "") return strError;
+
+			} else {
+				return std::string("ERROR: This type of vertical interpolation is not implemented");
+			}
+
+			// Interpolate vertically using Z3
+			if (m_eVertInterpMethod == VerticalInterp_PHISZ3toZ) {
+
+				// Get Z3 variable
+				Variable * pvarZ3;
+				strError = m_pobjSourceConfig->GetVariable("Z3", &pvarZ3);
+				if (strError != "") {
+					return strError;
+				}
+
+				if (pvarZ3->VerticalDimSize() < 2) {
+					return std::string("ERROR: Z3 must have at least two vertical levels");
+				}
+
+				// Allow variables to load more than one data instance
+				pvarZ3->RemoveSingleDataInstanceLimitation();
+				pvarSource->RemoveSingleDataInstanceLimitation();
+
+				// Loop through all auxiliary indices
+				for (; iterAux != iterEnd; iterAux++) {
+
+					// Create new auxiliary index with vertical level
+					VariableAuxIndex ixAux = iterAux;
+					ixAux.insert(ixAux.begin() + pvarSource->VerticalDimIx(), 0);
+
+					// Set of vertical levels required for interpolation
+					std::set<long> setVerticalLevelsUsed;
+
+					// Load PHIS data
+					DataArray1D<float> * pdataPHIS = NULL;
+					strError = pvarPHIS->LoadGridData(iterAux, &pdataPHIS);
+					if (strError != "") {
+						return strError;
+					}
+
+					// Unload existing Z3 data
+					pvarZ3->UnloadAllGridData();
+
+					// Data instances storing data on bounding levels
+					DataArray1D<float> * pdataZ3Last = NULL;
+					DataArray1D<float> * pdataZ3Next = NULL;
+
+					DataArray1D<float> * pdataSourceLast = NULL;
+					DataArray1D<float> * pdataSourceNext = NULL;
+
+					// Load Z3 from the lowest model level
+					ixAux[pvarZ3->VerticalDimIx()] = 0;
+					strError = pvarZ3->LoadGridData(ixAux, &pdataZ3Next);
+					if (strError != "") return strError;
+
+					// Get variable order
+					double dOrder = pvarZ3->VerticalDimOrder();
+
+					// Number of cells complete at each vertical level
+					DataArray1D<int> vecCellsComplete(m_vecLevelsValues.size());
+
+					// Store all vertically interpolated data
+					std::vector< DataArray1D<float> > vecdataInterp;
+					vecdataInterp.resize(m_vecLevelsValues.size());
+					for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
+						vecdataInterp[k].Allocate(pdataZ3Next->GetRows());
+					}
+
+					// Loop through all vertical levels
+					for (long l = -1; l < pvarZ3->VerticalDimSize(); l++) {
+
+						if (l > 0) {
+							ixAux[pvarSource->VerticalDimIx()] = l-1;
+							pvarZ3->UnloadGridData(ixAux);
+							pvarSource->UnloadGridData(ixAux, true);
+						}
+						pdataZ3Last = pdataZ3Next;
+						pdataSourceLast = pdataSourceNext;
+						pdataSourceNext = NULL;
+						if (l != pvarZ3->VerticalDimSize()-1) {
+							ixAux[pvarSource->VerticalDimIx()] = l+1;
+							pvarZ3->LoadGridData(ixAux, &pdataZ3Next);
+
+							// Remove surface component from Z3
+							for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
+								(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+							}
+						}
+
+						// Loop through all output levels
+						size_t sLevelsComplete = 0;
+						for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
+							if (vecCellsComplete[k] == pdataZ3Last->GetRows()) {
+								sLevelsComplete++;
+								continue;
+							}
+/*
+							// Load Target data array
+							DataArray1D<float> * pdataTarget = NULL;
+							ixAux[pvarTarget->VerticalDimIx()] = k;
+							strError = pvarTarget->LoadGridData(ixAux, &pdataTarget);
+							if (strError != "") return strError;
+*/
+							// Loop through all cells
+							for (int i = 0; i < pdataZ3Last->GetRows(); i++) {
+								double dLastZ;
+								double dNextZ;
+
+								if (l == -1) {
+									dLastZ = dOrder * (-DBL_MAX);
+								} else {
+									dLastZ = (*pdataZ3Last)[i];
+								}
+
+								if (l == pvarZ3->VerticalDimSize()-1) {
+									dNextZ = dOrder * (+DBL_MAX);
+								} else {
+									dNextZ = (*pdataZ3Next)[i];
+								}
+
+								// Level value found in interval [dLastZ, dNextZ)
+								if ((dOrder * m_vecLevelsValues[k] >= dOrder * dLastZ) &&
+									(dOrder * m_vecLevelsValues[k] < dOrder * dNextZ)
+								) {
+									if ((pdataSourceLast == NULL) && (l != (-1))) {
+										ixAux[pvarSource->VerticalDimIx()] = l;
+										strError = pvarSource->LoadGridData(ixAux, &pdataSourceLast);
+										if (strError != "") return strError;
+									}
+									if ((pdataSourceNext == NULL) && (l != pdataZ3Last->GetRows()-1)) {
+										ixAux[pvarSource->VerticalDimIx()] = l+1;
+										strError = pvarSource->LoadGridData(ixAux, &pdataSourceNext);
+										if (strError != "") return strError;
+									}
+
+									if (l == -1) {
+										vecdataInterp[k][i] = (*pdataSourceNext)[i];
+									} else if (l == pvarZ3->VerticalDimSize()-1) {
+										vecdataInterp[k][i] = (*pdataSourceLast)[i];
+									} else {
+										double dAlpha =
+											(m_vecLevelsValues[k] - (*pdataZ3Last)[i])
+											/ ((*pdataZ3Next)[i] - (*pdataZ3Last)[i]);
+										vecdataInterp[k][i] =
+											dAlpha * (*pdataSourceNext)[i]
+											+ (1.0 - dAlpha) * (*pdataSourceLast)[i];
+									}
+
+									vecCellsComplete[k]++;
+								}
+
+							}
+
+						}
+
+						// Check if we're done
+						if (sLevelsComplete == m_vecLevelsValues.size()) {
+							break;
+						}
+					}
+
+					// Unload all data
+					pvarZ3->UnloadAllGridData();
+					pvarSource->UnloadAllGridData();
+
+					// Allocate target data
+					for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
+
+						// Auxiliary index
+						ixAux[pvarTarget->VerticalDimIx()] = k;
+
+						// Allocate target data
+						DataArray1D<float> * pdataTarget = NULL;
+						strError = pvarTarget->AllocateGridData(ixAux, &pdataTarget);
+						if (strError != "") return strError;
+
+						// Apply the map
+						m_mapRemap.ApplyFloat(
+							vecdataInterp[k],
+							(*pdataTarget));
+
+						// Write target data
+						pvarTarget->WriteGridData(ixAux);
+					}
+
+					pvarTarget->UnloadAllGridData();
+				}
+			}
+
+		// No vertical interpolation
+		} else {
+
+			// Add the output variable to the target configuration
+			Variable * pvarTarget;
+			strError =
+				m_pobjTargetConfig->AddVariableFromTemplate(
+					m_pobjSourceConfig,
+					pvarSource,
+					&pvarTarget);
+
+			if (strError != "") {
+				return strError;
+			}
+
+			// Loop over all auxiliary indices and remap data
+			//std::cout << pvarSource->GetAuxIndexBegin().ToString() << std::endl;
+			//std::cout << pvarSource->GetAuxIndexEnd().ToString() << std::endl;
+			VariableAuxIndexIterator iterAux = pvarSource->GetAuxIndexBegin();
+			for (; iterAux != pvarSource->GetAuxIndexEnd(); iterAux++) {
+
+				//std::cout << iterAux.ToString() << std::endl;
+
+				// Load source data
+				DataArray1D<float> * pdataSource = NULL;
+				strError = pvarTarget->LoadGridData(iterAux, &pdataSource);
+				if (strError != "") return strError;
+
+				// Allocate target data
+				DataArray1D<float> * pdataTarget = NULL;
+				strError = pvarTarget->AllocateGridData(iterAux, &pdataTarget);
+				if (strError != "") return strError;
+
+				// Apply the map
+				m_mapRemap.ApplyFloat(
+					(*pdataSource),
+					(*pdataTarget));
+
+				// Write target data
+				pvarTarget->WriteGridData(iterAux);
+			}
+		}
+	}
 
 	return std::string("");
 }

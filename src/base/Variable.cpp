@@ -37,7 +37,6 @@ VariableRegistry::VariableRegistry(
 ///////////////////////////////////////////////////////////////////////////////
 
 VariableRegistry::~VariableRegistry() {
-
 	VariableMap::iterator iter = m_mapVariables.begin();
 	for (; iter != m_mapVariables.end(); iter++) {
 		delete iter->second;
@@ -64,6 +63,8 @@ std::string VariableRegistry::FindOrRegister(
 
 		return std::string("");
 	}
+
+	std::cout << "Registering " << m_pobjConfig->Name() << " : " << strVariableName << std::endl;
 
 	// Check if Variable is in the FileList, and add to registry if present
 	FileListObject * pobjFileList =
@@ -209,7 +210,7 @@ void VariableRegistry::UnloadAllGridData() {
 	std::map<std::string, Variable *>::iterator iter =
 		m_mapVariables.begin();
 	for (; iter != m_mapVariables.end(); iter++) {
-		iter->second->UnloadGridData();
+		iter->second->UnloadAllGridData();
 	}
 }
 
@@ -258,8 +259,10 @@ Variable::Variable(
 	m_fReductionOp(false),
 	m_strUnits(),
 	m_iTimeDimIx(-1),
+	m_iVerticalDimIx(-1),
+	m_nVerticalDimOrder(+1),
 	m_nSpecifiedDim(0),
-	m_fSingleTimeIndexAndHasData(false)
+	m_fLimitToSingleDataInstance(true)
 {
 	if (strName.length() == 0) {
 		_EXCEPTIONT("Variable name must be given");
@@ -270,9 +273,14 @@ Variable::Variable(
 	if (pvarinfo != NULL) {
 		m_strUnits = pvarinfo->m_strUnits;
 		m_vecAuxDimNames = pvarinfo->m_vecAuxDimNames;
-		m_vecAuxIndices.resize(pvarinfo->m_vecAuxDimSizes.size(), (-1));
 		m_iTimeDimIx = pvarinfo->m_iTimeDimIx;
+		m_iVerticalDimIx = pvarinfo->m_iVerticalDimIx;
+		m_nVerticalDimOrder = pvarinfo->m_nVerticalDimOrder;
 
+		//std::cout << "TEST " << m_strName << std::endl;
+		//for (int d = 0; d < pvarinfo->m_vecAuxDimSizes.size(); d++) {
+		//	std::cout << "  " << pvarinfo->m_vecAuxDimNames[d] << " " << pvarinfo->m_vecAuxDimSizes[d] << std::endl;
+		//}
 		m_iterAuxBegin.Initialize(pvarinfo->m_vecAuxDimSizes, false);
 		m_iterAuxEnd.Initialize(pvarinfo->m_vecAuxDimSizes, true);
 	}
@@ -366,35 +374,36 @@ std::string Variable::Initialize() {
 std::string Variable::InitializeAuxiliary(
 	const std::vector<Variable *> vecVarArguments
 ) {
+	// Inherit attributes from argument by default
+	if (vecVarArguments.size() != 0) {
+
+		m_strUnits = vecVarArguments[0]->m_strUnits;
+		m_vecAuxDimNames = vecVarArguments[0]->m_vecAuxDimNames;
+		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
+		m_iVerticalDimIx = vecVarArguments[0]->m_iVerticalDimIx;
+		m_nVerticalDimOrder = vecVarArguments[0]->m_nVerticalDimOrder;
+
+		m_iterAuxBegin = vecVarArguments[0]->m_iterAuxBegin;
+		m_iterAuxEnd = vecVarArguments[0]->m_iterAuxEnd;
+
+		if (m_iterAuxBegin.size() != m_vecAuxDimNames.size()) {
+			_EXCEPTIONT("Logic error");
+		}
+	}
+
 	// Reduction operator
 	if (m_strOpName == "_CLIMMEAN") {
 		if (vecVarArguments.size() != 1) {
 			return std::string("_CLIMMEAN expectes one argument");
 		}
 
-		// Inherit units from argument
-		m_strUnits = vecVarArguments[0]->m_strUnits;
-		m_iTimeDimIx = (-1);
-
 		// Remove time dimension
-		if (vecVarArguments[0]->m_vecAuxIndices.size() !=
-		    vecVarArguments[0]->m_vecAuxDimNames.size()
-		) {
-			_EXCEPTIONT("Logic error");
-		}
-		for (int d = 0; d < vecVarArguments[0]->m_vecAuxDimNames.size(); d++) {
-			if (d == vecVarArguments[0]->m_iTimeDimIx) {
-				continue;
-			}
-			m_vecAuxIndices.push_back(vecVarArguments[0]->m_vecAuxIndices[d]);
-			m_vecAuxDimNames.push_back(vecVarArguments[0]->m_vecAuxDimNames[d]);
-		}
+		m_vecAuxDimNames.erase(m_vecAuxDimNames.begin() + m_iTimeDimIx);
 
-		m_iterAuxBegin = vecVarArguments[0]->m_iterAuxBegin;
-		m_iterAuxEnd = vecVarArguments[0]->m_iterAuxEnd;
+		m_iterAuxBegin.RemoveDim(m_iTimeDimIx);
+		m_iterAuxEnd.RemoveDim(m_iTimeDimIx);
 
-		m_iterAuxBegin.RemoveDim(vecVarArguments[0]->m_iTimeDimIx);
-		m_iterAuxEnd.RemoveDim(vecVarArguments[0]->m_iTimeDimIx);
+		m_iTimeDimIx = (-1);
 
 		return std::string("");
 	}
@@ -405,15 +414,6 @@ std::string Variable::InitializeAuxiliary(
 			return std::string("_VECMAG expectes two arguments");
 		}
 
-		// Inherit attributes from argument
-		m_strUnits = vecVarArguments[0]->m_strUnits;
-		m_vecAuxDimNames = vecVarArguments[0]->m_vecAuxDimNames;
-		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
-		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
-
-		m_iterAuxBegin = vecVarArguments[0]->m_iterAuxBegin;
-		m_iterAuxEnd = vecVarArguments[0]->m_iterAuxEnd;
-
 		return std::string("");
 	}
 
@@ -423,15 +423,6 @@ std::string Variable::InitializeAuxiliary(
 			return std::string("_DIFF expectes two arguments");
 		}
 
-		// Inherit attributes from argument
-		m_strUnits = vecVarArguments[0]->m_strUnits;
-		m_vecAuxDimNames = vecVarArguments[0]->m_vecAuxDimNames;
-		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
-		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
-
-		m_iterAuxBegin = vecVarArguments[0]->m_iterAuxBegin;
-		m_iterAuxEnd = vecVarArguments[0]->m_iterAuxEnd;
-
 		return std::string("");
 	}
 
@@ -440,15 +431,6 @@ std::string Variable::InitializeAuxiliary(
 		if (vecVarArguments.size() != 2) {
 			return std::string("_PROD expectes two arguments");
 		}
-
-		// Inherit attributes from argument
-		m_strUnits = vecVarArguments[0]->m_strUnits + vecVarArguments[1]->m_strUnits;
-		m_vecAuxDimNames = vecVarArguments[0]->m_vecAuxDimNames;
-		m_vecAuxIndices = vecVarArguments[0]->m_vecAuxIndices;
-		m_iTimeDimIx = vecVarArguments[0]->m_iTimeDimIx;
-
-		m_iterAuxBegin = vecVarArguments[0]->m_iterAuxBegin;
-		m_iterAuxEnd = vecVarArguments[0]->m_iterAuxEnd;
 
 		return std::string("");
 	}
@@ -461,6 +443,8 @@ std::string Variable::InitializeAuxiliary(
 bool Variable::operator==(
 	const Variable & var
 ) {
+	_EXCEPTIONT("Not available");
+/*
 	if (m_strName != var.m_strName) {
 		return false;
 	}
@@ -468,9 +452,6 @@ bool Variable::operator==(
 		return false;
 	}
 	if (m_vecAuxDimNames != var.m_vecAuxDimNames) {
-		return false;
-	}
-	if (m_vecAuxIndices != var.m_vecAuxIndices) {
 		return false;
 	}
 	if (m_fOp != var.m_fOp) {
@@ -483,6 +464,7 @@ bool Variable::operator==(
 		return false;
 	}
 	return true;
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -527,35 +509,87 @@ std::string Variable::ToString() const {
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string Variable::LoadGridData(
-	size_t sTime
+	size_t sTime,
+	DataArray1D<float> ** ppdata
 ) {
 	if (m_iTimeDimIx == (-1)) {
-		return LoadGridData(m_vecAuxIndices);
+		return LoadGridData(m_iterAuxBegin, ppdata);
+
+	} else if (m_iterAuxBegin.size() != 1) {
+		_EXCEPTIONT("Multiple auxiliary indices found");
 
 	} else {
-		VariableAuxIndex ixAux = m_vecAuxIndices;
+		VariableAuxIndex ixAux = m_iterAuxBegin;
 		ixAux[m_iTimeDimIx] = static_cast<long>(sTime);
 	
-		return LoadGridData(ixAux);
+		return LoadGridData(ixAux, ppdata);
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/*
+std::string Variable::MultiLoadGridData(
+	const std::vector<VariableAuxIndex> & vecMultiIndex
+) {
+	UnloadAllGridData();
 
-std::string Variable::LoadGridData(
+	for (int d = 0; d < vecMultiIndex.size(); d++) {
+		DataArray1D<float> * pdata = new DataArray1D<float>;
+		if (pdata == NULL) {
+			_EXCEPTIONT("Allocation failure");
+		}
+
+		m_mapData.insert(DataMap::value_type(vecMultiIndex[d], pdata));
+
+		std::string strError = _LoadGridData(vecMultiIndex[d], NULL);
+		if (strError != "") {
+			return strError;
+		}
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string Variable::MultiLoadGridData3D(
 	const VariableAuxIndex & ixAux
 ) {
-	// Check for single time index (variable already loaded)
-	if (m_vecAuxIndices.size() != ixAux.size()) {
-		_EXCEPTION2("Auxiliary index size mismatch (%lu/%lu)",
-			m_vecAuxIndices.size(), ixAux.size());
+	if (ixAux.size() != m_vecAuxDimNames.size()-1) {
+		_EXCEPTIONT("Invalid length of auxiliary index");
 	}
-	if (m_iTimeDimIx == SingleTimeIndex) {
-		if (ixAux.size() == 0) {
-			if (m_fSingleTimeIndexAndHasData) {
-				return std::string("");
-			}
-		}
+	if (m_iVerticalDimIx == (-1)) {
+		_EXCEPTIONT("Not a 3D variable -- no vertical dimension found");
+	}
+
+	// Number of vertical levels
+	long lVeticalDimSize = VerticalDimSize();
+
+	// Build the multi-index
+	std::vector<VariableAuxIndex> vecMultiIndex;
+	vecMultiIndex.resize(lVeticalDimSize);
+
+	for (long k = 0; k < lVeticalDimSize; k++) {
+		vecMultiIndex[k] = ixAux;
+		vecMultiIndex[k].insert(
+			vecMultiIndex[k].begin() + m_iVerticalDimIx, k);
+	}
+
+	return MultiLoadGridData(vecMultiIndex);
+}
+*/
+///////////////////////////////////////////////////////////////////////////////
+
+std::string Variable::LoadGridData(
+	const VariableAuxIndex & ixAux,
+	DataArray1D<float> ** ppdata
+) {
+	std::string strError;
+
+	// Check for single time index (variable already loaded)
+	if (m_iterAuxBegin.size() != ixAux.size()) {
+		_EXCEPTION2("Auxiliary index size mismatch (%lu/%lu)",
+			m_iterAuxBegin.size(), ixAux.size());
 	}
 
 	// Get a pointer to the RecapConfigObject
@@ -576,57 +610,70 @@ std::string Variable::LoadGridData(
 	}
 
 	// Check if data already loaded
-	if ((m_vecAuxIndices.size() != 0) && (ixAux == m_vecAuxIndices)) {
-		if (m_data.GetRows() != mesh.sDOFCount) {
-			_EXCEPTIONT("Logic error");
-		}
-		return std::string("");
-	}
-	if ((m_vecAuxIndices.size() == 0) && (m_fSingleTimeIndexAndHasData)) {
-		if (m_data.GetRows() != mesh.sDOFCount) {
-			_EXCEPTIONT("Logic error");
+	DataMap::iterator iterData = m_mapData.find(ixAux);
+	if (iterData != m_mapData.end()) {
+		if (ppdata != NULL) {
+			(*ppdata) = iterData->second;
 		}
 		return std::string("");
 	}
 
+	// Create a new data array and insert into map
+	if (m_fLimitToSingleDataInstance) {
+		UnloadAllGridData();
+	}
+
+	DataArray1D<float> * pdata = new DataArray1D<float>;
+	if (pdata == NULL) {
+		_EXCEPTIONT("Out of memory");
+	}
+
+	std::pair<DataMap::iterator,bool> prSuccess =
+		m_mapData.insert(DataMap::value_type(ixAux, pdata));
+	if (!prSuccess.second) {
+		_EXCEPTIONT("Unable to insert new datafile into DataMap");
+	}
+	if (ppdata != NULL) {
+		(*ppdata) = pdata;
+	}
+
+	//std::cout << "Now contains " << m_mapData.size() << " data instances" << std::endl;
+
+	// Reference to data
+	DataArray1D<float> & data = (*pdata);
+
 	// Allocate data
-	m_data.Allocate(mesh.sDOFCount);
+	data.Allocate(mesh.sDOFCount);
 
 	// Check for special variable names
 	if (m_pvarinfo == NULL) {
 		if ((m_strName == "lon") && (mesh.dCenterLon.GetRows() == mesh.sDOFCount)) {
 			Announce("Extracting grid data [%s] [NoTime]", m_strName.c_str());
 			for (size_t i = 0; i < mesh.sDOFCount; i++) {
-				m_data[i] = static_cast<float>(mesh.dCenterLon[i]);
+				data[i] = static_cast<float>(mesh.dCenterLon[i]);
 			}
 
-			m_fSingleTimeIndexAndHasData = true;
 			return std::string("");
 		}
 		if ((m_strName == "lat") && (mesh.dCenterLat.GetRows() == mesh.sDOFCount)) {
 			Announce("Extracting grid data [%s] [NoTime]", m_strName.c_str());
 			for (size_t i = 0; i < mesh.sDOFCount; i++) {
-				m_data[i] = static_cast<float>(mesh.dCenterLat[i]);
+				data[i] = static_cast<float>(mesh.dCenterLat[i]);
 			}
 
-			m_fSingleTimeIndexAndHasData = true;
 			return std::string("");
 		}
 	}
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
-		std::string strError =
+		strError =
 			pobjFileList->LoadData_float(
 				m_strName,
 				ixAux,
-				m_data);
+				data);
 
-		if (strError != "") {
-			return strError;
-		}
-
-		m_vecAuxIndices = ixAux;
+		if (strError != "") return strError;
 
 		return std::string("");
 	}
@@ -640,15 +687,12 @@ std::string Variable::LoadGridData(
 		}
 
 		Variable * pvar = NULL;
-		std::string strError =
-			pobjConfig->GetVariable(m_vecArg[0], &pvar);
-		if (strError != "") {
-			_EXCEPTION1("%s", strError.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[0], &pvar);
+		if (strError != "") return strError;
 
-		if (pvar->m_vecAuxIndices.size()-1 != ixAux.size()) {
+		if (pvar->m_iterAuxBegin.size()-1 != ixAux.size()) {
 			_EXCEPTION2("Dimension size mismatch in reduce operation (%lu / %lu)",
-				pvar->m_vecAuxIndices.size()-1, ixAux.size());
+				pvar->m_iterAuxBegin.size()-1, ixAux.size());
 		}
 
 		// Calculate climate mean
@@ -656,23 +700,17 @@ std::string Variable::LoadGridData(
 		for (size_t t = 0; t < sTimeCount; t++) {
 			VariableAuxIndex ixAuxArg = ixAux;
 			ixAuxArg.insert(ixAuxArg.begin() + pvar->m_iTimeDimIx, t);
-			pvar->LoadGridData(ixAuxArg);
 
-			const DataArray1D<float> & dataVar = pvar->m_data;
+			DataArray1D<float> * pdataVar = NULL;
+			strError = pvar->LoadGridData(ixAuxArg, &pdataVar);
+			if (strError != "") return strError;
 
-			for (int i = 0; i < m_data.GetRows(); i++) {
-				m_data[i] += dataVar[i];
+			for (int i = 0; i < data.GetRows(); i++) {
+				data[i] += (*pdataVar)[i];
 			}
 		}
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] /= static_cast<double>(sTimeCount);
-		}
-
-		// Set this data as loaded
-		if (ixAux.size() == 0) {
-			m_fSingleTimeIndexAndHasData = true;
-		} else {
-			m_vecAuxIndices = ixAux;
+		for (int i = 0; i < data.GetRows(); i++) {
+			data[i] /= static_cast<double>(sTimeCount);
 		}
 
 	// Evaluate the vector magnitude operator
@@ -684,28 +722,24 @@ std::string Variable::LoadGridData(
 		Variable * pvarLeft = NULL;
 		Variable * pvarRight = NULL;
 
-		std::string strErrorLeft =
-			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
-		if (strErrorLeft != "") {
-			_EXCEPTION1("%s", strErrorLeft.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strError != "") return strError;
 
-		std::string strErrorRight =
-			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
-		if (strErrorRight != "") {
-			_EXCEPTION1("%s", strErrorRight.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strError != "") return strError;
 
-		pvarLeft->LoadGridData(ixAux);
-		pvarRight->LoadGridData(ixAux);
+		DataArray1D<float> * pdataLeft = NULL;
+		strError = pvarLeft->LoadGridData(ixAux, &pdataLeft);
+		if (strError != "") return strError;
 
-		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
-		const DataArray1D<float> & dataRight = pvarRight->GetData();
+		DataArray1D<float> * pdataRight = NULL;
+		strError = pvarRight->LoadGridData(ixAux, &pdataRight);
+		if (strError != "") return strError;
 
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] =
-				sqrt(dataLeft[i] * dataLeft[i]
-					+ dataRight[i] * dataRight[i]);
+		for (int i = 0; i < data.GetRows(); i++) {
+			data[i] =
+				sqrt((*pdataLeft)[i] * (*pdataLeft)[i]
+					+ (*pdataRight)[i] * (*pdataRight)[i]);
 		}
 
 	// Evaluate the difference operator
@@ -717,26 +751,22 @@ std::string Variable::LoadGridData(
 		Variable * pvarLeft = NULL;
 		Variable * pvarRight = NULL;
 
-		std::string strErrorLeft =
-			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
-		if (strErrorLeft != "") {
-			_EXCEPTION1("%s", strErrorLeft.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strError != "") return strError;
 
-		std::string strErrorRight =
-			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
-		if (strErrorRight != "") {
-			_EXCEPTION1("%s", strErrorRight.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strError != "") return strError;
 
-		pvarLeft->LoadGridData(ixAux);
-		pvarRight->LoadGridData(ixAux);
+		DataArray1D<float> * pdataLeft = NULL;
+		strError = pvarLeft->LoadGridData(ixAux, &pdataLeft);
+		if (strError != "") return strError;
 
-		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
-		const DataArray1D<float> & dataRight = pvarRight->GetData();
+		DataArray1D<float> * pdataRight = NULL;
+		strError = pvarRight->LoadGridData(ixAux, &pdataRight);
+		if (strError != "") return strError;
 
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = dataLeft[i] - dataRight[i];
+		for (int i = 0; i < data.GetRows(); i++) {
+			data[i] = (*pdataLeft)[i] - (*pdataRight)[i];
 		}
 
 	// Evaluate the product operator
@@ -748,26 +778,22 @@ std::string Variable::LoadGridData(
 		Variable * pvarLeft = NULL;
 		Variable * pvarRight = NULL;
 
-		std::string strErrorLeft =
-			pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
-		if (strErrorLeft != "") {
-			_EXCEPTION1("%s", strErrorLeft.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[0], &pvarLeft);
+		if (strError != "") return strError;
 
-		std::string strErrorRight =
-			pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
-		if (strErrorRight != "") {
-			_EXCEPTION1("%s", strErrorRight.c_str());
-		}
+		strError = pobjConfig->GetVariable(m_vecArg[1], &pvarRight);
+		if (strError != "") return strError;
 
-		pvarLeft->LoadGridData(ixAux);
-		pvarRight->LoadGridData(ixAux);
+		DataArray1D<float> * pdataLeft = NULL;
+		strError = pvarLeft->LoadGridData(ixAux, &pdataLeft);
+		if (strError != "") return strError;
 
-		const DataArray1D<float> & dataLeft  = pvarLeft->GetData();
-		const DataArray1D<float> & dataRight = pvarRight->GetData();
+		DataArray1D<float> * pdataRight = NULL;
+		strError = pvarRight->LoadGridData(ixAux, &pdataRight);
+		if (strError != "") return strError;
 
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = dataLeft[i] * dataRight[i];
+		for (int i = 0; i < data.GetRows(); i++) {
+			data[i] = (*pdataLeft)[i] * (*pdataRight)[i];
 		}
 
 /*
@@ -929,7 +955,14 @@ std::string Variable::LoadGridData(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Variable::AllocateGridData() {
+std::string Variable::AllocateGridData(
+	const VariableAuxIndex & ixAux,
+	DataArray1D<float> ** ppdata
+) {
+	// Check aux index
+	if (ixAux.size() != m_vecAuxDimNames.size()) {
+		_EXCEPTIONT("Invalid auxiliary index");
+	}
 
 	// Get a pointer to the RecapConfigObject
 	RecapConfigObject * pobjConfig = m_pvarreg->GetRecapConfigObject();
@@ -937,13 +970,40 @@ void Variable::AllocateGridData() {
 	// Get Mesh
 	GridObject * pobjGrid = pobjConfig->GetGrid();
 	if (pobjGrid == NULL) {
-		_EXCEPTIONT("Invalid configuration: Missing grid");
+		return std::string("ERROR: Invalid configuration (missing grid)");
 	}
 
 	const Mesh & mesh = pobjGrid->GetMesh();
 
-	// Allocate data
-	m_data.Allocate(mesh.sDOFCount);
+	// Find data instance in DataMap
+	DataMap::iterator iterData = m_mapData.find(ixAux);
+	if (iterData != m_mapData.end()) {
+		(*ppdata) = iterData->second;
+	}
+
+	// Remove other data instances
+	if (m_fLimitToSingleDataInstance) {
+		UnloadAllGridData();
+	}
+
+	// Create a new data array and insert into map
+	DataArray1D<float> * pdata = new DataArray1D<float>;
+	if (pdata == NULL) {
+		_EXCEPTIONT("Out of memory");
+	}
+	if (ppdata != NULL) {
+		(*ppdata) = pdata;
+	}
+
+	pdata->Allocate(mesh.sDOFCount);
+
+	std::pair<DataMap::iterator,bool> prSuccess =
+		m_mapData.insert(DataMap::value_type(ixAux, pdata));
+	if (!prSuccess.second) {
+		_EXCEPTIONT("Unable to insert new datafile into DataMap");
+	}
+
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -960,19 +1020,61 @@ std::string Variable::WriteGridData(
 		_EXCEPTIONT("Invalid configuration: Missing file_list");
 	}
 
+	DataMap::iterator iterData = m_mapData.find(ixAux);
+	if (iterData == m_mapData.end()) {
+		return std::string("ERROR: AuxIndex not found in data");
+	}
+
 	std::string strError =
 		pobjFileList->WriteData_float(
 			m_strName,
 			ixAux,
-			m_data);
+			*(iterData->second));
 
 	return strError;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Variable::UnloadGridData() {
-	m_data.Deallocate();
+void Variable::UnloadAllGridData() {
+	for (DataMap::iterator iter = m_mapData.begin(); iter != m_mapData.end(); iter++) {
+		{
+			std::string strLoading =
+				std::string("Unloading data [") + m_strName + std::string("]");
+
+			VariableAuxIndex vecAuxIndices = iter->first;
+			for (size_t d = 0; d < vecAuxIndices.size(); d++) {
+				strLoading +=
+					std::string(" [")
+					+ std::to_string(vecAuxIndices[d])
+					+ std::string("]");
+			}
+		
+			Announce(strLoading.c_str());
+		}
+
+		iter->second->Deallocate();
+		delete iter->second;
+	}
+	m_mapData.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Variable::UnloadGridData(
+	const VariableAuxIndex & ixAux,
+	bool fNoThrow
+) {
+	DataMap::iterator iter = m_mapData.find(ixAux);
+	if (iter == m_mapData.end()) {
+		if (fNoThrow) {
+			return;
+		}
+		_EXCEPTIONT("Data instance not found.");
+	}
+
+	iter->second->Deallocate();
+	m_mapData.erase(iter);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

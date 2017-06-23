@@ -258,6 +258,228 @@ bool StringObject::ToUnit(
 		_EXCEPTIONT("Invalid pointer to double on return");
 	}
 
+	return
+		StringToValueUnit(
+			m_strValue,
+			strTargetUnit,
+			(*dValueOut),
+			fIsDelta);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Utility functions
+///////////////////////////////////////////////////////////////////////////////
+
+bool StringToValueUnit(
+	const std::string & strString,
+	const std::string & strTargetUnit,
+	double & dValueOut,
+	bool fIsDelta
+) {
+
+	// Extract the value and unit
+	double dValue;
+	std::string strUnit;
+
+	bool fParseSuccess =
+		ExtractValueUnit(
+			strString,
+			dValue,
+			strUnit);
+
+	if (!fParseSuccess) {
+		return false;
+	}
+
+	// Unit is equal to TargetUnit
+	if (strUnit == strTargetUnit) {
+		dValueOut = dValue;
+
+	// Perform unit conversion from great circle distance (degrees)
+	} else if ((strUnit == "deg") || (strUnit == "degrees_north") || (strUnit == "degrees_east")) {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
+			dValueOut = dValue;
+
+		} else if (strTargetUnit == "rad") {
+			dValueOut = dValue * M_PI / 180.0;
+
+		} else if (strTargetUnit == "m") {
+			dValueOut = 6.37122e6 * dValue * M_PI / 180.0;
+
+		} else if (strTargetUnit == "km") {
+			dValueOut = 6.37122e3 * dValue * M_PI / 180.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (radians)
+	} else if (strUnit == "rad") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
+			dValueOut = 180.0 / M_PI * dValue;
+
+		} else if (strTargetUnit == "m") {
+			dValueOut = 6.37122e6 * dValue;
+
+		} else if (strTargetUnit == "km") {
+			dValueOut = 6.37122e3 * dValue;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (meters)
+	// or altitude (meters)
+	} else if (strUnit == "m") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
+			dValueOut = 180.0 / M_PI * dValue / 6.37122e6;
+
+		} else if (strTargetUnit == "rad") {
+			dValueOut = dValue / 6.37122e6;
+
+		} else if (strTargetUnit == "km") {
+			dValueOut = dValue / 1000.0;
+
+		} else if (strTargetUnit == "m2/s2") {
+			dValueOut = dValue * 9.80616;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from great circle distance (kilometers)
+	} else if (strUnit == "km") {
+		if ((strTargetUnit == "deg") ||
+		    (strTargetUnit == "degrees_north") ||
+		    (strTargetUnit == "degrees_east")
+		) {
+			dValueOut = 180.0 / M_PI * dValue / 6.37122e3;
+
+		} else if (strTargetUnit == "rad") {
+			dValueOut = dValue / 6.37122e3;
+
+		} else if (strTargetUnit == "m") {
+			dValueOut = dValue * 1000.0;
+
+		} else if (strTargetUnit == "m2/s2") {
+			dValueOut = dValue * 1000.0 * 9.80616;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from temperature (K)
+	} else if (strUnit == "K") {
+		if (strTargetUnit == "degC") {
+			if (fIsDelta) {
+				dValueOut = dValue;
+			} else {
+				dValueOut = dValue - 273.15;
+			}
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from temperature (degC)
+	} else if (strUnit == "degC") {
+		if (strTargetUnit == "K") {
+			if (fIsDelta) {
+				dValueOut = dValue;
+			} else {
+				dValueOut = dValue + 273.15;
+			}
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (Pa)
+	} else if (strUnit == "Pa") {
+		if ((strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			dValueOut = dValue / 100.0;
+
+		} else if (strTargetUnit == "atm") {
+			dValueOut = dValue / 101325.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (hPa,mb,mbar)
+	} else if ((strUnit == "hPa") || (strUnit == "mb") || (strUnit == "mbar")) {
+		if (strTargetUnit == "Pa") {
+			dValueOut = dValue * 100.0;
+
+		} else if (
+		    (strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			dValueOut = dValue;
+
+		} else if (strTargetUnit == "atm") {
+			dValueOut = dValue / 1013.25;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from pressure (atm)
+	} else if (strUnit == "atm") {
+		if (strTargetUnit == "Pa") {
+			dValueOut = dValue * 101325.0;
+
+		} else if (
+		    (strTargetUnit == "hPa") ||
+		    (strTargetUnit == "mb") ||
+		    (strTargetUnit == "mbar")
+		) {
+			dValueOut = dValue * 1013.25;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from geopotential (m2/s2)
+	} else if (strUnit == "m2/s2") {
+		if (strTargetUnit == "m") {
+			dValueOut = dValue / 9.80616;
+
+		} else if (strUnit == "km") {
+			dValueOut = dValue / 9.80616 / 1000.0;
+
+		} else {
+			return false;
+		}
+
+	} else {
+		return false;
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool ExtractValueUnit(
+	const std::string & strString,
+	double & dValue,
+	std::string & strUnit
+) {
+
 	// Extract the value and unit from this String
 	enum ParseMode {
 		ParseMode_WS,
@@ -271,18 +493,17 @@ bool StringObject::ToUnit(
 	bool fHasPeriod = false;
 
 	std::string strNumber;
-	std::string strUnit;
 
 	int iPos = 0;
 	for (;;) {
-		if (iPos >= m_strValue.length()) {
+		if (iPos >= strString.length()) {
 			break;
 		}
 
 		// Whitespace
 		if (mode == ParseMode_WS) {
-			if ((m_strValue[iPos] == ' ') ||
-			    (m_strValue[iPos] == '\t')
+			if ((strString[iPos] == ' ') ||
+			    (strString[iPos] == '\t')
 			) {
 				iPos++;
 			} else {
@@ -291,36 +512,36 @@ bool StringObject::ToUnit(
 
 		// Number
 		} else if (mode == ParseMode_Number) {
-			if ((m_strValue[iPos] >= '0') && (m_strValue[iPos] <= '9')) {
-				strNumber += m_strValue[iPos];
+			if ((strString[iPos] >= '0') && (strString[iPos] <= '9')) {
+				strNumber += strString[iPos];
 				iPos++;
 
-			} else if (m_strValue[iPos] == '.') {
+			} else if (strString[iPos] == '.') {
 				if (fHasPeriod) {
 					return false;
 				} else {
-					strNumber += m_strValue[iPos];
+					strNumber += strString[iPos];
 					fHasPeriod = true;
 					iPos++;
 				}
 
-			} else if (m_strValue[iPos] == '-') {
+			} else if (strString[iPos] == '-') {
 				if (strNumber.length() != 0) {
 					return false;
 				} else {
-					strNumber += m_strValue[iPos];
+					strNumber += strString[iPos];
 					iPos++;
 				}
 
 			} else if (
-				((m_strValue[iPos] >= 'a') && (m_strValue[iPos] <= 'z')) ||
-				((m_strValue[iPos] >= 'A') && (m_strValue[iPos] <= 'Z'))
+				((strString[iPos] >= 'a') && (strString[iPos] <= 'z')) ||
+				((strString[iPos] >= 'A') && (strString[iPos] <= 'Z'))
 			) {
 				mode = ParseMode_Unit;
 
 			} else if (
-				(m_strValue[iPos] == ' ') ||
-			    (m_strValue[iPos] == '\t')
+				(strString[iPos] == ' ') ||
+			    (strString[iPos] == '\t')
 			) {
 				mode = ParseMode_WS;
 				modeNext = ParseMode_Unit;
@@ -331,15 +552,15 @@ bool StringObject::ToUnit(
 
 		// Unit
 		} else if (mode == ParseMode_Unit) {
-			if (((m_strValue[iPos] >= 'a') && (m_strValue[iPos] <= 'z')) ||
-				((m_strValue[iPos] >= 'A') && (m_strValue[iPos] <= 'Z'))
+			if (((strString[iPos] >= 'a') && (strString[iPos] <= 'z')) ||
+				((strString[iPos] >= 'A') && (strString[iPos] <= 'Z'))
 			) {
-				strUnit += m_strValue[iPos];
+				strUnit += strString[iPos];
 				iPos++;
 
 			} else if (
-				(m_strValue[iPos] == ' ') ||
-			    (m_strValue[iPos] == '\t')
+				(strString[iPos] == ' ') ||
+			    (strString[iPos] == '\t')
 			) {
 				break;
 
@@ -358,187 +579,46 @@ bool StringObject::ToUnit(
 	}
 
 	// Value
-	const double dValue = atof(strNumber.c_str());
+	dValue = atof(strNumber.c_str());
 
-	// Unit is equal to TargetUnit
-	if (strUnit == strTargetUnit) {
-		(*dValueOut) = dValue;
+	return true;
+}
 
-	// Perform unit conversion from great circle distance (degrees)
-	} else if ((strUnit == "deg") || (strUnit == "degrees_north") || (strUnit == "degrees_east")) {
-		if ((strTargetUnit == "deg") ||
-		    (strTargetUnit == "degrees_north") ||
-		    (strTargetUnit == "degrees_east")
-		) {
-			(*dValueOut) = dValue;
+///////////////////////////////////////////////////////////////////////////////
 
-		} else if (strTargetUnit == "rad") {
-			(*dValueOut) = dValue * M_PI / 180.0;
+std::string ArgumentToStringVector(
+	const ObjectRegistry & objreg,
+	const std::string & strArgument,
+	std::vector<std::string> & vecStringList
+) {
+	ListObject * pobjVariableList =
+		dynamic_cast<ListObject *>(
+			objreg.GetObject(strArgument));
 
-		} else if (strTargetUnit == "m") {
-			(*dValueOut) = 6.37122e6 * dValue * M_PI / 180.0;
+	if (pobjVariableList != NULL) {
+		for (size_t i = 0; i < pobjVariableList->Count(); i++) {
+			StringObject * pobjVariableString =
+				dynamic_cast<StringObject *>(
+					objreg.GetObject(pobjVariableList->ChildName(i)));
 
-		} else if (strTargetUnit == "km") {
-			(*dValueOut) = 6.37122e3 * dValue * M_PI / 180.0;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from great circle distance (radians)
-	} else if (strUnit == "rad") {
-		if ((strTargetUnit == "deg") ||
-		    (strTargetUnit == "degrees_north") ||
-		    (strTargetUnit == "degrees_east")
-		) {
-			(*dValueOut) = 180.0 / M_PI * dValue;
-
-		} else if (strTargetUnit == "m") {
-			(*dValueOut) = 6.37122e6 * dValue;
-
-		} else if (strTargetUnit == "km") {
-			(*dValueOut) = 6.37122e3 * dValue;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from great circle distance (meters)
-	// or altitude (meters)
-	} else if (strUnit == "m") {
-		if ((strTargetUnit == "deg") ||
-		    (strTargetUnit == "degrees_north") ||
-		    (strTargetUnit == "degrees_east")
-		) {
-			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e6;
-
-		} else if (strTargetUnit == "rad") {
-			(*dValueOut) = dValue / 6.37122e6;
-
-		} else if (strTargetUnit == "km") {
-			(*dValueOut) = dValue / 1000.0;
-
-		} else if (strTargetUnit == "m2/s2") {
-			(*dValueOut) = dValue * 9.80616;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from great circle distance (kilometers)
-	} else if (strUnit == "km") {
-		if ((strTargetUnit == "deg") ||
-		    (strTargetUnit == "degrees_north") ||
-		    (strTargetUnit == "degrees_east")
-		) {
-			(*dValueOut) = 180.0 / M_PI * dValue / 6.37122e3;
-
-		} else if (strTargetUnit == "rad") {
-			(*dValueOut) = dValue / 6.37122e3;
-
-		} else if (strTargetUnit == "m") {
-			(*dValueOut) = dValue * 1000.0;
-
-		} else if (strTargetUnit == "m2/s2") {
-			(*dValueOut) = dValue * 1000.0 * 9.80616;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from temperature (K)
-	} else if (strUnit == "K") {
-		if (strTargetUnit == "degC") {
-			if (fIsDelta) {
-				(*dValueOut) = dValue;
-			} else {
-				(*dValueOut) = dValue - 273.15;
+			if (pobjVariableString == NULL) {
+				return std::string("ERROR: Argument must be a list of string objects");
 			}
 
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from temperature (degC)
-	} else if (strUnit == "degC") {
-		if (strTargetUnit == "K") {
-			if (fIsDelta) {
-				(*dValueOut) = dValue;
-			} else {
-				(*dValueOut) = dValue + 273.15;
-			}
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from pressure (Pa)
-	} else if (strUnit == "Pa") {
-		if ((strTargetUnit == "hPa") ||
-		    (strTargetUnit == "mb") ||
-		    (strTargetUnit == "mbar")
-		) {
-			(*dValueOut) = dValue / 100.0;
-
-		} else if (strTargetUnit == "atm") {
-			(*dValueOut) = dValue / 101325.0;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from pressure (hPa,mb,mbar)
-	} else if ((strUnit == "hPa") || (strUnit == "mb") || (strUnit == "mbar")) {
-		if (strTargetUnit == "Pa") {
-			(*dValueOut) = dValue * 100.0;
-
-		} else if (
-		    (strTargetUnit == "hPa") ||
-		    (strTargetUnit == "mb") ||
-		    (strTargetUnit == "mbar")
-		) {
-			(*dValueOut) = dValue;
-
-		} else if (strTargetUnit == "atm") {
-			(*dValueOut) = dValue / 1013.25;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from pressure (atm)
-	} else if (strUnit == "atm") {
-		if (strTargetUnit == "Pa") {
-			(*dValueOut) = dValue * 101325.0;
-
-		} else if (
-		    (strTargetUnit == "hPa") ||
-		    (strTargetUnit == "mb") ||
-		    (strTargetUnit == "mbar")
-		) {
-			(*dValueOut) = dValue * 1013.25;
-
-		} else {
-			return false;
-		}
-
-	// Perform unit conversion from geopotential (m2/s2)
-	} else if (strUnit == "m2/s2") {
-		if (strTargetUnit == "m") {
-			(*dValueOut) = dValue / 9.80616;
-
-		} else if (strUnit == "km") {
-			(*dValueOut) = dValue / 9.80616 / 1000.0;
-
-		} else {
-			return false;
+			vecStringList.push_back(pobjVariableString->Value());
 		}
 
 	} else {
-		return false;
+		StringObject * pobjVariableString =
+			dynamic_cast<StringObject *>(
+				objreg.GetObject(strArgument));
+		if (pobjVariableString == NULL) {
+			vecStringList.push_back(strArgument);
+		} else {
+			vecStringList.push_back(pobjVariableString->Value());
+		}
 	}
-
-	return true;
+	return std::string("");
 }
 
 ///////////////////////////////////////////////////////////////////////////////

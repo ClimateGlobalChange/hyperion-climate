@@ -169,6 +169,7 @@ protected:
 		}
 	}
 
+public:
 	///	<summary>
 	///		Remove the dimension with specified index.
 	///	</summary>
@@ -282,6 +283,13 @@ public:
 		return strOut;
 	}
 
+	///	<summary>
+	///		Get the length of this auxiliary index.
+	///	</summary>
+	size_t size() const {
+		return m_vecSize.size();
+	}
+
 protected:
 	///	<summary>
 	///		The sizes of the auxiliary indices.
@@ -300,6 +308,11 @@ protected:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A map between auxiliary indices and the data stored therein.
+///	</summary>
+typedef std::map<VariableAuxIndex, DataArray1D<float> *> DataMap;
 
 ///	<summary>
 ///		A class storing a 2D slice of data.
@@ -363,23 +376,36 @@ public:
 	std::string ToString() const;
 
 	///	<summary>
+	///		Remove limitations on number of data instances.
+	///	</summary>
+	void RemoveSingleDataInstanceLimitation() {
+		m_fLimitToSingleDataInstance = false;
+	}
+
+	///	<summary>
 	///		Load a data block from disk using the specified time index.
 	///	</summary>
 	std::string LoadGridData(
-		size_t sTime
+		size_t sTime,
+		DataArray1D<float> ** ppdata = NULL
 	);
 
 	///	<summary>
 	///		Load a data block from disk.
 	///	</summary>
 	std::string LoadGridData(
-		const VariableAuxIndex & ixAux
+		const VariableAuxIndex & ixAux,
+		DataArray1D<float> ** ppdata = NULL
 	);
 
+public:
 	///	<summary>
 	///		Allocate an empty data block for the specified variable.
 	///	</summary>
-	void AllocateGridData();
+	std::string AllocateGridData(
+		const VariableAuxIndex & ixAux,
+		DataArray1D<float> ** ppdata = NULL
+	);
 
 	///	<summary>
 	///		Load a data block from disk.
@@ -389,9 +415,17 @@ public:
 	);
 
 	///	<summary>
-	///		Unload the current data block.
+	///		Unload all data.
 	///	</summary>
-	void UnloadGridData();
+	void UnloadAllGridData();
+
+	///	<summary>
+	///		Unload the specified data block.
+	///	</summary>
+	void UnloadGridData(
+		const VariableAuxIndex & ixAux,
+		bool fNoThrow = false
+	);
 
 public:
 	///	<summary>
@@ -413,6 +447,37 @@ public:
 	///	</summary>
 	const std::vector<std::string> & AuxDimNames() const {
 		return m_vecAuxDimNames;
+	}
+
+	///	<summary>
+	///		Time dimension index.
+	///	</summary>
+	int TimeDimIx() const {
+		return m_iTimeDimIx;
+	}
+
+	///	<summary>
+	///		Vertical dimension index.
+	///	</summary>
+	int VerticalDimIx() const {
+		return m_iVerticalDimIx;
+	}
+
+	///	<summary>
+	///		Vertical dimension order.
+	///	</summary>
+	int VerticalDimOrder() const {
+		return m_nVerticalDimOrder;
+	}
+
+	///	<summary>
+	///		Number of vertical levels.
+	///	</summary>
+	long VerticalDimSize() const {
+		if (m_iVerticalDimIx == (-1)) {
+			_EXCEPTION();
+		}
+		return m_iterAuxBegin.m_vecSize[m_iVerticalDimIx];
 	}
 
 	///	<summary>
@@ -443,20 +508,6 @@ public:
 	///	</summary>
 	const VariableAuxIndexIterator & GetAuxIndexEnd() const {
 		return m_iterAuxEnd;
-	}
-
-	///	<summary>
-	///		Get the data associated with this variable.
-	///	</summary>
-	const DataArray1D<float> & GetData() const {
-		return m_data;
-	}
-
-	///	<summary>
-	///		Get the data associated with this variable.
-	///	</summary>
-	DataArray1D<float> & GetData() {
-		return m_data;
 	}
 
 protected:
@@ -491,6 +542,16 @@ protected:
 	///		Index of the record dimension.
 	///	</summary>
 	int m_iTimeDimIx;
+
+	///	<summary>
+	///		Index of the vertical dimension.
+	///	</summary>
+	int m_iVerticalDimIx;
+
+	///	<summary>
+	///		(+1) if the vertical coordinate is bottom-up, (-1) if top-down.
+	///	</summary>
+	int m_nVerticalDimOrder;
 
 protected:
 	///	<summary>
@@ -531,25 +592,14 @@ protected:
 
 protected:
 	///	<summary>
-	///		Information on the slice of data currently stored in this Variable.
+	///		Limit number of data instances to 1.
 	///	</summary>
-	//DataSliceTag m_tag;
+	bool m_fLimitToSingleDataInstance;
 
 	///	<summary>
-	///		Flag indicating that this single time index Variable contains
-	///		active data.
+	///		A map between auxiliary index and data slice.
 	///	</summary>
-	bool m_fSingleTimeIndexAndHasData;
-
-	///	<summary>
-	///		Auxiliary indices associated with data loaded in this Variable.
-	///	</summary>
-	VariableAuxIndex m_vecAuxIndices;
-
-	///	<summary>
-	///		Data associated with this Variable.
-	///	</summary>
-	DataArray1D<float> m_data;
+	DataMap m_mapData;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -58,7 +58,9 @@ public:
 		const std::string & strVariableName
 	) :
 		m_strVariableName(strVariableName),
-		m_iTimeDimIx(-1)
+		m_iTimeDimIx(-1),
+		m_iVerticalDimIx(-1),
+		m_nVerticalDimOrder(+1)
 	{ } 
 
 public:
@@ -76,6 +78,16 @@ public:
 	///		Index of time dimension or (-1) if time dimension doesn't exist.
 	///	</summary>
 	int m_iTimeDimIx;
+
+	///	<summary>
+	///		Index of the vertical dimension or (-1) if vertical dimension doesn't exist.
+	///	</summary>
+	int m_iVerticalDimIx;
+
+	///	<summary>
+	///		(+1) if the vertical coordinate is bottom-up, (-1) if top-down.
+	///	</summary>
+	int m_nVerticalDimOrder;
 
 	///	<summary>
 	///		Dimension names.
@@ -358,7 +370,6 @@ public:
 	std::string LoadData_float(
 		const std::string & strVariableName,
 		const std::vector<long> & vecAuxIndices,
-		//size_t sTime,
 		DataArray1D<float> & data
 	);
 
@@ -368,7 +379,6 @@ public:
 	std::string WriteData_float(
 		const std::string & strVariableName,
 		const std::vector<long> & vecAuxIndices,
-		//size_t sTime,
 		const DataArray1D<float> & data
 	);
 
@@ -381,6 +391,16 @@ public:
 		VariableInfo ** ppvarinfo
 	);
 
+	///	<summary>
+	///		Add a new variable from a template and replace the vertical dimension.
+	///	</summary>
+	std::string AddVariableFromTemplateWithNewVerticalDim(
+		const FileListObject * pobjSourceFileList,
+		const Variable * pvar,
+		const std::string & strVerticalDimName,
+		VariableInfo ** ppvarinfo
+	);
+
 public:
 	///	<summary>
 	///		Add the given dimension to this FileListObject.
@@ -389,6 +409,15 @@ public:
 		const std::string & strDimName,
 		long lDimSize,
 		bool fGridDim = false
+	);
+
+	///	<summary>
+	///		Add the given vertical dimension to this FileListObject.
+	///	</summary>
+	std::string AddVerticalDimension(
+		const std::string & strDimName,
+		long lDimSize,
+		int nOrder
 	);
 
 	///	<summary>
@@ -472,6 +501,11 @@ protected:
 	///		A map between dimension name and size in the FileList.
 	///	</summary>
 	std::map<std::string, long> m_mapDimNameSize;
+
+	///	<summary>
+	///		A map between dimension name and order in the FileList.
+	///	</summary>
+	std::map<std::string, int> m_mapDimNameOrder;
 
 	///	<summary>
 	///		Names of grid dimensions for this FileList.

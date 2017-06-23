@@ -579,6 +579,40 @@ protected:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+// Utility functions
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Try to convert the string to have the specified units.
+///	</summary>
+bool StringToValueUnit(
+	const std::string & strString,
+	const std::string & strTargetUnit,
+	double & dValue,
+	bool fIsDelta
+);
+
+///	<summary>
+///		Extract the value and unit of this string.
+///	</summary>
+bool ExtractValueUnit(
+	const std::string & strString,
+	double & dValue,
+	std::string & strUnit
+);
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Retrieve the contents of this Object as a list of strings.
+///	</summary>
+std::string ArgumentToStringVector(
+	const ObjectRegistry & objreg,
+	const std::string & strArgument,
+	std::vector<std::string> & vecStringList
+);
+
+///////////////////////////////////////////////////////////////////////////////
 
 #endif
 

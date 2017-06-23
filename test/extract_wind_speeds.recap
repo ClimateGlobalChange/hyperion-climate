@@ -28,10 +28,9 @@ config_out.create_output_files("VR14_HIST.cam.h1.%T.regrid.nc", 8)
 # Create a new regridder
 remapparam = parameter_list()
 remapparam.mono = "true"
-#remapparam.levels = ["50m","100m","150m"]
+remapparam.levels = ["50m","100m","150m"]
 my_regrid = tempestregrid(config, config_out, remapparam)
 
 # Regrid
-vars = ["PHIS", "Z3", "_VECMAG(U,V)"]
-my_regrid.regrid(vars)
+my_regrid.regrid("_VECMAG(U,V)")
 
