@@ -789,9 +789,9 @@ std::string FileListObject::WriteData_float(
 		vecSize.push_back(iter->second);
 		lTotalSize *= iter->second;
 	}
-	for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
-		printf("DIM %s %i/%i\n", varinfo.m_vecDimNames[d].c_str(), vecPos[d], vecSize[d]);
-	}
+	//for (size_t d = 0; d < m_vecGridDimNames.size(); d++) {
+	//	printf("DIM %s %i/%i\n", varinfo.m_vecDimNames[d].c_str(), vecPos[d], vecSize[d]);
+	//}
 
 	if (data.GetRows() != lTotalSize) {
 		_EXCEPTION2("Data size mismatch (%i/%lu)", data.GetRows(), lTotalSize);

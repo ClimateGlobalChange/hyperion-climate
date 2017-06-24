@@ -226,6 +226,13 @@ public:
 
 public:
 	///	<summary>
+	///		Number of degrees of freedom on the output Mesh.
+	///	</summary>
+	size_t GetSourceSize() const {
+		return static_cast<size_t>(m_dSourceAreas.GetRows());
+	}
+
+	///	<summary>
 	///		Get the vector of areas associated with degrees of freedom on
 	///		the input Mesh.
 	///	</summary>
@@ -239,6 +246,13 @@ public:
 	///	</summary>
 	const DataArray1D<double> & GetSourceAreas() const {
 		return m_dSourceAreas;
+	}
+
+	///	<summary>
+	///		Number of degrees of freedom on the output Mesh.
+	///	</summary>
+	size_t GetTargetSize() const {
+		return static_cast<size_t>(m_dTargetAreas.GetRows());
 	}
 
 	///	<summary>

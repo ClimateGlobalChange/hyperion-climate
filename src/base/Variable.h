@@ -387,7 +387,8 @@ public:
 	///	</summary>
 	std::string LoadGridData(
 		size_t sTime,
-		DataArray1D<float> ** ppdata = NULL
+		DataArray1D<float> ** ppdata = NULL,
+		bool * pfReloaded = NULL
 	);
 
 	///	<summary>
@@ -395,7 +396,8 @@ public:
 	///	</summary>
 	std::string LoadGridData(
 		const VariableAuxIndex & ixAux,
-		DataArray1D<float> ** ppdata = NULL
+		DataArray1D<float> ** ppdata = NULL,
+		bool * pfReloaded = NULL
 	);
 
 public:

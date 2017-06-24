@@ -650,6 +650,8 @@ std::string TempestRegridObject::Regrid(
 			// Interpolate vertically using Z3
 			if (m_eVertInterpMethod == VerticalInterp_PHISZ3toZ) {
 
+				bool fReloaded = false;
+
 				// Get Z3 variable
 				Variable * pvarZ3;
 				strError = m_pobjSourceConfig->GetVariable("Z3", &pvarZ3);
@@ -663,7 +665,6 @@ std::string TempestRegridObject::Regrid(
 
 				// Allow variables to load more than one data instance
 				pvarZ3->RemoveSingleDataInstanceLimitation();
-				pvarSource->RemoveSingleDataInstanceLimitation();
 
 				// Loop through all auxiliary indices
 				for (; iterAux != iterEnd; iterAux++) {
@@ -689,63 +690,45 @@ std::string TempestRegridObject::Regrid(
 					DataArray1D<float> * pdataZ3Last = NULL;
 					DataArray1D<float> * pdataZ3Next = NULL;
 
-					DataArray1D<float> * pdataSourceLast = NULL;
-					DataArray1D<float> * pdataSourceNext = NULL;
-
 					// Load Z3 from the lowest model level
 					ixAux[pvarZ3->VerticalDimIx()] = 0;
-					strError = pvarZ3->LoadGridData(ixAux, &pdataZ3Next);
+					strError = pvarZ3->LoadGridData(ixAux, &pdataZ3Next, &fReloaded);
 					if (strError != "") return strError;
+
+					// Remove surface component from Z3
+					if (fReloaded) {
+						for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
+							(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+						}
+					}
 
 					// Get variable order
 					double dOrder = pvarZ3->VerticalDimOrder();
 
-					// Number of cells complete at each vertical level
-					DataArray1D<int> vecCellsComplete(m_vecLevelsValues.size());
+					// Determine which vertical levels are needed from the source data
+					std::set<int> setVerticalLevelsNeeded;
 
-					// Store all vertically interpolated data
-					std::vector< DataArray1D<float> > vecdataInterp;
-					vecdataInterp.resize(m_vecLevelsValues.size());
-					for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
-						vecdataInterp[k].Allocate(pdataZ3Next->GetRows());
-					}
-
-					// Loop through all vertical levels
 					for (long l = -1; l < pvarZ3->VerticalDimSize(); l++) {
 
-						if (l > 0) {
-							ixAux[pvarSource->VerticalDimIx()] = l-1;
-							pvarZ3->UnloadGridData(ixAux);
-							pvarSource->UnloadGridData(ixAux, true);
-						}
+						// Load in Z3 data
 						pdataZ3Last = pdataZ3Next;
-						pdataSourceLast = pdataSourceNext;
-						pdataSourceNext = NULL;
 						if (l != pvarZ3->VerticalDimSize()-1) {
 							ixAux[pvarSource->VerticalDimIx()] = l+1;
-							pvarZ3->LoadGridData(ixAux, &pdataZ3Next);
+							strError = pvarZ3->LoadGridData(ixAux, &pdataZ3Next, &fReloaded);
+							if (strError != "") return strError;
 
 							// Remove surface component from Z3
-							for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
-								(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+							if (fReloaded) {
+								for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
+									(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+								}
 							}
 						}
 
 						// Loop through all output levels
-						size_t sLevelsComplete = 0;
 						for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
-							if (vecCellsComplete[k] == pdataZ3Last->GetRows()) {
-								sLevelsComplete++;
-								continue;
-							}
-/*
-							// Load Target data array
-							DataArray1D<float> * pdataTarget = NULL;
-							ixAux[pvarTarget->VerticalDimIx()] = k;
-							strError = pvarTarget->LoadGridData(ixAux, &pdataTarget);
-							if (strError != "") return strError;
-*/
-							// Loop through all cells
+
+							// Loop through all cells on this level
 							for (int i = 0; i < pdataZ3Last->GetRows(); i++) {
 								double dLastZ;
 								double dNextZ;
@@ -766,68 +749,134 @@ std::string TempestRegridObject::Regrid(
 								if ((dOrder * m_vecLevelsValues[k] >= dOrder * dLastZ) &&
 									(dOrder * m_vecLevelsValues[k] < dOrder * dNextZ)
 								) {
-									if ((pdataSourceLast == NULL) && (l != (-1))) {
-										ixAux[pvarSource->VerticalDimIx()] = l;
-										strError = pvarSource->LoadGridData(ixAux, &pdataSourceLast);
-										if (strError != "") return strError;
-									}
-									if ((pdataSourceNext == NULL) && (l != pdataZ3Last->GetRows()-1)) {
-										ixAux[pvarSource->VerticalDimIx()] = l+1;
-										strError = pvarSource->LoadGridData(ixAux, &pdataSourceNext);
-										if (strError != "") return strError;
-									}
-
 									if (l == -1) {
-										vecdataInterp[k][i] = (*pdataSourceNext)[i];
+										setVerticalLevelsNeeded.insert(0);
 									} else if (l == pvarZ3->VerticalDimSize()-1) {
-										vecdataInterp[k][i] = (*pdataSourceLast)[i];
+										setVerticalLevelsNeeded.insert(l);
+									} else {
+										setVerticalLevelsNeeded.insert(l);
+										setVerticalLevelsNeeded.insert(l+1);
+									}
+									break;
+								}
+							}
+						}
+					}
+
+					// Buffer data vector, storing remapped data on levels
+					// where data is needed for vertical interpolation
+					std::vector< DataArray1D<float> > vecdataInterp;
+					vecdataInterp.resize(pvarZ3->VerticalDimSize());
+
+					// Horizontally remap data on needed levels
+					for (
+						std::set<int>::iterator iterLevNeeded = setVerticalLevelsNeeded.begin();
+						iterLevNeeded != setVerticalLevelsNeeded.end();
+						iterLevNeeded++
+					) {
+						// Allocate buffer data
+						vecdataInterp[*iterLevNeeded].Allocate(m_mapRemap.GetTargetSize());
+
+						// Load source data
+						DataArray1D<float> * pdataSource = NULL;
+						ixAux[pvarSource->VerticalDimIx()] = *iterLevNeeded;
+						strError = pvarSource->LoadGridData(ixAux, &pdataSource);
+						if (strError != "") return strError;
+
+						// Apply the horizontal map on this level
+						m_mapRemap.ApplyFloat(
+							(*pdataSource),
+							vecdataInterp[*iterLevNeeded]);
+					}
+
+					// Loop through all output levels
+					for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
+
+						// Load in target data array
+						DataArray1D<float> * pdataTarget = NULL;
+						ixAux[pvarTarget->VerticalDimIx()] = k;
+						strError = pvarTarget->AllocateGridData(ixAux, &pdataTarget);
+						if (strError != "") return strError;
+
+						// Perform the vertical interpolation
+						DataArray1D<float> * pdataZ3Last = NULL;
+						DataArray1D<float> * pdataZ3Next = NULL;
+
+						// Load Z3 from the lowest model level
+						ixAux[pvarZ3->VerticalDimIx()] = 0;
+						strError = pvarZ3->LoadGridData(ixAux, &pdataZ3Next, &fReloaded);
+						if (strError != "") return strError;
+
+						// Remove surface component from Z3
+						if (fReloaded) {
+							for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
+								(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+							}
+						}
+
+						// Loop through all input levels
+						for (long l = -1; l < pvarZ3->VerticalDimSize(); l++) {
+							pdataZ3Last = pdataZ3Next;
+							if (l != pvarZ3->VerticalDimSize()-1) {
+								ixAux[pvarSource->VerticalDimIx()] = l+1;
+								pvarZ3->LoadGridData(ixAux, &pdataZ3Next, &fReloaded);
+
+								// Remove surface component from Z3
+								if (fReloaded) {
+									for (int i = 0; i < pdataZ3Next->GetRows(); i++) {
+										(*pdataZ3Next)[i] -= (*pdataPHIS)[i] / 9.80616;
+									}
+								}
+							}
+
+							// Loop through all cells
+							for (int i = 0; i < pdataTarget->GetRows(); i++) {
+								double dLastZ;
+								double dNextZ;
+
+								if (l == -1) {
+									dLastZ = dOrder * (-DBL_MAX);
+								} else {
+									dLastZ = (*pdataZ3Last)[i];
+								}
+
+								if (l == pvarZ3->VerticalDimSize()-1) {
+									dNextZ = dOrder * (+DBL_MAX);
+								} else {
+									dNextZ = (*pdataZ3Next)[i];
+								}
+
+								// Level value found in interval [dLastZ, dNextZ)
+								if ((dOrder * m_vecLevelsValues[k] >= dOrder * dLastZ) &&
+									(dOrder * m_vecLevelsValues[k] < dOrder * dNextZ)
+								) {
+									if (l == -1) {
+										(*pdataTarget)[i] = vecdataInterp[0][i];
+									} else if (l == pvarZ3->VerticalDimSize()-1) {
+										(*pdataTarget)[i] = vecdataInterp[l][i];
 									} else {
 										double dAlpha =
 											(m_vecLevelsValues[k] - (*pdataZ3Last)[i])
 											/ ((*pdataZ3Next)[i] - (*pdataZ3Last)[i]);
-										vecdataInterp[k][i] =
-											dAlpha * (*pdataSourceNext)[i]
-											+ (1.0 - dAlpha) * (*pdataSourceLast)[i];
+										(*pdataTarget)[i] =
+											dAlpha * vecdataInterp[l+1][i]
+											+ (1.0 - dAlpha) * vecdataInterp[l][i];
 									}
-
-									vecCellsComplete[k]++;
 								}
-
 							}
-
 						}
 
-						// Check if we're done
-						if (sLevelsComplete == m_vecLevelsValues.size()) {
-							break;
-						}
+						// Write target data
+						ixAux[pvarTarget->VerticalDimIx()] = k;
+						strError = pvarTarget->WriteGridData(ixAux);
+						if (strError != "") return strError;
+
+						pvarTarget->UnloadAllGridData();
 					}
 
 					// Unload all data
 					pvarZ3->UnloadAllGridData();
 					pvarSource->UnloadAllGridData();
-
-					// Allocate target data
-					for (size_t k = 0; k < m_vecLevelsValues.size(); k++) {
-
-						// Auxiliary index
-						ixAux[pvarTarget->VerticalDimIx()] = k;
-
-						// Allocate target data
-						DataArray1D<float> * pdataTarget = NULL;
-						strError = pvarTarget->AllocateGridData(ixAux, &pdataTarget);
-						if (strError != "") return strError;
-
-						// Apply the map
-						m_mapRemap.ApplyFloat(
-							vecdataInterp[k],
-							(*pdataTarget));
-
-						// Write target data
-						pvarTarget->WriteGridData(ixAux);
-					}
-
-					pvarTarget->UnloadAllGridData();
 				}
 			}
 

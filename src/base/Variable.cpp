@@ -510,10 +510,11 @@ std::string Variable::ToString() const {
 
 std::string Variable::LoadGridData(
 	size_t sTime,
-	DataArray1D<float> ** ppdata
+	DataArray1D<float> ** ppdata,
+	bool * pfReloaded
 ) {
 	if (m_iTimeDimIx == (-1)) {
-		return LoadGridData(m_iterAuxBegin, ppdata);
+		return LoadGridData(m_iterAuxBegin, ppdata, pfReloaded);
 
 	} else if (m_iterAuxBegin.size() != 1) {
 		_EXCEPTIONT("Multiple auxiliary indices found");
@@ -522,7 +523,7 @@ std::string Variable::LoadGridData(
 		VariableAuxIndex ixAux = m_iterAuxBegin;
 		ixAux[m_iTimeDimIx] = static_cast<long>(sTime);
 	
-		return LoadGridData(ixAux, ppdata);
+		return LoadGridData(ixAux, ppdata, pfReloaded);
 	}
 }
 
@@ -582,9 +583,15 @@ std::string Variable::MultiLoadGridData3D(
 
 std::string Variable::LoadGridData(
 	const VariableAuxIndex & ixAux,
-	DataArray1D<float> ** ppdata
+	DataArray1D<float> ** ppdata,
+	bool * pfReloaded
 ) {
 	std::string strError;
+
+	// Assume data needs to be reloaded
+	if (pfReloaded != NULL) {
+		(*pfReloaded) = true;
+	}
 
 	// Check for single time index (variable already loaded)
 	if (m_iterAuxBegin.size() != ixAux.size()) {
@@ -614,6 +621,9 @@ std::string Variable::LoadGridData(
 	if (iterData != m_mapData.end()) {
 		if (ppdata != NULL) {
 			(*ppdata) = iterData->second;
+		}
+		if (pfReloaded != NULL) {
+			(*pfReloaded) = false;
 		}
 		return std::string("");
 	}
@@ -1038,9 +1048,10 @@ std::string Variable::WriteGridData(
 
 void Variable::UnloadAllGridData() {
 	for (DataMap::iterator iter = m_mapData.begin(); iter != m_mapData.end(); iter++) {
+/*
 		{
 			std::string strLoading =
-				std::string("Unloading data [") + m_strName + std::string("]");
+				std::string("UNLOAD [") + m_strName + std::string("]");
 
 			VariableAuxIndex vecAuxIndices = iter->first;
 			for (size_t d = 0; d < vecAuxIndices.size(); d++) {
@@ -1052,7 +1063,7 @@ void Variable::UnloadAllGridData() {
 		
 			Announce(strLoading.c_str());
 		}
-
+*/
 		iter->second->Deallocate();
 		delete iter->second;
 	}
@@ -1072,7 +1083,21 @@ void Variable::UnloadGridData(
 		}
 		_EXCEPTIONT("Data instance not found.");
 	}
+/*
+	{
+		std::string strLoading =
+			std::string("UNLOAD [") + m_strName + std::string("]");
 
+		for (size_t d = 0; d < ixAux.size(); d++) {
+			strLoading +=
+				std::string(" [")
+				+ std::to_string(ixAux[d])
+				+ std::string("]");
+		}
+	
+		Announce(strLoading.c_str());
+	}
+*/
 	iter->second->Deallocate();
 	m_mapData.erase(iter);
 }
