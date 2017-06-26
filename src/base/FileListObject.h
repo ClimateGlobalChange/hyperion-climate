@@ -118,6 +118,102 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class that describes dimension information from a FileList.
+///	</summary>
+class DimensionInfo {
+
+public:
+	enum Type {
+		Type_Unknown,
+		Type_Auxiliary,
+		Type_Grid,
+		Type_Record,
+		Type_Vertical
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DimensionInfo() :
+		m_lSize(0),
+		m_nOrder(0),
+		m_eType(Type_Unknown)
+	{ }
+
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DimensionInfo(
+		const std::string & strName
+	) :
+		m_strName(strName),
+		m_lSize(0),
+		m_nOrder(0),
+		m_eType(Type_Unknown)
+	{ }
+
+public:
+	///	<summary>
+	///		Equality operator.
+	///	</summary>
+	bool operator== (const DimensionInfo & diminfo) const {
+		return (
+			(m_strName == diminfo.m_strName) &&
+			(m_eType == diminfo.m_eType) &&
+			(m_lSize == diminfo.m_lSize) &&
+			(m_nOrder == diminfo.m_nOrder) &&
+			(m_dValues == diminfo.m_dValues) &&
+			(m_strUnits == diminfo.m_strUnits));
+	}
+
+	///	<summary>
+	///		Inequality operator.
+	///	</summary>
+	bool operator!= (const DimensionInfo & diminfo) const {
+		return !((*this) == diminfo);
+	}
+
+public:
+	///	<summary>
+	///		Dimension name.
+	///	</summary>
+	std::string m_strName;
+
+	///	<summary>
+	///		Dimension type.
+	///	</summary>
+	Type m_eType;
+
+	///	<summary>
+	///		Dimension size.
+	///	</summary>
+	long m_lSize;
+
+	///	<summary>
+	///		Dimension order.
+	///	</summary>
+	int m_nOrder;
+
+	///	<summary>
+	///		Dimension values
+	///	</summary>
+	std::vector<double> m_dValues;
+
+	///	<summary>
+	///		Dimension units.
+	///	</summary>
+	std::string m_strUnits;
+};
+
+///	<summary>
+///		A map from a dimension name to DimensionInfo structure.
+///	</summary>
+typedef std::map<std::string, DimensionInfo> DimensionInfoMap;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		A GlobalFunction that builds a new FileListObject.
 ///	</summary>
 class FileListObjectConstructor : public GlobalFunction {
@@ -202,7 +298,7 @@ public:
 		pobjDuplicate->m_vecFilenames = m_vecFilenames;
 		pobjDuplicate->m_vecTimes = m_vecTimes;
 		pobjDuplicate->m_vecVariableInfo = m_vecVariableInfo;
-		pobjDuplicate->m_mapDimNameSize = m_mapDimNameSize;
+		pobjDuplicate->m_mapDimensionInfo = m_mapDimensionInfo;
 		pobjDuplicate->m_sReduceTargetIx = m_sReduceTargetIx;
 		pobjDuplicate->m_mapOutputTimeFile = m_mapOutputTimeFile;
 
@@ -338,11 +434,11 @@ public:
 	///		Get the size of the specified dimension.
 	///	</summary>
 	long GetDimSize(const std::string & strDimName) const {
-		std::map<std::string, long>::const_iterator iter =
-			m_mapDimNameSize.find(strDimName);
+		DimensionInfoMap::const_iterator iter =
+			m_mapDimensionInfo.find(strDimName);
 
-		if (iter != m_mapDimNameSize.end()) {
-			return iter->second;
+		if (iter != m_mapDimensionInfo.end()) {
+			return iter->second.m_lSize;
 		}
 
 		_EXCEPTIONT("Invalid dimension name");
@@ -416,8 +512,8 @@ public:
 	///	</summary>
 	std::string AddVerticalDimension(
 		const std::string & strDimName,
-		long lDimSize,
-		int nOrder
+		const std::vector<double> & vecDimValues,
+		const std::string & strDimUnits
 	);
 
 	///	<summary>
@@ -493,19 +589,9 @@ protected:
 	std::vector<VariableInfo *> m_vecVariableInfo;
 
 	///	<summary>
-	///		A map between the variable name and index in m_vecVariableInfo.
+	///		A set containing dimension information for this FileList.
 	///	</summary>
-	std::map<std::string, size_t> m_mapVariableNameToIndex;
-
-	///	<summary>
-	///		A map between dimension name and size in the FileList.
-	///	</summary>
-	std::map<std::string, long> m_mapDimNameSize;
-
-	///	<summary>
-	///		A map between dimension name and order in the FileList.
-	///	</summary>
-	std::map<std::string, int> m_mapDimNameOrder;
+	DimensionInfoMap m_mapDimensionInfo;
 
 	///	<summary>
 	///		Names of grid dimensions for this FileList.

@@ -548,31 +548,6 @@ std::string TempestRegridObject::Regrid(
 	bool fFileListCompatible =
 		pobjSourceFileList->IsCompatible(pobjTargetFileList);
 
-	// Determine order of target vertical dimension and verify monotonicity
-	int nTargetVerticalDimOrder = (+1);
-	if (m_vecLevelsValues.size() != 0) {
-
-		if (m_vecLevelsValues.size() > 1) {
-			if (m_vecLevelsValues[1] > m_vecLevelsValues[0]) {
-				nTargetVerticalDimOrder = (+1);
-				for (size_t s = 0; s < m_vecLevelsValues.size()-1; s++) {
-					if (m_vecLevelsValues[s+1] <= m_vecLevelsValues[s]) {
-						return std::string("ERROR: Target vertical levels must be monotonic");
-					}
-				}
-			} else if (m_vecLevelsValues[1] < m_vecLevelsValues[0]) {
-				nTargetVerticalDimOrder = (-1);
-				for (size_t s = 0; s < m_vecLevelsValues.size()-1; s++) {
-					if (m_vecLevelsValues[s+1] >= m_vecLevelsValues[s]) {
-						return std::string("ERROR: Target vertical levels must be monotonic");
-					}
-				}
-			} else {
-				return std::string("ERROR: Target vertical levels must be monotonic");
-			}
-		}
-	}
-
 	// Check the size of all variables
 	for (int v = 0; v < vecVariables.size(); v++) {
 
@@ -631,8 +606,8 @@ std::string TempestRegridObject::Regrid(
 
 				strError = pobjTargetFileList->AddVerticalDimension(
 					std::string("z"),
-					static_cast<long>(m_vecLevelsValues.size()),
-					nTargetVerticalDimOrder);
+					m_vecLevelsValues,
+					m_strLevelsUnits);
 				if (strError != "") return strError;
 
 				strError =
