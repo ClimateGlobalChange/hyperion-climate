@@ -71,6 +71,7 @@ public:
 	enum VerticalInterpolationMethod {
 		VerticalInterp_PHISZ3toZ,
 		VerticalInterp_PHISPSTtoZ,
+		VerticalInterp_PtoP,
 	};
 
 public:

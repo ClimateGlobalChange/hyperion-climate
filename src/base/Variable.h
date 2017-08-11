@@ -452,6 +452,16 @@ public:
 	}
 
 	///	<summary>
+	///		Dimension name accessor.
+	///	</summary>
+	const std::string & AuxDimName(int iDim) const {
+		if ((iDim < 0) || (iDim >= m_vecAuxDimNames.size())) {
+			_EXCEPTIONT("Index out of range");
+		}
+		return m_vecAuxDimNames[iDim];
+	}
+
+	///	<summary>
 	///		Time dimension index.
 	///	</summary>
 	int TimeDimIx() const {

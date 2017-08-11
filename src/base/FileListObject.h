@@ -124,11 +124,11 @@ class DimensionInfo {
 
 public:
 	enum Type {
-		Type_Unknown,
-		Type_Auxiliary,
-		Type_Grid,
-		Type_Record,
-		Type_Vertical
+		Type_Unknown = (-1),
+		Type_Auxiliary = 0,
+		Type_Grid = 1,
+		Type_Record = 2,
+		Type_Vertical = 3
 	};
 
 public:
@@ -172,6 +172,29 @@ public:
 	///	</summary>
 	bool operator!= (const DimensionInfo & diminfo) const {
 		return !((*this) == diminfo);
+	}
+
+	///	<summary>
+	///		Convert to string.
+	///	</summary>
+	std::string ToString() const {
+		std::string str;
+		str += m_strName + " : ";
+		str += std::to_string(m_eType) + " : ";
+		str += std::to_string(m_lSize) + " : ";
+		str += std::to_string(m_nOrder) + " : ";
+		str += m_strUnits + "\n";
+		str += "[";
+
+		for (int i = 0; i < m_dValues.size(); i++) {
+			str += std::to_string(m_dValues[i]);
+			if (i != m_dValues.size()-1) {
+				str += ", ";
+			}
+		}
+		str += "]";
+
+		return str;
 	}
 
 public:
@@ -431,6 +454,20 @@ public:
 	}
 
 	///	<summary>
+	///		Get the information on the specified dimension.
+	///	</summary>
+	const DimensionInfo & GetDimInfo(
+		const std::string & strDimName
+	) const {
+		DimensionInfoMap::const_iterator iterDimInfo =
+			m_mapDimensionInfo.find(strDimName);
+		if (iterDimInfo == m_mapDimensionInfo.end()) {
+			_EXCEPTIONT("Invalid dimension");
+		}
+		return (iterDimInfo->second);
+	}
+
+	///	<summary>
 	///		Get the size of the specified dimension.
 	///	</summary>
 	long GetDimSize(const std::string & strDimName) const {
@@ -504,7 +541,7 @@ public:
 	std::string AddDimension(
 		const std::string & strDimName,
 		long lDimSize,
-		bool fGridDim = false
+		DimensionInfo::Type eDimType
 	);
 
 	///	<summary>

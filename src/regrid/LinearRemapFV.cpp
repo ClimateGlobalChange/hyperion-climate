@@ -27,6 +27,7 @@
 #include "MathHelper.h"
 #include "DataArray3D.h"
 
+#include <iostream>
 #include <cstring>
 #include <map>
 
@@ -1126,6 +1127,10 @@ void LinearRemapFVtoFV(
 		}
 
 		int nOverlapFaces = ixOverlapEnd - ixOverlapBegin;
+
+		if (nOverlapFaces == 0) {
+			continue;
+		}
 
 		// Build integration array
 		DataArray2D<double> dIntArray;

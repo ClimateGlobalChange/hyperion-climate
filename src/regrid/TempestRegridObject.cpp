@@ -23,6 +23,7 @@
 
 #include "OverlapMesh.h"
 #include "LinearRemapSE0.h"
+#include "LinearRemapFV.h"
 
 #include <cfloat>
 
@@ -210,10 +211,18 @@ std::string TempestRegridObject::Initialize(
 
 		// Check if levels are specified in height units
 		double dValue;
+
 		bool fIsHeightUnit =
 			StringToValueUnit(
 				vecLevels[0],
 				std::string("m"),
+				dValue,
+				false);
+
+		bool fIsPressureUnit =
+			StringToValueUnit(
+				vecLevels[0],
+				std::string("Pa"),
 				dValue,
 				false);
 
@@ -243,7 +252,16 @@ std::string TempestRegridObject::Initialize(
 			if ((pvarPS != NULL) && (pvarT != NULL)) {
 				m_eVertInterpMethod = VerticalInterp_PHISPSTtoZ;
 			}
+
+		// Pressure units
+		} else if (fIsPressureUnit) {
+			m_eVertInterpMethod = VerticalInterp_PtoP;
+
+		// Invalid units
+		} else {
+			return std::string("ERROR: Invalid units for \"levels\"");
 		}
+
 
 		// Extract remaining levels
 		bool fExtractSuccess =
@@ -503,6 +521,17 @@ std::string TempestRegridObject::Initialize(
 			_EXCEPTIONT("Not implemented");
 		}
 
+	} else if (
+		(meshSource.eDataLayout == Mesh::DataLayout_Volumetric) ||
+		(meshSource.eDataLayout == Mesh::DataLayout_Volumetric)
+	) {
+		LinearRemapFVtoFV(
+			meshSource,
+			meshTarget,
+			*pMeshOverlap,
+			1,
+			m_mapRemap);
+
 	} else {
 		_EXCEPTIONT("Not implemented");
 	}
@@ -596,7 +625,181 @@ std::string TempestRegridObject::Regrid(
 			// Target variable
 			Variable * pvarTarget = NULL;
 
-			// Get PHIS, if needed
+			// See if we can interpolate directly
+			std::string strVerticalDimName =
+				pvarSource->AuxDimName(pvarSource->VerticalDimIx());
+
+			const DimensionInfo & diminfo =
+				pobjSourceFileList->GetDimInfo(strVerticalDimName);
+
+			double dValue = 0.0;
+			bool fAreUnitsCompatible =
+				AreUnitsCompatible(
+					diminfo.m_strUnits,
+					m_strLevelsUnits);
+
+			if (fAreUnitsCompatible) {
+				strError = pobjTargetFileList->AddVerticalDimension(
+					strVerticalDimName,
+					m_vecLevelsValues,
+					m_strLevelsUnits);
+				if (strError != "") return strError;
+
+				strError =
+					m_pobjTargetConfig->AddVariableFromTemplateWithNewVerticalDim(
+						m_pobjSourceConfig,
+						pvarSource,
+						strVerticalDimName,
+						&pvarTarget);
+				if (strError != "") return strError;
+
+				double dOrder = static_cast<double>(diminfo.m_nOrder);
+
+				// Convert units and determine which vertical levels are needed
+				std::set<int> setVerticalLevelsNeeded;
+				DataArray1D<double> vecLevelsValuesNew(m_vecLevelsValues.size());
+
+				for (int k = 0; k < m_vecLevelsValues.size(); k++) {
+					ConvertUnits(
+						m_vecLevelsValues[k],
+						m_strLevelsUnits,
+						vecLevelsValuesNew[k],
+						diminfo.m_strUnits,
+						false);
+
+					if (dOrder * vecLevelsValuesNew[k] <= dOrder * diminfo.m_dValues[0]) {
+						setVerticalLevelsNeeded.insert(0);
+
+					} else if (dOrder * vecLevelsValuesNew[k] >=
+						dOrder * diminfo.m_dValues[diminfo.m_dValues.size()-1]
+					) {
+						setVerticalLevelsNeeded.insert(diminfo.m_dValues.size()-1);
+
+					} else {
+						int l = 0;
+						for (; l < diminfo.m_dValues.size(); l++) {
+							if ((dOrder * vecLevelsValuesNew[k] >= dOrder * diminfo.m_dValues[l]) &&
+								(dOrder * vecLevelsValuesNew[k] < dOrder * diminfo.m_dValues[l+1])
+							) {
+								setVerticalLevelsNeeded.insert(l);
+								setVerticalLevelsNeeded.insert(l+1);
+								break;
+							}
+						}
+						if (l == diminfo.m_dValues.size()) {
+							_EXCEPTIONT("Logic error");
+						}
+					}
+				}
+/*
+				printf("Levels needed:\n");
+				for (std::set<int>::iterator iter = setVerticalLevelsNeeded.begin();
+					iter != setVerticalLevelsNeeded.end();
+					iter++
+				) {
+					printf("%i\n", *iter);
+				}
+*/
+
+				// Buffer data vector, storing remapped data on levels
+				// where data is needed for vertical interpolation
+				std::vector< DataArray1D<float> > vecdataInterp;
+				vecdataInterp.resize(pvarSource->VerticalDimSize());
+
+				// Loop through all auxiliary indices
+				for (; iterAux != iterEnd; iterAux++) {
+
+					// Create new auxiliary index with vertical level
+					VariableAuxIndex ixAux = iterAux;
+					ixAux.insert(ixAux.begin() + pvarSource->VerticalDimIx(), 0);
+
+					// Horizontally remap data on needed levels
+					for (
+						std::set<int>::iterator iterLevNeeded = setVerticalLevelsNeeded.begin();
+						iterLevNeeded != setVerticalLevelsNeeded.end();
+						iterLevNeeded++
+					) {
+						// Allocate buffer data
+						vecdataInterp[*iterLevNeeded].Allocate(m_mapRemap.GetTargetSize());
+
+						// Load source data
+						DataArray1D<float> * pdataSource = NULL;
+						ixAux[pvarSource->VerticalDimIx()] = *iterLevNeeded;
+						strError = pvarSource->LoadGridData(ixAux, &pdataSource);
+						if (strError != "") return strError;
+
+						// Apply the horizontal map on this level
+						m_mapRemap.ApplyFloat(
+							(*pdataSource),
+							vecdataInterp[*iterLevNeeded]);
+					}
+
+					// Interpolate vertically
+					for (size_t k = 0; k < vecLevelsValuesNew.GetRows(); k++) {
+
+						// Load in target data array
+						DataArray1D<float> * pdataTarget = NULL;
+						ixAux[pvarTarget->VerticalDimIx()] = k;
+						strError = pvarTarget->AllocateGridData(ixAux, &pdataTarget);
+						if (strError != "") return strError;
+
+						// Loop through all input levels
+						long lInputLevels = static_cast<long>(diminfo.m_dValues.size());
+						for (int l = -1; l < lInputLevels; l++) {
+
+							// Loop through all cells
+							for (int i = 0; i < pdataTarget->GetRows(); i++) {
+								double dLastZ;
+								double dNextZ;
+
+								if (l == -1) {
+									dLastZ = dOrder * (-DBL_MAX);
+								} else {
+									dLastZ = diminfo.m_dValues[l];
+								}
+
+								if (l == diminfo.m_dValues.size()-1) {
+									dNextZ = dOrder * (+DBL_MAX);
+								} else {
+									dNextZ = diminfo.m_dValues[l+1];
+								}
+
+								// Level value found in interval [dLastZ, dNextZ)
+								if ((dOrder * vecLevelsValuesNew[k] >= dOrder * dLastZ) &&
+									(dOrder * vecLevelsValuesNew[k] < dOrder * dNextZ)
+								) {
+									if (l == -1) {
+										(*pdataTarget)[i] = vecdataInterp[0][i];
+									} else if (l == diminfo.m_dValues.size()-1) {
+										(*pdataTarget)[i] = vecdataInterp[l][i];
+									} else {
+										double dAlpha =
+											(vecLevelsValuesNew[k] - dLastZ)
+											/ (dNextZ - dLastZ);
+										(*pdataTarget)[i] =
+											dAlpha * vecdataInterp[l+1][i]
+											+ (1.0 - dAlpha) * vecdataInterp[l][i];
+									}
+								}
+							}
+						}
+
+						// Write target data
+						ixAux[pvarTarget->VerticalDimIx()] = k;
+						strError = pvarTarget->WriteGridData(ixAux);
+						if (strError != "") return strError;
+
+						pvarTarget->UnloadAllGridData();
+					}
+
+					// Unload source data
+					pvarSource->UnloadAllGridData();
+				}
+
+				return std::string("");
+			}
+
+			// Methods for interpolation from pressure levels to z levels
 			Variable * pvarPHIS = NULL;
 			if ((m_eVertInterpMethod == VerticalInterp_PHISZ3toZ) ||
 				(m_eVertInterpMethod == VerticalInterp_PHISPSTtoZ)
@@ -831,8 +1034,8 @@ std::string TempestRegridObject::Regrid(
 										(*pdataTarget)[i] = vecdataInterp[l][i];
 									} else {
 										double dAlpha =
-											(m_vecLevelsValues[k] - (*pdataZ3Last)[i])
-											/ ((*pdataZ3Next)[i] - (*pdataZ3Last)[i]);
+											(m_vecLevelsValues[k] - dLastZ)
+											/ (dNextZ - dLastZ);
 										(*pdataTarget)[i] =
 											dAlpha * vecdataInterp[l+1][i]
 											+ (1.0 - dAlpha) * vecdataInterp[l][i];

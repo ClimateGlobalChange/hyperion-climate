@@ -56,7 +56,7 @@ try {
 
 	// Output usage information
 	if (argc < 2) {
-		Announce("recap version 0.1, March 8th, 2017");
+		Announce("recap version 0.11, August 11th, 2017");
 		Announce("Usage: %s <input file> [assignment list]", argv[0]);
 		return (0);
 	}
@@ -78,6 +78,10 @@ try {
 	funcreg.Assign(
 		std::string("parameter_list"),
 		new ObjectConstructor(std::string("parameter_list")));
+
+	funcreg.Assign(
+		std::string("list_span"),
+		new ListObjectSpanConstructor(std::string("list_span")));
 
 	funcreg.Assign(
 		std::string("recap_configuration"),
@@ -511,7 +515,7 @@ try {
 				) {
 					printf("LIST %s\n", vecCommandLine[0].c_str());
 
-					ListObject * pobjList = new ListObject(vecCommandLine[0]);
+					ListObject * pobjList = new ListObject("");
 
 					bool fSuccess =
 						objreg.Assign(
@@ -544,7 +548,8 @@ try {
 						}
 
 						std::string strChildName =
-							vecCommandLine[0] + "._" + std::to_string(static_cast<long long>(iListEntry));
+							vecCommandLine[0] + "._"
+							+ std::to_string(static_cast<long long>(iListEntry));
 /*
 						printf("%i %i %i %s %s\n",
 							i, iListEntry,

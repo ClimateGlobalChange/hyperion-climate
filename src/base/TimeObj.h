@@ -134,6 +134,8 @@ public:
 			return CalendarStandard;
 		} else if (strCalendar == "gregorian") {
 			return CalendarGregorian;
+		} else if (strCalendar == "proleptic_gregorian") {
+			return CalendarGregorian;
 		} else {
 			return CalendarUnknown;
 		}

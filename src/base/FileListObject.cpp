@@ -754,7 +754,7 @@ std::string FileListObject::WriteData_float(
 			varinfo.m_mapTimeFile.insert(
 				VariableTimeFileMap::value_type(
 					sTime,
-					LocalFileTimePair(sFile, sTime)));
+					LocalFileTimePair(sFile, iLocalTime)));
 		}
 
 	} else {
@@ -811,10 +811,12 @@ std::string FileListObject::WriteData_float(
 		long lDimSize = GetDimensionSize(varinfo.m_vecDimNames[d]);
 		vecDims[d] = ncout.get_dim(varinfo.m_vecDimNames[d].c_str());
 		if (vecDims[d] != NULL) {
-			if (vecDims[d]->size() != lDimSize) {
-				_EXCEPTION3("Dimension %s mismatch (%lu / %li)",
-					varinfo.m_vecDimNames[d].c_str(),
-					vecDims[d]->size(), lDimSize);
+			if (d != varinfo.m_iTimeDimIx) {
+				if (vecDims[d]->size() != lDimSize) {
+					_EXCEPTION3("Dimension %s mismatch (%lu / %li)",
+						varinfo.m_vecDimNames[d].c_str(),
+						vecDims[d]->size(), lDimSize);
+				}
 			}
 
 		} else {
@@ -944,7 +946,8 @@ std::string FileListObject::AddVariableFromTemplate(
 			}
 			if ((vecDimNames[d] != "lev") &&
 				(vecDimNames[d] != "pres") &&
-				(vecDimNames[d] != "z")
+				(vecDimNames[d] != "z") &&
+				(vecDimNames[d] != "plev")
 			) {
 				return std::string("Invalid vertical dimension name \"")
 					+ vecDimNames[d] + std::string("\"");
@@ -1048,7 +1051,8 @@ std::string FileListObject::AddVariableFromTemplateWithNewVerticalDim(
 
 	if ((strVerticalDimName != "lev") &&
 		(strVerticalDimName != "pres") &&
-		(strVerticalDimName != "z")
+		(strVerticalDimName != "z") &&
+		(strVerticalDimName != "plev")
 	) {
 		_EXCEPTIONT("Invalid name for vertical dimension");
 	}
@@ -1121,7 +1125,8 @@ std::string FileListObject::AddVariableFromTemplateWithNewVerticalDim(
 			}
 			if ((vecDimNames[d] != "lev") &&
 				(vecDimNames[d] != "pres") &&
-				(vecDimNames[d] != "z")
+				(vecDimNames[d] != "z") &&
+				(vecDimNames[d] != "plev")
 			) {
 				return std::string("Invalid vertical dimension name \"")
 					+ vecDimNames[d] + std::string("\"");
@@ -1223,10 +1228,10 @@ std::string FileListObject::AddDimension(
 	long lDimSize,
 	DimensionInfo::Type eDimType
 ) {
-	if ((eDimType != Type_Auxiliary) &&
-		(eDimType != Type_Grid) &&
-		(eDimType != Type_Record) &&
-		(eDimType != Type_Vertical)
+	if ((eDimType != DimensionInfo::Type_Auxiliary) &&
+		(eDimType != DimensionInfo::Type_Grid) &&
+		(eDimType != DimensionInfo::Type_Record) &&
+		(eDimType != DimensionInfo::Type_Vertical)
 	) {
 		_EXCEPTIONT("Invalid eDimType");
 	}
@@ -1237,13 +1242,18 @@ std::string FileListObject::AddDimension(
 	diminfo.m_eType = eDimType;
 
 	// Find if dimension exists in dimension map
-	DimensionInfoMap::const_iterator iter =
+	DimensionInfoMap::iterator iter =
 		m_mapDimensionInfo.find(strDimName);
 
 	if (iter != m_mapDimensionInfo.end()) {
-		if (diminfo != m_mapDimensionInfo->second) {
-			_EXCEPTION3("Dimension info mismatch: %s, %li, %li",
-				strDimName.c_str(), lDimSize, iter->second.m_lSize);
+		if (iter->second.m_eType == DimensionInfo::Type_Auxiliary) {
+			iter->second.m_eType = diminfo.m_eType;
+		}
+		if (diminfo != iter->second) {
+			std::string strDimInfo = diminfo.ToString();
+			std::string strIter = iter->second.ToString();
+			_EXCEPTION2("Dimension info mismatch:\n%s\n%s",
+				strDimInfo.c_str(), strIter.c_str());
 		}
 
 	} else {
@@ -1563,7 +1573,8 @@ std::string FileListObject::IndexVariableData(
 				// Dimension is of type vertical
 				if ((strDimName == "lev") ||
 					(strDimName == "pres") ||
-					(strDimName == "z")
+					(strDimName == "z") ||
+					(strDimName == "plev")
 				) {
 					diminfo.m_eType = DimensionInfo::Type_Vertical;
 
@@ -1576,6 +1587,17 @@ std::string FileListObject::IndexVariableData(
 							_EXCEPTIONT("Dimension variable must have at most 1 dimension");
 						}
 
+						// Check for presence of "units" attribute
+						NcAtt * attUnits = varDim->get_att("units");
+						if (attUnits != NULL) {
+							diminfo.m_strUnits = attUnits->as_string(0);
+						}
+
+						// Load values
+						diminfo.m_dValues.resize(diminfo.m_lSize);
+						varDim->set_cur((long)0);
+						varDim->get(&(diminfo.m_dValues[0]), diminfo.m_lSize);
+
 						// Check for presence of "positive" attribute
 						NcAtt * attPositive = varDim->get_att("positive");
 						if (attPositive != NULL) {
@@ -1583,20 +1605,17 @@ std::string FileListObject::IndexVariableData(
 								diminfo.m_nOrder = (-1);
 							}
 
-						// Load variable to obtain orientation
+						// Obtain orientation from values
 						} else {
 
 							// Dimension variable is of type double
 							if (varDim->type() == ncDouble) {
-								DataArray1D<double> dDimValue(varDim->get_dim(0)->size());
-								varDim->set_cur((long)0);
-								varDim->get(&(dDimValue[0]), varDim->get_dim(0)->size());
 
 								// Positive orientation (bottom-up)
-								if (dDimValue[1] > dDimValue[0]) {
+								if (diminfo.m_dValues[1] > diminfo.m_dValues[0]) {
 									diminfo.m_nOrder = (+1);
-									for (size_t s = 0; s < dDimValue.GetRows()-1; s++) {
-										if (dDimValue[s+1] < dDimValue[s]) {
+									for (size_t s = 0; s < diminfo.m_dValues.size()-1; s++) {
+										if (diminfo.m_dValues[s+1] < diminfo.m_dValues[s]) {
 											_EXCEPTION1("Dimension variable \"%s\" is not monotone",
 												strDimName.c_str());
 										}
@@ -1605,8 +1624,8 @@ std::string FileListObject::IndexVariableData(
 								// Negative orientation (top-down)
 								} else {
 									diminfo.m_nOrder = (-1);
-									for (size_t s = 0; s < dDimValue.GetRows()-1; s++) {
-										if (dDimValue[s+1] > dDimValue[s]) {
+									for (size_t s = 0; s < diminfo.m_dValues.size()-1; s++) {
+										if (diminfo.m_dValues[s+1] > diminfo.m_dValues[s]) {
 											_EXCEPTION1("Dimension variable \"%s\" is not monotone",
 												strDimName.c_str());
 										}
@@ -1714,7 +1733,8 @@ std::string FileListObject::IndexVariableData(
 
 				if ((info.m_vecDimNames[d] == "lev") ||
 					(info.m_vecDimNames[d] == "pres") ||
-					(info.m_vecDimNames[d] == "z")
+					(info.m_vecDimNames[d] == "z") ||
+					(info.m_vecDimNames[d] == "plev")
 				) {
 					if (info.m_iVerticalDimIx != (-1)) {
 						if (info.m_iVerticalDimIx != d) {

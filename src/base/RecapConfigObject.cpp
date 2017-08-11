@@ -276,7 +276,7 @@ bool RecapConfigObject::AddChild(
 				pobjFileList->AddDimension(
 					mesh.vecDimNames[d],
 					mesh.vecDimSizes[d],
-					true);
+					DimensionInfo::Type_Grid);
 			}
 		}
 		return Object::AddChild(pChild);
@@ -303,7 +303,7 @@ bool RecapConfigObject::AddChild(
 				pobjFileList->AddDimension(
 					mesh.vecDimNames[d],
 					mesh.vecDimSizes[d],
-					true);
+					DimensionInfo::Type_Grid);
 			}
 		}
 		return Object::AddChild(pChild);

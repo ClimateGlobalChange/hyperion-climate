@@ -221,6 +221,17 @@ public:
 		return NULL;
 	}
 
+	///	<summary>
+	///		Add a child Object.
+	///	</summary>
+	virtual bool AddUnassignedChild(Object * pChild) {
+		if (m_strName != "__TEMPNAME__") {
+			_EXCEPTIONT("Not a temporary object");
+		}
+		m_vecChildrenUnassigned.push_back(pChild);
+		return true;
+	}
+
 protected:
 	///	<summary>
 	///		Add a child Object.
@@ -269,6 +280,11 @@ protected:
 	///		Name of the Object.
 	///	</summary>
 	std::string m_strName;
+
+	///	<summary>
+	///		List of unassigned child Objects.
+	///	</summary>
+	ObjectChildrenVector m_vecChildrenUnassigned;
 
 	///	<summary>
 	///		List of child Objects.
@@ -553,6 +569,9 @@ public:
 	void PushBack(
 		const std::string & strObject
 	) {
+		if (m_vecObjectNames.size() > 10000) {
+			_EXCEPTIONT("Maximum of 10000 Objects allowed in ListObject");
+		}
 		m_vecObjectNames.push_back(strObject);
 	}
 
@@ -579,8 +598,46 @@ protected:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A GlobalFunction that builds a new ListObject.
+///	</summary>
+class ListObjectSpanConstructor : public GlobalFunction {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ListObjectSpanConstructor(const std::string & strName) :
+		GlobalFunction(strName)
+	{ }
+
+public:
+	///	<summary>
+	///		Call a member function of this GlobalFunction.
+	///	</summary>
+	virtual std::string Call(
+		const ObjectRegistry & objreg,
+		const std::vector<std::string> & vecCommandLine,
+		const std::vector<ObjectType> & vecCommandLineType,
+		Object ** ppReturn
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
 // Utility functions
 ///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Try to convert a value/unit pair to the target units.
+///	</summary>
+bool ConvertUnits(
+	double dValueIn,
+	const std::string & strUnit,
+	double & dValueOut,
+	const std::string & strTargetUnit,
+	bool fIsDelta
+);
 
 ///	<summary>
 ///		Try to convert the string to have the specified units.
@@ -590,6 +647,14 @@ bool StringToValueUnit(
 	const std::string & strTargetUnit,
 	double & dValue,
 	bool fIsDelta
+);
+
+///	<summary>
+///		Determine if two units are compatible.
+///	</summary>
+bool AreUnitsCompatible(
+	const std::string & strSourceUnit,
+	const std::string & strTargetUnit
 );
 
 ///	<summary>

@@ -19,6 +19,7 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <iostream>
 
 ///////////////////////////////////////////////////////////////////////////////
 // ObjectRegistry
@@ -57,7 +58,7 @@ bool ObjectRegistry::Create(
 		return Assign(
 			strName,
 			new StringObject(
-				strName,
+				"",
 				strValue));
 
 	// Integer type on RHS
@@ -65,7 +66,7 @@ bool ObjectRegistry::Create(
 		return Assign(
 			strName,
 			new IntegerObject(
-				strName,
+				"",
 				atoi(strValue.c_str())));
 
 	// Floating point type on RHS
@@ -73,7 +74,7 @@ bool ObjectRegistry::Create(
 		return Assign(
 			strName,
 			new FloatingPointObject(
-				strName,
+				"",
 				atof(strValue.c_str())));
 
 	// Object type on RHS
@@ -139,7 +140,10 @@ bool ObjectRegistry::Assign(
 	const std::string & strName,
 	Object * pObject
 ) {
-	//printf("ASSIGN %s\n", strName.c_str());
+	if (strName == "__TEMPNAME__") {
+		_EXCEPTIONT("Token \"__TEMPNAME__\" is restricted");
+	}
+	printf("ASSIGN %s\n", strName.c_str());
 
 	// Check if this Object already exists
 	ObjectMap::const_iterator iter = m_mapObjects.find(strName);
@@ -154,6 +158,15 @@ bool ObjectRegistry::Assign(
 	// Assign the Object its name
 	if (pObject->m_strName == "") {
 		pObject->m_strName = strName;
+
+	} else if (
+		(pObject->m_strName.length() == 12) &&
+	   	(pObject->m_strName.substr(0,12) == "__TEMPNAME__")
+	) {
+		pObject->m_strName = strName;
+
+	} else {
+		_EXCEPTION1("Invalid name in assignment \"%s\"", pObject->m_strName.c_str());
 	}
 
 	// Add the Object to its parent
@@ -179,15 +192,31 @@ bool ObjectRegistry::Assign(
 		}
 	}
 
-	// Assign the Object into the ObjectRegistry
+	// Insert the Object into the ObjectRegistry
 	m_mapObjects.insert(
 		ObjectMap::value_type(strName, pObject));
+
+	// Insert any children of this object to the ObjectRegistry
+	for (int k = 0; k < pObject->m_vecChildrenUnassigned.size(); k++) {
+		if ((pObject->m_vecChildrenUnassigned[k]->m_strName.length() >= 12) &&
+	   		(pObject->m_vecChildrenUnassigned[k]->m_strName.substr(0,12) == "__TEMPNAME__")
+		) {
+			std::string strNewChildName =
+				strName + pObject->m_vecChildrenUnassigned[k]->m_strName.substr(12, std::string::npos);
+			pObject->m_vecChildrenUnassigned[k]->m_strName = "";
+			Assign(strNewChildName, pObject->m_vecChildrenUnassigned[k]);
+
+		} else {
+			_EXCEPTIONT("Logic error");
+		}
+	}
+	pObject->m_vecChildrenUnassigned.clear();
 
 	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Object
+// ObjectConstructor
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string ObjectConstructor::Call(
@@ -199,7 +228,7 @@ std::string ObjectConstructor::Call(
 	if (ppReturn != NULL) {
 		Object * pobj = new Object("");
 		if (pobj == NULL) {
-			_EXCEPTIONT("Unable to initialize GridObject");
+			_EXCEPTIONT("Unable to initialize Object");
 		}
 
 		// Set the return value
@@ -267,30 +296,88 @@ bool StringObject::ToUnit(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// ListConstructor
+///////////////////////////////////////////////////////////////////////////////
+
+std::string ListObjectSpanConstructor::Call(
+	const ObjectRegistry & objreg,
+	const std::vector<std::string> & vecCommandLine,
+	const std::vector<ObjectType> & vecCommandLineType,
+	Object ** ppReturn
+) {
+	if (ppReturn != NULL) {
+		ListObject * pobj = new ListObject("__TEMPNAME__");
+		if (pobj == NULL) {
+			_EXCEPTIONT("Unable to initialize ListObject");
+		}
+
+		if (vecCommandLine.size() < 2) {
+			return std::string("ERROR: list_span must have at least two arguments");
+		}
+
+		// Loop through all elements of span
+		for (int k = 0; k < vecCommandLine.size()-1; k++) {
+			int nColons = 0;
+			int iLastColon = (-1);
+			std::vector<double> dValue;
+			for (int i = 0; i < vecCommandLine[k].length(); i++) {
+				if (vecCommandLine[k][i] == ':') {
+					nColons++;
+					dValue.push_back(
+						atof(vecCommandLine[k].substr(
+							iLastColon+1, i-iLastColon-1).c_str()));
+					iLastColon = i;
+				}
+			}
+			dValue.push_back(atof(
+				vecCommandLine[k].substr(
+					iLastColon+1, std::string::npos).c_str()));
+
+			if ((nColons != 2) || (dValue.size() != 3)) {
+				return std::string("ERROR: list_span argument must consist of three values, "
+					"separated by colons");
+			}
+			if (dValue[2] == 0.0) {
+				return std::string("ERROR: Infinite number of items in list_span");
+			}
+
+			double dSign = 1.0;
+			if (dValue[2] < 0.0) {
+				dSign = -1.0;
+			}
+
+			std::string strUnits = vecCommandLine[vecCommandLine.size()-1];
+
+			double dTarget = (1.0+dSign*1.0e-12)*dValue[1]*dSign;
+			int ix = pobj->Count();
+			for (double d = dValue[0]; d*dSign <= dTarget; d += dValue[2]) {
+				pobj->PushBack(pobj->ChildName(ix));
+				pobj->AddUnassignedChild(
+					new StringObject(
+						pobj->ChildName(ix),
+						std::to_string(d) + strUnits));
+				ix++;
+			}
+		}
+
+		// Set the return value
+		(*ppReturn) = pobj;
+	}
+
+	return std::string("");
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Utility functions
 ///////////////////////////////////////////////////////////////////////////////
 
-bool StringToValueUnit(
-	const std::string & strString,
-	const std::string & strTargetUnit,
+bool ConvertUnits(
+	double dValue,
+	const std::string & strUnit,
 	double & dValueOut,
+	const std::string & strTargetUnit,
 	bool fIsDelta
 ) {
-
-	// Extract the value and unit
-	double dValue;
-	std::string strUnit;
-
-	bool fParseSuccess =
-		ExtractValueUnit(
-			strString,
-			dValue,
-			strUnit);
-
-	if (!fParseSuccess) {
-		return false;
-	}
-
 	// Unit is equal to TargetUnit
 	if (strUnit == strTargetUnit) {
 		dValueOut = dValue;
@@ -470,6 +557,54 @@ bool StringToValueUnit(
 	}
 
 	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool StringToValueUnit(
+	const std::string & strString,
+	const std::string & strTargetUnit,
+	double & dValueOut,
+	bool fIsDelta
+) {
+
+	// Extract the value and unit
+	double dValue;
+	std::string strUnit;
+
+	bool fParseSuccess =
+		ExtractValueUnit(
+			strString,
+			dValue,
+			strUnit);
+
+	if (!fParseSuccess) {
+		return false;
+	}
+
+	return ConvertUnits(
+		dValue,
+		strUnit,
+		dValueOut,
+		strTargetUnit,
+		fIsDelta);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool AreUnitsCompatible(
+	const std::string & strSourceUnit,
+	const std::string & strTargetUnit
+) {
+	std::string strString = std::string("0") + strSourceUnit;
+
+	double dValue;
+
+	return StringToValueUnit(
+		strString,
+		strTargetUnit,
+		dValue,
+		false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
